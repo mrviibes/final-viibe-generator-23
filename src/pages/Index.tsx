@@ -6260,7 +6260,7 @@ const Index = () => {
                       <tr>
                         <td className="p-3 text-sm">Visual AI Recommendations</td>
                         <td className="p-3 text-sm">
-                          {selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? `Option ${selectedVisualIndex + 1}: ${truncateWords(visualOptions[selectedVisualIndex].subject, 5)}` : "Not selected"}
+                          {selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? `${visualOptions[selectedVisualIndex].subject} - ${visualOptions[selectedVisualIndex].background}` : "Not selected"}
                         </td>
                       </tr>
                       <tr>
