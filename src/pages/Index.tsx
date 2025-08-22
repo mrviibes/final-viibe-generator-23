@@ -5791,7 +5791,7 @@ const Index = () => {
                       </div>}
 
                     {/* Dimensions Selection - Show when AI assist visual is selected */}
-                    {selectedSubjectOption === "ai-assist" && selectedVisualIndex !== null && <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    {selectedSubjectOption === "ai-assist" && selectedVisualIndex !== null && (!selectedDimension || selectedDimension === "custom") && <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <div className="text-center mb-6">
                           <p className="text-xl text-muted-foreground">Choose your dimensions</p>
                         </div>
@@ -5946,7 +5946,7 @@ const Index = () => {
                   </div>)}
 
                 {/* General Dimensions Selection - Show only for non-AI assist options */}
-                {selectedSubjectOption && (selectedSubjectOption === "design-myself" && isSubjectDescriptionConfirmed || selectedSubjectOption === "no-subject" || selectedSubjectOption === "single-person" || selectedSubjectOption === "multiple-people") && <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {selectedSubjectOption && (selectedSubjectOption === "design-myself" && isSubjectDescriptionConfirmed || selectedSubjectOption === "no-subject" || selectedSubjectOption === "single-person" || selectedSubjectOption === "multiple-people") && (!selectedDimension || selectedDimension === "custom") && <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div className="text-center mb-6">
                       <p className="text-xl text-muted-foreground">Choose your dimensions</p>
                     </div>
