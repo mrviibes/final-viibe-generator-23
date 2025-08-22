@@ -216,23 +216,21 @@ export async function generateVisualRecommendations(
   const enrichedInputs = autoEnrichInputs(inputs);
   const { category, subcategory, tone, tags, visualStyle, finalLine, specificEntity, subjectOption, dimensions } = enrichedInputs;
   
-const systemPrompt = `Generate 4 vivid visual concepts for social graphics. Keep prompts concise (60-80 words each).
+const systemPrompt = `Generate 4 visual concepts for graphics. Be concise.
 
-CRITICAL RULES:
-- Return ONLY pure JSON - no code blocks, no prose, no extra text
-- Use double quotes for all keys and strings
-- Each prompt must be 60-80 words maximum for efficiency
+RULES:
+- Return ONLY valid JSON - no markdown, no extra text
+- Each prompt: 40-60 words maximum
 - 4 slots: "background-only", "subject+background", "object", "tone-twist"
 
-IMPORTANT: Your response must be valid JSON that begins with { and ends with }. No markdown formatting.
-
+Format:
 {
   "options": [
     {
       "slot": "background-only",
       "subject": "brief description",
       "background": "brief description", 
-      "prompt": "compact prompt with [TAGS:] [TEXT_SAFE_ZONE:] etc (60-80 words)"
+      "prompt": "concise prompt (40-60 words)"
     }
   ]
 }`;
@@ -247,21 +245,21 @@ function getStyleKeywords(visualStyle?: string): string {
   return styles[visualStyle || '3d-animated'] || 'modern visual style';
 }
 
-  const userPrompt = `Context: ${category} > ${subcategory}, ${tone} tone, ${visualStyle || '3d-animated'} style
-Tags: ${tags.join(', ')}
+  const userPrompt = `${category}>${subcategory}, ${tone}, ${visualStyle || '3d-animated'}
+Tags: ${tags.slice(0, 4).join(', ')}
 ${finalLine ? `Text: "${finalLine}"` : ''}
 
-Generate 4 compact visual concepts. Each prompt: 60-80 words with [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: busy center] [ASPECTS: ${dimensions || 'flexible'}] [TEXT_HINT: dark text]
+4 concepts. Each 40-60 words. Include [TAGS: ${tags.slice(0, 3).join(', ')}] [TEXT_SAFE_ZONE: center 60x35]
 
-Return pure JSON only.`;
+JSON only.`;
 
   try {
     const startTime = Date.now();
     console.log('🚀 Starting visual generation with optimized settings...');
     
-    // Create a timeout promise with increased timeout for better reliability
+    // Create a timeout promise with increased timeout
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('TIMEOUT')), 30000);
+      setTimeout(() => reject(new Error('TIMEOUT')), 45000);
     });
 
     // Primary attempt with optimized settings
@@ -273,16 +271,16 @@ Return pure JSON only.`;
           { role: 'user', content: userPrompt }
         ], {
           temperature: 0.7,
-          max_completion_tokens: 900, // Increased to prevent truncation
-          model: 'gpt-5-mini-2025-08-07'
+          max_tokens: 500,
+          model: 'gpt-4.1-2025-04-14'
         }),
         timeoutPromise
       ]);
     } catch (firstError) {
-      // Automatic retry with larger model and compact prompt on parse failure
-      if (firstError instanceof Error && (firstError.message.includes('JSON') || firstError.message.includes('parse'))) {
-        console.log('🔄 Retrying with larger model due to parse error...');
-        const compactUserPrompt = `${category}>${subcategory}, ${tone}, ${tags.slice(0,3).join(',')}. Generate 4 compact visual JSON concepts. Pure JSON only.`;
+      // Retry with shorter prompt on failure
+      if (firstError instanceof Error && (firstError.message.includes('JSON') || firstError.message.includes('parse') || firstError.message.includes('TIMEOUT'))) {
+        console.log('🔄 Retrying with compact prompt...');
+        const compactUserPrompt = `${category}>${subcategory}, ${tone}. 4 visual JSON concepts.`;
         
         result = await Promise.race([
           openAIService.chatJSON([
@@ -290,8 +288,8 @@ Return pure JSON only.`;
             { role: 'user', content: compactUserPrompt }
           ], {
             temperature: 0.6,
-            max_completion_tokens: 1000,
-            model: 'gpt-5-2025-08-07'
+            max_tokens: 450,
+            model: 'gpt-4.1-2025-04-14'
           }),
           timeoutPromise
         ]);
@@ -328,7 +326,7 @@ Return pure JSON only.`;
 
     return {
       options: validOptions,
-      model: result._apiMeta?.modelUsed || 'gpt-5-mini-2025-08-07'
+      model: result._apiMeta?.modelUsed || 'gpt-4.1-2025-04-14'
     };
   } catch (error) {
     console.error('Error generating visual recommendations:', error);
@@ -339,7 +337,7 @@ Return pure JSON only.`;
     if (error instanceof Error) {
       if (error.message === 'TIMEOUT') {
         errorCode = 'timeout';
-        console.warn('⚠️ Visual generation timed out after 30s');
+        console.warn('⚠️ Visual generation timed out after 45s');
       } else if (error.message.includes('401') || error.message.includes('unauthorized')) {
         errorCode = 'unauthorized';
         console.warn('⚠️ API key issue detected');
