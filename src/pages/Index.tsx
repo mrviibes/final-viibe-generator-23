@@ -4033,7 +4033,8 @@ const Index = () => {
   const [showProxySettingsDialog, setShowProxySettingsDialog] = useState<boolean>(false);
   const [showCorsRetryDialog, setShowCorsRetryDialog] = useState<boolean>(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState<boolean>(false);
-  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
+  const [generatedImages, setGeneratedImages] = useState<string[]>([]);
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
   const [imageGenerationError, setImageGenerationError] = useState<string>("");
   const [directPrompt, setDirectPrompt] = useState<string>("");
   const [showProxySettings, setShowProxySettings] = useState(false);
@@ -4645,7 +4646,8 @@ const Index = () => {
     }
     setIsGeneratingImage(true);
     setImageGenerationError("");
-    setGeneratedImageUrl(null);
+    setGeneratedImages([]);
+    setSelectedImageIndex(0);
     try {
       // Build the handoff data using actual form values
       const finalText = selectedGeneratedOption || stepTwoText || "";
@@ -4714,7 +4716,9 @@ const Index = () => {
         style_type: styleForIdeogram
       });
       if (response.data && response.data.length > 0) {
-        setGeneratedImageUrl(response.data[0].url);
+        const imageUrls = response.data.map(img => img.url);
+        setGeneratedImages(imageUrls);
+        setSelectedImageIndex(0);
         toast({
           title: "Image Generated!",
           description: "Your VIIBE has been successfully created with Ideogram Turbo."
@@ -4751,10 +4755,11 @@ const Index = () => {
     }
   };
   const handleDownloadImage = () => {
-    if (!generatedImageUrl) return;
+    const currentImageUrl = generatedImages[selectedImageIndex];
+    if (!currentImageUrl) return;
     const link = document.createElement('a');
-    link.href = generatedImageUrl;
-    link.download = 'viibe-image.jpg';
+    link.href = currentImageUrl;
+    link.download = `viibe-image-${selectedImageIndex + 1}.jpg`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -5998,7 +6003,7 @@ const Index = () => {
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-medium text-foreground">Preview</h3>
                   <div className="flex items-center gap-2 flex-wrap">
-                    {!isGeneratingImage && !generatedImageUrl && <>
+                    {!isGeneratingImage && generatedImages.length === 0 && <>
                          {/* Spelling Guarantee Toggle */}
                          {(selectedGeneratedOption || stepTwoText) && (selectedGeneratedOption || stepTwoText).trim() && <div className="flex items-center gap-2 bg-muted/30 rounded-lg px-3 py-2">
                              <input type="checkbox" id="spelling-guarantee" checked={spellingGuaranteeMode} onChange={e => setSpellingGuaranteeMode(e.target.checked)} className="rounded" />
@@ -6034,8 +6039,31 @@ const Index = () => {
                   {isGeneratingImage ? <div className="flex flex-col items-center gap-4">
                       <Loader2 className="h-8 w-8 animate-spin text-primary" />
                       <p className="text-muted-foreground text-lg">Generating image with Ideogram Turbo...</p>
-                    </div> : generatedImageUrl ? <div className="max-w-full max-h-full">
-                      <img src={generatedImageUrl} alt="Generated VIIBE" className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
+                    </div> : generatedImages.length > 0 ? <div className="max-w-full max-h-full">
+                      <div className="mb-4">
+                        <img src={generatedImages[selectedImageIndex]} alt={`Generated VIIBE ${selectedImageIndex + 1}`} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
+                      </div>
+                      {generatedImages.length > 1 && <div className="flex flex-col gap-4">
+                        <p className="text-sm text-muted-foreground text-center">Choose your favorite ({selectedImageIndex + 1} of {generatedImages.length})</p>
+                        <div className="grid grid-cols-5 gap-2 max-w-md mx-auto">
+                          {generatedImages.map((imageUrl, index) => (
+                            <button
+                              key={index}
+                              onClick={() => setSelectedImageIndex(index)}
+                              className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
+                                selectedImageIndex === index ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'
+                              }`}
+                            >
+                              <img src={imageUrl} alt={`VIIBE option ${index + 1}`} className="w-full h-full object-cover" />
+                              {selectedImageIndex === index && (
+                                <div className="absolute inset-0 bg-primary/10 flex items-center justify-center">
+                                  <div className="w-4 h-4 rounded-full bg-primary" />
+                                </div>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>}
                     </div> : imageGenerationError ? <div className="flex flex-col items-center gap-4 text-center max-w-md">
                       <AlertCircle className="h-8 w-8 text-destructive" />
                       <div>
@@ -6054,7 +6082,7 @@ const Index = () => {
                 </div>
                 
                  {/* Text Misspelling Detection */}
-                 {generatedImageUrl && textMisspellingDetected && <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 p-4 rounded-lg mb-4 text-center">
+                 {generatedImages.length > 0 && textMisspellingDetected && <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 p-4 rounded-lg mb-4 text-center">
                      <p className="text-sm font-medium mb-2">⚠️ Text may be misspelled in the generated image</p>
                      <div className="flex gap-2 justify-center">
                        <Button variant="outline" size="sm" onClick={() => {
@@ -6071,7 +6099,7 @@ const Index = () => {
 
 
                  {/* Action Buttons */}
-                {generatedImageUrl && !showTextOverlay && <div className="flex flex-wrap gap-4 justify-center">
+                {generatedImages.length > 0 && !showTextOverlay && <div className="flex flex-wrap gap-4 justify-center">
                     <Button variant="outline" className="flex items-center gap-2" onClick={handleDownloadImage}>
                       <Download className="h-4 w-4" />
                       Download Image
@@ -6404,17 +6432,20 @@ const Index = () => {
                   }
                 }
 
-                // Generate the image normally
+                // Generate 5 images with Ideogram Turbo
                 const result = await generateIdeogramImage({
                   prompt: promptText,
                   aspect_ratio: aspectRatioKey,
                   style_type: styleType,
-                  model: model,
-                  magic_prompt_option: 'AUTO'
+                  model: 'V_2A_TURBO', // Use Turbo for speed
+                  magic_prompt_option: 'AUTO',
+                  count: 5
                 });
-                if (result.data?.[0]?.url) {
-                  setGeneratedImageUrl(result.data[0].url);
-                  sonnerToast.success("Your VIIBE has been generated successfully!");
+                if (result.data && result.data.length > 0) {
+                  const imageUrls = result.data.map(img => img.url);
+                  setGeneratedImages(imageUrls);
+                  setSelectedImageIndex(0);
+                  sonnerToast.success(`Generated ${imageUrls.length} VIIBE options! Choose your favorite.`);
                 } else {
                   sonnerToast.error("Failed to generate your VIIBE. Please try again.");
                 }

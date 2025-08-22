@@ -22,6 +22,7 @@ export interface IdeogramGenerateRequest {
   magic_prompt_option: 'AUTO';
   seed?: number;
   style_type?: 'AUTO' | 'GENERAL' | 'REALISTIC' | 'DESIGN' | 'RENDER_3D' | 'ANIME';
+  count?: number;
 }
 
 export interface IdeogramGenerateResponse {

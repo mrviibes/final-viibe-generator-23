@@ -17,6 +17,7 @@ interface IdeogramGenerateRequest {
   magic_prompt_option: 'AUTO';
   seed?: number;
   style_type?: 'AUTO' | 'GENERAL' | 'REALISTIC' | 'DESIGN' | 'RENDER_3D' | 'ANIME';
+  count?: number;
 }
 
 serve(async (req) => {
@@ -43,72 +44,148 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Ideogram API call - Model: ${request.model}, Prompt: ${request.prompt.substring(0, 50)}...`);
+    const count = request.count || 1;
+    console.log(`Ideogram API call - Model: ${request.model}, Count: ${count}, Prompt: ${request.prompt.substring(0, 50)}...`);
 
-    // Build the payload following Ideogram's API structure
-    const payload: any = {
-      prompt: request.prompt,
-      aspect_ratio: request.aspect_ratio,
-      model: request.model,
-      magic_prompt_option: request.magic_prompt_option,
-    };
-    
-    if (request.seed !== undefined) {
-      payload.seed = request.seed;
-    }
-    
-    if (request.style_type) {
-      payload.style_type = request.style_type;
-    }
-
-    const requestBody = JSON.stringify({ image_request: payload });
-
-    const response = await fetch(IDEOGRAM_API_BASE, {
-      method: 'POST',
-      headers: {
-        'Api-Key': ideogramApiKey,
-        'Content-Type': 'application/json',
-      },
-      body: requestBody,
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Ideogram API error (${response.status}):`, errorText);
+    if (count === 1) {
+      // Single image generation (existing logic)
+      const payload: any = {
+        prompt: request.prompt,
+        aspect_ratio: request.aspect_ratio,
+        model: request.model,
+        magic_prompt_option: request.magic_prompt_option,
+      };
       
-      let errorMessage = `HTTP ${response.status}`;
-      try {
-        const errorData = JSON.parse(errorText);
-        errorMessage = errorData.error?.message || errorMessage;
-      } catch {
-        errorMessage = errorText || errorMessage;
+      if (request.seed !== undefined) {
+        payload.seed = request.seed;
+      }
+      
+      if (request.style_type) {
+        payload.style_type = request.style_type;
       }
 
-      // Handle specific error cases
-      if (response.status === 400 && errorText.includes('content_filtering')) {
-        errorMessage = 'Content was filtered by Ideogram. Try rephrasing your prompt.';
-      } else if (response.status === 429) {
-        errorMessage = 'Rate limit exceeded. Please try again later.';
-      } else if (response.status === 401) {
-        errorMessage = 'Invalid API key. Please check your Ideogram API key.';
+      const requestBody = JSON.stringify({ image_request: payload });
+
+      const response = await fetch(IDEOGRAM_API_BASE, {
+        method: 'POST',
+        headers: {
+          'Api-Key': ideogramApiKey,
+          'Content-Type': 'application/json',
+        },
+        body: requestBody,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Ideogram API error (${response.status}):`, errorText);
+        
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error?.message || errorMessage;
+        } catch {
+          errorMessage = errorText || errorMessage;
+        }
+
+        // Handle specific error cases
+        if (response.status === 400 && errorText.includes('content_filtering')) {
+          errorMessage = 'Content was filtered by Ideogram. Try rephrasing your prompt.';
+        } else if (response.status === 429) {
+          errorMessage = 'Rate limit exceeded. Please try again later.';
+        } else if (response.status === 401) {
+          errorMessage = 'Invalid API key. Please check your Ideogram API key.';
+        }
+
+        return new Response(JSON.stringify({ 
+          error: errorMessage,
+          status: response.status 
+        }), {
+          status: response.status,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
 
-      return new Response(JSON.stringify({ 
-        error: errorMessage,
-        status: response.status 
+      const data = await response.json();
+      console.log(`Ideogram API success - Generated ${data.data?.length || 0} image(s)`);
+      
+      return new Response(JSON.stringify(data), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    } else {
+      // Multiple image generation
+      const promises: Promise<any>[] = [];
+      
+      for (let i = 0; i < count; i++) {
+        const payload: any = {
+          prompt: request.prompt,
+          aspect_ratio: request.aspect_ratio,
+          model: request.model,
+          magic_prompt_option: request.magic_prompt_option,
+        };
+        
+        if (request.seed !== undefined) {
+          payload.seed = request.seed + i; // Vary seed for different results
+        }
+        
+        if (request.style_type) {
+          payload.style_type = request.style_type;
+        }
+
+        const requestBody = JSON.stringify({ image_request: payload });
+
+        promises.push(
+          fetch(IDEOGRAM_API_BASE, {
+            method: 'POST',
+            headers: {
+              'Api-Key': ideogramApiKey,
+              'Content-Type': 'application/json',
+            },
+            body: requestBody,
+          }).then(async (response) => {
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error(`Ideogram API error for image ${i + 1} (${response.status}):`, errorText);
+              return null; // Return null for failed images
+            }
+            return response.json();
+          }).catch((error) => {
+            console.error(`Network error for image ${i + 1}:`, error);
+            return null;
+          })
+        );
+      }
+
+      const results = await Promise.all(promises);
+      const successfulResults = results.filter(result => result !== null);
+      
+      if (successfulResults.length === 0) {
+        return new Response(JSON.stringify({ 
+          error: 'All image generation attempts failed',
+          status: 500 
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Combine all successful results
+      const combinedData: any[] = [];
+      successfulResults.forEach(result => {
+        if (result.data && Array.isArray(result.data)) {
+          combinedData.push(...result.data);
+        }
+      });
+
+      console.log(`Ideogram API batch success - Generated ${combinedData.length}/${count} images`);
+      
+      return new Response(JSON.stringify({
+        created: successfulResults[0]?.created || new Date().toISOString(),
+        data: combinedData
       }), {
-        status: response.status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const data = await response.json();
-    
-    console.log(`Ideogram API success - Generated ${data.data?.length || 0} image(s)`);
-
-    return new Response(JSON.stringify(data), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
 
   } catch (error) {
     console.error('Error in ideogram-generate function:', error);
