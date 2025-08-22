@@ -4713,7 +4713,8 @@ const Index = () => {
         aspect_ratio: aspectForIdeogram,
         model: 'V_2A_TURBO',
         magic_prompt_option: 'AUTO',
-        style_type: styleForIdeogram
+        style_type: styleForIdeogram,
+        count: 5
       });
       if (response.data && response.data.length > 0) {
         const imageUrls = response.data.map(img => img.url);
@@ -6433,6 +6434,7 @@ const Index = () => {
                 }
 
                 // Generate 5 images with Ideogram Turbo
+                console.log('Starting auto-generation of 5 images with V_2A_TURBO...');
                 const result = await generateIdeogramImage({
                   prompt: promptText,
                   aspect_ratio: aspectRatioKey,
@@ -6447,7 +6449,24 @@ const Index = () => {
                   setSelectedImageIndex(0);
                   sonnerToast.success(`Generated ${imageUrls.length} VIIBE options! Choose your favorite.`);
                 } else {
-                  sonnerToast.error("Failed to generate your VIIBE. Please try again.");
+                  // Retry with fewer images if initial attempt failed
+                  console.log('Initial generation failed, retrying with 3 images...');
+                  const retryResult = await generateIdeogramImage({
+                    prompt: promptText,
+                    aspect_ratio: aspectRatioKey,
+                    style_type: styleType,
+                    model: 'V_2A_TURBO',
+                    magic_prompt_option: 'AUTO',
+                    count: 3
+                  });
+                  if (retryResult.data && retryResult.data.length > 0) {
+                    const imageUrls = retryResult.data.map(img => img.url);
+                    setGeneratedImages(imageUrls);
+                    setSelectedImageIndex(0);
+                    sonnerToast.success(`Generated ${imageUrls.length} VIIBE options! Choose your favorite.`);
+                  } else {
+                    sonnerToast.error("Failed to generate your VIIBE. Please try the manual generation button.");
+                  }
                 }
               } catch (error) {
                 console.error("Error generating image:", error);

@@ -168,6 +168,11 @@ export async function generateIdeogramImage(request: IdeogramGenerateRequest): P
     } catch (error) {
       console.error('Backend Ideogram API call failed:', error);
       
+      // For multiple images, only use backend
+      if (request.count && request.count > 1) {
+        throw new IdeogramAPIError('Multiple image generation requires backend API. Please try again.');
+      }
+      
       // Fallback to frontend if backend fails and we have a key
       const key = getIdeogramApiKey();
       if (key) {
