@@ -4054,39 +4054,12 @@ const Index = () => {
   const [selectedRecommendation, setSelectedRecommendation] = useState<number | null>(null);
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
 
-  // Generate visual recommendations when reaching step 4
+  // Auto-generate 5 images when Step 4 loads
   useEffect(() => {
-    const generateRecommendations = async () => {
-      if (currentStep === 4 && !visualRecommendations && !isLoadingRecommendations) {
-        setIsLoadingRecommendations(true);
-        try {
-          const recommendations = await generateVisualRecommendations({
-            category: selectedStyle || 'general',
-            subcategory: selectedSubOption || '',
-            tone: selectedTextStyle || 'humorous',
-            tags: tags,
-            visualStyle: selectedVisualStyle || undefined,
-            finalLine: selectedGeneratedOption || undefined,
-            subjectOption: selectedSubjectOption || undefined,
-            dimensions: selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || undefined
-          });
-          setVisualRecommendations(recommendations);
-        } catch (error) {
-          console.error('Failed to generate visual recommendations:', error);
-          const {
-            toast
-          } = useToast();
-          toast({
-            title: "Error",
-            description: "Failed to generate visual recommendations",
-            variant: "destructive"
-          });
-        }
-        setIsLoadingRecommendations(false);
-      }
-    };
-    generateRecommendations();
-  }, [currentStep, visualRecommendations, isLoadingRecommendations, selectedStyle, selectedSubOption, selectedTextStyle, tags, selectedVisualStyle, selectedGeneratedOption]);
+    if (currentStep === 4 && !isGeneratingImage && generatedImages.length === 0 && !imageGenerationError) {
+      handleGenerateImage(5); // Generate 5 images automatically
+    }
+  }, [currentStep]);
 
   // Visual AI recommendations state
   const [isTestingProxy, setIsTestingProxy] = useState(false);
@@ -4636,7 +4609,7 @@ const Index = () => {
       description: "Your Ideogram API key has been saved securely."
     });
   };
-  const handleGenerateImage = async () => {
+  const handleGenerateImage = async (numImages = 1) => {
     if (!hasIdeogramApiKey()) {
       // Only show dialog if not using backend API
       if (!ideogramIsUsingBackend()) {
@@ -4708,20 +4681,31 @@ const Index = () => {
         magic_prompt_option: 'AUTO',
         style_type: styleForIdeogram
       });
-      const response = await generateIdeogramImage({
-        prompt,
-        aspect_ratio: aspectForIdeogram,
-        model: 'V_2A_TURBO',
-        magic_prompt_option: 'AUTO',
-        style_type: styleForIdeogram
-      });
-      if (response.data && response.data.length > 0) {
-        const imageUrls = response.data.map(img => img.url);
-        setGeneratedImages(imageUrls);
+      // Generate multiple images
+      const imagePromises = Array(numImages).fill(null).map(() => 
+        generateIdeogramImage({
+          prompt,
+          aspect_ratio: aspectForIdeogram,
+          model: 'V_2A_TURBO',
+          magic_prompt_option: 'AUTO',
+          style_type: styleForIdeogram
+        })
+      );
+      
+      const responses = await Promise.all(imagePromises);
+      // Collect all image URLs from all responses
+      const allImageUrls = responses.flatMap(response => 
+        response.data && response.data.length > 0 
+          ? response.data.map(img => img.url)
+          : []
+      );
+      
+      if (allImageUrls.length > 0) {
+        setGeneratedImages(allImageUrls);
         setSelectedImageIndex(0);
         toast({
-          title: "Image Generated!",
-          description: "Your VIIBE has been successfully created with Ideogram Turbo."
+          title: "Images Generated!",
+          description: `Your ${allImageUrls.length} VIIBE${allImageUrls.length > 1 ? 's have' : ' has'} been successfully created with Ideogram Turbo.`
         });
       } else {
         throw new Error("No image data received from Ideogram API");
@@ -5595,11 +5579,6 @@ const Index = () => {
                       {generatedOptions.slice(0, 4).map((option, index) => <Card key={index} className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-1 p-4 hover:bg-accent/50" onClick={() => {
                 setSelectedGeneratedOption(option);
                 setSelectedGeneratedIndex(index);
-                // Auto-enable spelling guarantee and clean background when text is selected
-                if (option && option.trim()) {
-                  setSpellingGuaranteeMode(true);
-                  setCleanBackgroundMode(true);
-                }
               }}>
                           <div className="space-y-3">
                             <div className="flex items-center justify-between">
@@ -6002,37 +5981,6 @@ const Index = () => {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-medium text-foreground">Preview</h3>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {!isGeneratingImage && generatedImages.length === 0 && <>
-                         {/* Spelling Guarantee Toggle */}
-                         {(selectedGeneratedOption || stepTwoText) && (selectedGeneratedOption || stepTwoText).trim() && <div className="flex items-center gap-2 bg-muted/30 rounded-lg px-3 py-2">
-                             <input type="checkbox" id="spelling-guarantee" checked={spellingGuaranteeMode} onChange={e => setSpellingGuaranteeMode(e.target.checked)} className="rounded" />
-                             <label htmlFor="spelling-guarantee" className="text-sm font-medium cursor-pointer">
-                               Spelling Guarantee
-                             </label>
-                           </div>}
-                         
-                         {/* Clean Background Toggle */}
-                         <div className="flex items-center gap-2 bg-muted/30 rounded-lg px-3 py-2">
-                           <input type="checkbox" id="clean-background" checked={cleanBackgroundMode} onChange={e => setCleanBackgroundMode(e.target.checked)} className="rounded" />
-                           <label htmlFor="clean-background" className="text-sm font-medium cursor-pointer">
-                             Clean Background (recommended)
-                           </label>
-                         </div>
-                        
-                        <Button onClick={() => setShowProxySettingsDialog(true)} variant="outline" size="sm" className="flex items-center gap-2">
-                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          Proxy Settings
-                        </Button>
-                        <Button onClick={handleGenerateImage} variant="brand" className="flex items-center gap-2">
-                          <Download className="h-4 w-4" />
-                          Generate with Ideogram
-                        </Button>
-                      </>}
-                  </div>
                 </div>
                 
                 <div className="bg-muted/50 rounded-lg p-8 flex items-center justify-center min-h-[300px] border-2 border-dashed border-muted-foreground/20">
@@ -6071,26 +6019,23 @@ const Index = () => {
                         <p className="text-muted-foreground text-sm mt-1">{imageGenerationError}</p>
                       </div>
                       <div className="flex gap-2">
-                        <Button onClick={handleGenerateImage} variant="outline" size="sm">
+                        <Button onClick={() => handleGenerateImage(5)} variant="outline" size="sm">
                           Try Again
                         </Button>
                         {imageGenerationError.includes('CORS proxy needs activation') && <Button variant="brand" size="sm" onClick={() => setShowCorsRetryDialog(true)}>
                             Enable CORS Proxy
                           </Button>}
                       </div>
-                    </div> : <p className="text-muted-foreground text-lg">Click "Generate with Ideogram" to create your image</p>}
+                    </div> : <p className="text-muted-foreground text-lg">Preparing your VIIBE...</p>}
                 </div>
                 
                  {/* Text Misspelling Detection */}
                  {generatedImages.length > 0 && textMisspellingDetected && <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 p-4 rounded-lg mb-4 text-center">
                      <p className="text-sm font-medium mb-2">⚠️ Text may be misspelled in the generated image</p>
                      <div className="flex gap-2 justify-center">
-                       <Button variant="outline" size="sm" onClick={() => {
-                  setSpellingGuaranteeMode(true);
-                  handleGenerateImage();
-                }}>
-                         Regenerate (Strict Text Mode)
-                       </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleGenerateImage(5)}>
+                          Regenerate
+                        </Button>
                        <Button variant="outline" size="sm" onClick={() => setSpellingGuaranteeMode(true)}>
                          Use Spelling Guarantee
                        </Button>
@@ -6104,7 +6049,7 @@ const Index = () => {
                       <Download className="h-4 w-4" />
                       Download Image
                     </Button>
-                    <Button variant="brand" className="flex items-center gap-2" onClick={handleGenerateImage} disabled={isGeneratingImage}>
+                    <Button variant="brand" className="flex items-center gap-2" onClick={() => handleGenerateImage(5)} disabled={isGeneratingImage}>
                       {isGeneratingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>}
