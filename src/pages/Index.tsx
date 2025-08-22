@@ -18,7 +18,7 @@ import { useNavigate } from "react-router-dom";
 import { generateCandidates, VibeResult } from "@/lib/vibeModel";
 import { buildIdeogramHandoff } from "@/lib/ideogram";
 import { generateVisualRecommendations, VisualOption } from "@/lib/visualModel";
-import { generateIdeogramImage, setIdeogramApiKey, getIdeogramApiKey, IdeogramAPIError, getProxySettings, setProxySettings, testProxyConnection, ProxySettings } from "@/lib/ideogramApi";
+import { generateIdeogramImage, setIdeogramApiKey, getIdeogramApiKey, hasIdeogramApiKey, isUsingBackend as ideogramIsUsingBackend, IdeogramAPIError, getProxySettings, setProxySettings, testProxyConnection, ProxySettings } from "@/lib/ideogramApi";
 import { buildIdeogramPrompt, getAspectRatioForIdeogram, getStyleTypeForIdeogram } from "@/lib/ideogramPrompt";
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
@@ -4382,8 +4382,11 @@ const Index = () => {
   // Generate subject using AI
   const handleGenerateSubject = async () => {
     if (!openAIService.hasApiKey()) {
-      setShowApiKeyDialog(true);
-      return;
+      // Only show dialog if not using backend API
+      if (!openAIService.isUsingBackend()) {
+        setShowApiKeyDialog(true);
+        return;
+      }
     }
 
     // Auto-commit pending tag input before generating
@@ -4495,8 +4498,11 @@ const Index = () => {
   // Generate text using Vibe Model
   const handleGenerateText = async () => {
     if (!openAIService.hasApiKey()) {
-      setShowApiKeyDialog(true);
-      return;
+      // Only show dialog if not using backend API
+      if (!openAIService.isUsingBackend()) {
+        setShowApiKeyDialog(true);
+        return;
+      }
     }
     setIsGenerating(true);
     try {
@@ -4630,10 +4636,12 @@ const Index = () => {
     });
   };
   const handleGenerateImage = async () => {
-    const apiKey = getIdeogramApiKey();
-    if (!apiKey) {
-      setShowIdeogramKeyDialog(true);
-      return;
+    if (!hasIdeogramApiKey()) {
+      // Only show dialog if not using backend API
+      if (!ideogramIsUsingBackend()) {
+        setShowIdeogramKeyDialog(true);
+        return;
+      }
     }
     setIsGeneratingImage(true);
     setImageGenerationError("");
@@ -4758,8 +4766,11 @@ const Index = () => {
   const handleSearch = async (searchTerm: string) => {
     if (!searchTerm.trim() || !selectedSubOption) return;
     if (!openAIService.hasApiKey()) {
-      setShowApiKeyDialog(true);
-      return;
+      // Only show dialog if not using backend API
+      if (!openAIService.isUsingBackend()) {
+        setShowApiKeyDialog(true);
+        return;
+      }
     }
     setIsSearching(true);
     setSearchError("");

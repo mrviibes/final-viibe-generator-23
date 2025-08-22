@@ -1,3 +1,5 @@
+import { supabase } from "@/integrations/supabase/client";
+
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
 export interface OpenAISearchResult {
@@ -29,18 +31,21 @@ function safeParseArray(content: string): OpenAISearchResult[] {
 
 export class OpenAIService {
   private apiKey: string | null = null;
+  private useBackendAPI: boolean = true; // Use Supabase backend by default
 
   constructor() {
+    // Still support localStorage for fallback, but prefer backend
     this.apiKey = localStorage.getItem('openai_api_key');
   }
 
   setApiKey(key: string) {
     this.apiKey = key;
     localStorage.setItem('openai_api_key', key);
+    this.useBackendAPI = false; // Switch to frontend mode when key is set
   }
 
   hasApiKey(): boolean {
-    return !!this.apiKey;
+    return this.useBackendAPI || !!this.apiKey;
   }
 
   getApiKey(): string | null {
@@ -50,6 +55,114 @@ export class OpenAIService {
   clearApiKey() {
     this.apiKey = null;
     localStorage.removeItem('openai_api_key');
+    this.useBackendAPI = true; // Go back to backend mode
+  }
+
+  isUsingBackend(): boolean {
+    return this.useBackendAPI;
+  }
+
+  private async callBackendAPI(messages: Array<{role: string; content: string}>, options: {
+    temperature?: number;
+    max_tokens?: number;
+    max_completion_tokens?: number;
+    model?: string;
+  }): Promise<any> {
+    const {
+      temperature = 0.8,
+      max_tokens = 2500,
+      max_completion_tokens,
+      model = 'gpt-5-mini-2025-08-07'
+    } = options;
+
+    console.log(`Calling OpenAI backend API - Model: ${model}, Messages: ${messages.length}`);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('openai-chat', {
+        body: {
+          messages,
+          options: {
+            temperature,
+            max_tokens,
+            max_completion_tokens,
+            model,
+            response_format: { type: "json_object" } // Always use JSON format
+          }
+        }
+      });
+
+      if (error) {
+        console.error('Backend API error:', error);
+        throw new Error(`Backend API error: ${error.message}`);
+      }
+
+      if (!data) {
+        throw new Error('No data received from backend API');
+      }
+
+      const content = data.choices?.[0]?.message?.content;
+      const finishReason = data.choices?.[0]?.finish_reason;
+      
+      console.log(`Backend API Response - Model: ${model}, Finish Reason: ${finishReason}, Content Length: ${content?.length || 0}`);
+      
+      if (!content || content.trim() === '') {
+        if (finishReason === 'length') {
+          throw new Error('Response truncated - prompt too long. Try shorter input.');
+        }
+        throw new Error(`No content received from backend API (finish_reason: ${finishReason})`);
+      }
+
+      // Parse JSON response
+      try {
+        const parsed = JSON.parse(content);
+        console.log('Successfully parsed backend JSON response');
+        return parsed;
+      } catch (parseError) {
+        console.error('JSON parse error from backend:', parseError);
+        console.error('Raw content that failed to parse:', content);
+        
+        // Clean content by removing common wrapping patterns
+        let cleanedContent = content
+          .replace(/```json\s*|\s*```/g, '') // Remove code fences
+          .replace(/^[^{]*/, '') // Remove text before first {
+          .replace(/[^}]*$/, '') // Remove text after last }
+          .trim();
+        
+        try {
+          const parsed = JSON.parse(cleanedContent);
+          console.log('Successfully parsed cleaned backend JSON:', parsed);
+          return parsed;
+        } catch (cleanError) {
+          // Final attempt: extract largest JSON block
+          const jsonMatch = content.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            try {
+              const extracted = JSON.parse(jsonMatch[0]);
+              console.log('Successfully extracted JSON from backend response:', extracted);
+              return extracted;
+            } catch (e) {
+              console.error('Failed to parse extracted JSON:', e);
+            }
+          }
+        }
+        
+        throw new Error(`Invalid JSON response from backend API (model: ${model})`);
+      }
+
+    } catch (error) {
+      console.error('Backend API call failed:', error);
+      
+      // Fallback to frontend if backend fails
+      if (this.apiKey) {
+        console.log('Falling back to frontend API...');
+        this.useBackendAPI = false;
+        const result = await this.chatJSON(messages, options);
+        this.useBackendAPI = true; // Reset for next call
+        return result;
+      }
+      
+      throw error;
+    }
   }
 
   async chatJSON(messages: Array<{role: string; content: string}>, options: {
@@ -58,6 +171,11 @@ export class OpenAIService {
     max_completion_tokens?: number;
     model?: string;
   } = {}): Promise<any> {
+    // Use backend API if available, fallback to frontend
+    if (this.useBackendAPI) {
+      return this.callBackendAPI(messages, options);
+    }
+    
     if (!this.apiKey) {
       throw new Error('OpenAI API key not set');
     }

@@ -1,3 +1,5 @@
+import { supabase } from "@/integrations/supabase/client";
+
 const IDEOGRAM_API_BASE = 'https://api.ideogram.ai/generate';
 
 export interface ProxySettings {
@@ -41,10 +43,12 @@ export class IdeogramAPIError extends Error {
 
 let apiKey: string | null = null;
 let proxySettings: ProxySettings = { type: 'direct' };
+let useBackendAPI: boolean = true; // Use Supabase backend by default
 
 export function setIdeogramApiKey(key: string) {
   apiKey = key;
   localStorage.setItem('ideogram_api_key', key);
+  useBackendAPI = false; // Switch to frontend mode when key is set
 }
 
 export function getIdeogramApiKey(): string | null {
@@ -62,6 +66,15 @@ export function getIdeogramApiKey(): string | null {
 export function clearIdeogramApiKey() {
   apiKey = null;
   localStorage.removeItem('ideogram_api_key');
+  useBackendAPI = true; // Go back to backend mode
+}
+
+export function hasIdeogramApiKey(): boolean {
+  return useBackendAPI || !!getIdeogramApiKey();
+}
+
+export function isUsingBackend(): boolean {
+  return useBackendAPI;
 }
 
 export function setProxySettings(settings: ProxySettings) {
@@ -130,6 +143,51 @@ export async function findBestProxy(): Promise<ProxySettings['type']> {
 }
 
 export async function generateIdeogramImage(request: IdeogramGenerateRequest): Promise<IdeogramGenerateResponse> {
+  // Try backend API first if enabled
+  if (useBackendAPI) {
+    console.log(`Calling Ideogram backend API - Model: ${request.model}, Prompt: ${request.prompt.substring(0, 50)}...`);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('ideogram-generate', {
+        body: request
+      });
+
+      if (error) {
+        console.error('Backend Ideogram API error:', error);
+        throw new IdeogramAPIError(`Backend API error: ${error.message}`);
+      }
+
+      if (!data) {
+        throw new IdeogramAPIError('No data received from backend API');
+      }
+
+      console.log(`Backend Ideogram API success - Generated ${data.data?.length || 0} image(s)`);
+      return data as IdeogramGenerateResponse;
+
+    } catch (error) {
+      console.error('Backend Ideogram API call failed:', error);
+      
+      // Fallback to frontend if backend fails and we have a key
+      const key = getIdeogramApiKey();
+      if (key) {
+        console.log('Falling back to frontend Ideogram API...');
+        useBackendAPI = false;
+        const result = await generateIdeogramImageFrontend(request);
+        useBackendAPI = true; // Reset for next call
+        return result;
+      }
+      
+      throw error instanceof IdeogramAPIError ? error : new IdeogramAPIError(
+        error instanceof Error ? error.message : 'Backend API call failed'
+      );
+    }
+  }
+
+  // Frontend mode
+  return generateIdeogramImageFrontend(request);
+}
+
+async function generateIdeogramImageFrontend(request: IdeogramGenerateRequest): Promise<IdeogramGenerateResponse> {
   const key = getIdeogramApiKey();
   if (!key) {
     throw new IdeogramAPIError('No API key provided');
