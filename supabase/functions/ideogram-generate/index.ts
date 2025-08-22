@@ -112,11 +112,9 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     } else {
-      // Multiple image generation with sequential retry logic
-      const results: any[] = [];
-      let successCount = 0;
+      // Multiple image generation
+      const promises: Promise<any>[] = [];
       
-      // Generate images sequentially with retry for better reliability
       for (let i = 0; i < count; i++) {
         const payload: any = {
           prompt: request.prompt,
@@ -135,61 +133,32 @@ serve(async (req) => {
 
         const requestBody = JSON.stringify({ image_request: payload });
 
-        // Retry logic for each individual image
-        let retryCount = 0;
-        const maxRetries = 2;
-        let imageSuccess = false;
-
-        while (retryCount <= maxRetries && !imageSuccess) {
-          try {
-            if (retryCount > 0) {
-              // Add delay between retries
-              await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
-              console.log(`Retrying image ${i + 1}, attempt ${retryCount + 1}/${maxRetries + 1}`);
-            }
-
-            const response = await fetch(IDEOGRAM_API_BASE, {
-              method: 'POST',
-              headers: {
-                'Api-Key': ideogramApiKey,
-                'Content-Type': 'application/json',
-              },
-              body: requestBody,
-            });
-
+        promises.push(
+          fetch(IDEOGRAM_API_BASE, {
+            method: 'POST',
+            headers: {
+              'Api-Key': ideogramApiKey,
+              'Content-Type': 'application/json',
+            },
+            body: requestBody,
+          }).then(async (response) => {
             if (!response.ok) {
               const errorText = await response.text();
-              console.error(`Ideogram API error for image ${i + 1}, attempt ${retryCount + 1} (${response.status}):`, errorText);
-              
-              // Don't retry on certain errors
-              if (response.status === 401 || response.status === 403) {
-                break;
-              }
-              
-              retryCount++;
-              continue;
+              console.error(`Ideogram API error for image ${i + 1} (${response.status}):`, errorText);
+              return null; // Return null for failed images
             }
-
-            const result = await response.json();
-            if (result.data && Array.isArray(result.data)) {
-              results.push(...result.data);
-              successCount++;
-              imageSuccess = true;
-              console.log(`Successfully generated image ${i + 1}/${count}`);
-            }
-          } catch (error) {
-            console.error(`Network error for image ${i + 1}, attempt ${retryCount + 1}:`, error);
-            retryCount++;
-          }
-        }
-
-        // Add small delay between requests to avoid rate limiting
-        if (i < count - 1) {
-          await new Promise(resolve => setTimeout(resolve, 200));
-        }
+            return response.json();
+          }).catch((error) => {
+            console.error(`Network error for image ${i + 1}:`, error);
+            return null;
+          })
+        );
       }
+
+      const results = await Promise.all(promises);
+      const successfulResults = results.filter(result => result !== null);
       
-      if (results.length === 0) {
+      if (successfulResults.length === 0) {
         return new Response(JSON.stringify({ 
           error: 'All image generation attempts failed',
           status: 500 
@@ -199,11 +168,19 @@ serve(async (req) => {
         });
       }
 
-      console.log(`Ideogram API batch success - Generated ${results.length}/${count} images (${successCount} successful requests)`);
+      // Combine all successful results
+      const combinedData: any[] = [];
+      successfulResults.forEach(result => {
+        if (result.data && Array.isArray(result.data)) {
+          combinedData.push(...result.data);
+        }
+      });
+
+      console.log(`Ideogram API batch success - Generated ${combinedData.length}/${count} images`);
       
       return new Response(JSON.stringify({
-        created: new Date().toISOString(),
-        data: results
+        created: successfulResults[0]?.created || new Date().toISOString(),
+        data: combinedData
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
