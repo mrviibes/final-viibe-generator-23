@@ -22,6 +22,21 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     // For images without text, focus on visual elements only
     parts.push("Create a visual composition without any text or typography overlays.");
   }
+
+  // Extract and handle subject from various sources
+  let subject = handoff.rec_subject;
+  if (!subject && handoff.chosen_visual) {
+    // Try to split "subject - background" format
+    const parts_visual = handoff.chosen_visual.split(' - ');
+    if (parts_visual.length >= 2) {
+      subject = parts_visual[0].trim();
+    }
+  }
+
+  // Include subject in the scene description if available
+  if (subject && subject.trim()) {
+    parts.push(`The main subject should feature ${subject}.`);
+  }
   
   // This content is for [CATEGORY], specifically [SUBCATEGORY][ (SECOND SUBCATEGORY if Pop Culture) ].
   let contentLine = `This content is for ${handoff.category}, specifically ${handoff.subcategory_primary}`;
@@ -51,7 +66,15 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   }
   
   // Background should be [AI GENERATED BACKGROUND].
-  let background = handoff.rec_background || handoff.chosen_visual || "a clean, contextually appropriate background";
+  let background = handoff.rec_background;
+  if (!background && handoff.chosen_visual) {
+    // Try to extract background from "subject - background" format
+    const parts_visual = handoff.chosen_visual.split(' - ');
+    background = parts_visual.length >= 2 ? parts_visual[1].trim() : handoff.chosen_visual;
+  }
+  if (!background) {
+    background = "a clean, contextually appropriate background";
+  }
   if (cleanBackground) {
     background = "a clean, minimal, high-contrast background with no visual clutter, no decorative elements, no patterns, and a clear center area";
   }

@@ -4657,6 +4657,20 @@ const Index = () => {
       const visualTagsStr = subjectTags.join(', ') || "None";
       const chosenVisual = selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].prompt : selectedSubjectOption === "design-myself" && subjectDescription ? subjectDescription : "";
       const subcategorySecondary = selectedStyle === 'pop-culture' && selectedPick ? selectedPick : undefined;
+      // Get selected visual recommendation details
+      let recSubject = undefined;
+      let recBackground = undefined;
+      if (selectedRecommendation !== null && visualRecommendations) {
+        const selectedRec = visualRecommendations.options[selectedRecommendation];
+        recSubject = selectedRec.subject;
+        recBackground = selectedRec.background;
+      } else if (visualRecommendations && visualRecommendations.options.length > 0) {
+        // Default to first option if nothing selected
+        const firstRec = visualRecommendations.options[0];
+        recSubject = firstRec.subject;
+        recBackground = firstRec.background;
+      }
+
       const ideogramPayload = buildIdeogramHandoff({
         visual_style: visualStyle,
         subcategory: subcategory,
@@ -4670,7 +4684,9 @@ const Index = () => {
         text_tags_csv: textTagsStr,
         visual_tags_csv: visualTagsStr,
         ai_text_assist_used: selectedCompletionOption === "ai-assist",
-        ai_visual_assist_used: selectedSubjectOption === "ai-assist"
+        ai_visual_assist_used: selectedSubjectOption === "ai-assist",
+        rec_subject: recSubject,
+        rec_background: recBackground
       });
 
       // Use direct prompt if provided, otherwise use selected recommendation prompt, otherwise build from structured inputs
