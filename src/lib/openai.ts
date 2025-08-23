@@ -344,11 +344,26 @@ Return as a JSON object with this exact format:
       const result = await this.chatJSON([
         { role: 'user', content: prompt }
       ], {
-        max_completion_tokens: 400, // Reduced to prevent reasoning overruns
-        model: 'gpt-5-mini-2025-08-07'
+        max_completion_tokens: 500,
+        model: 'gpt-4.1-2025-04-14' // More reliable model
       });
 
-      return result?.suggestions || [];
+      // Post-process to ensure we have exactly 5 valid items
+      const suggestions = result?.suggestions || [];
+      const validSuggestions = suggestions.filter((item: any) => 
+        item && typeof item.title === 'string' && typeof item.description === 'string' &&
+        item.title.trim() && item.description.trim()
+      );
+
+      // If we don't have enough valid suggestions, pad with generic ones
+      while (validSuggestions.length < 5) {
+        validSuggestions.push({
+          title: `${category} suggestion ${validSuggestions.length + 1}`,
+          description: `Popular ${category.toLowerCase()} related to ${searchTerm}`
+        });
+      }
+
+      return validSuggestions.slice(0, 5);
     } catch (error) {
       console.error('Pop culture search failed:', error);
       

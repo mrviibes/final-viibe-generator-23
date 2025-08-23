@@ -4027,6 +4027,13 @@ const Index = () => {
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [searchResults, setSearchResults] = useState<OpenAISearchResult[]>([]);
   const [searchError, setSearchError] = useState<string>("");
+  
+  // Independent state for pop culture search
+  const [popSearchTerm, setPopSearchTerm] = useState<string>("");
+  const [popSearchResults, setPopSearchResults] = useState<OpenAISearchResult[]>([]);
+  const [isPopSearching, setIsPopSearching] = useState<boolean>(false);
+  const [popSearchError, setPopSearchError] = useState<string>("");
+  const popSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [stepTwoText, setStepTwoText] = useState<string>("");
   const [isCustomTextConfirmed, setIsCustomTextConfirmed] = useState<boolean>(false);
   const [showIdeogramKeyDialog, setShowIdeogramKeyDialog] = useState<boolean>(false);
@@ -4777,6 +4784,67 @@ const Index = () => {
       setIsSearching(false);
     }
   };
+  
+  // Independent pop culture search handler
+  const handlePopSearch = async (searchTerm: string) => {
+    if (!searchTerm.trim() || !selectedSubOption) return;
+    if (!openAIService.hasApiKey()) {
+      if (!openAIService.isUsingBackend()) {
+        setShowApiKeyDialog(true);
+        return;
+      }
+    }
+    setIsPopSearching(true);
+    setPopSearchError("");
+    setPopSearchResults([]);
+    try {
+      const results = await openAIService.searchPopCulture(selectedSubOption, searchTerm);
+      setPopSearchResults(results);
+    } catch (error) {
+      console.error('Pop culture search error:', error);
+      setPopSearchError(error instanceof Error ? error.message : 'Search failed');
+      if (error instanceof Error && error.message.includes('API key')) {
+        setShowApiKeyDialog(true);
+      }
+    } finally {
+      setIsPopSearching(false);
+    }
+  };
+
+  const handlePopSearchInputChange = (value: string) => {
+    setPopSearchTerm(value);
+    setPopSearchResults([]);
+    setPopSearchError("");
+
+    // Clear results if search is empty
+    if (!value.trim()) {
+      return;
+    }
+
+    // If searching fictional characters, also search the local list
+    if (selectedSubOption === "Fictional Characters" && value.trim()) {
+      const filteredCharacters = fictionalCharactersList.filter(character => 
+        character.toLowerCase().includes(value.toLowerCase())
+      ).slice(0, 8).map(character => ({
+        title: character,
+        description: `Fictional character from popular culture`
+      }));
+      setPopSearchResults(filteredCharacters);
+    }
+
+    // Clear previous timeout
+    if (popSearchTimeoutRef.current) {
+      clearTimeout(popSearchTimeoutRef.current);
+    }
+
+    // Debounced search - trigger after 250ms of no typing
+    popSearchTimeoutRef.current = setTimeout(() => {
+      if (value.trim()) {
+        handlePopSearch(value);
+      }
+    }, 250);
+  };
+  
   const handleSearchInputChange = (value: string) => {
     setFinalSearchTerm(value);
     setSearchResults([]);
@@ -5274,18 +5342,18 @@ const Index = () => {
                   {/* Dynamic Search Input - searches as you type */}
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                    <Input value={searchTerm} onChange={e => {
-                  setSearchTerm(e.target.value);
-                  handleSearchInputChange(e.target.value);
+                    <Input value={popSearchTerm} onChange={e => {
+                  setPopSearchTerm(e.target.value);
+                  handlePopSearchInputChange(e.target.value);
                 }} placeholder={`Search ${selectedSubOption}... (type to search automatically)`} className="pl-10 text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
-                    {isSearching && <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    {isPopSearching && <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
                         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                       </div>}
                   </div>
 
                   {/* Search Status and Results */}
-                  {searchTerm.length >= 2 && <>
-                      {isSearching && <div className="text-center p-4 bg-muted/50 rounded-lg border border-border">
+                  {popSearchTerm.length >= 2 && <>
+                      {isPopSearching && <div className="text-center p-4 bg-muted/50 rounded-lg border border-border">
                           <div className="flex items-center justify-center gap-2">
                             <Loader2 className="h-4 w-4 animate-spin" />
                             <p className="text-sm text-muted-foreground">
@@ -5294,19 +5362,19 @@ const Index = () => {
                           </div>
                         </div>}
 
-                      {!isSearching && searchResults.length > 0 && <>
+                      {!isPopSearching && popSearchResults.length > 0 && <>
                           <div className="text-center mb-4">
                             <p className="text-sm text-muted-foreground">
-                              Found {searchResults.length} results from OpenAI's extensive database
+                              Found {popSearchResults.length} results from OpenAI's extensive database
                             </p>
                           </div>
                           <Card className="max-h-96 overflow-hidden">
                             <ScrollArea className="h-96">
                               <div className="p-4 space-y-2">
-                                {searchResults.map((result, index) => <div key={index} onClick={() => {
+                                {popSearchResults.map((result, index) => <div key={index} onClick={() => {
                           setSelectedPick(result.title);
-                          setSearchResults([]);
-                          setSearchTerm("");
+                          setPopSearchResults([]);
+                          setPopSearchTerm("");
                         }} className="p-3 rounded-lg border border-border hover:bg-accent/50 cursor-pointer transition-colors">
                                     <p className="text-sm font-medium text-card-foreground">
                                       {result.title}
@@ -5320,37 +5388,37 @@ const Index = () => {
                           </Card>
                         </>}
 
-                      {!isSearching && searchResults.length === 0 && !searchError && searchTerm.length >= 2 && <div className="text-center p-4 bg-muted/30 rounded-lg border border-dashed border-muted-foreground/50">
+                      {!isPopSearching && popSearchResults.length === 0 && !popSearchError && popSearchTerm.length >= 2 && <div className="text-center p-4 bg-muted/30 rounded-lg border border-dashed border-muted-foreground/50">
                           <p className="text-sm text-muted-foreground mb-2">
                             No results found in database
                           </p>
                           <Button onClick={() => {
-                    setSelectedPick(searchTerm.trim());
-                    setSearchTerm("");
+                    setSelectedPick(popSearchTerm.trim());
+                    setPopSearchTerm("");
                   }} variant="outline" size="sm" className="px-4 py-2">
-                            Use "{searchTerm.trim()}" anyway
+                            Use "{popSearchTerm.trim()}" anyway
                           </Button>
                         </div>}
                     </>}
 
-                  {searchTerm.length > 0 && searchTerm.length < 2 && <div className="text-center p-4 bg-muted/20 rounded-lg border border-dashed border-muted-foreground/30">
+                  {popSearchTerm.length > 0 && popSearchTerm.length < 2 && <div className="text-center p-4 bg-muted/20 rounded-lg border border-dashed border-muted-foreground/30">
                       <p className="text-sm text-muted-foreground">
                         Type at least 2 characters to search...
                       </p>
                     </div>}
 
                   {/* Search Error */}
-                  {searchError && <div className="text-center p-4 bg-destructive/10 rounded-lg border border-destructive/20">
-                      <p className="text-sm text-destructive">{searchError}</p>
+                  {popSearchError && <div className="text-center p-4 bg-destructive/10 rounded-lg border border-destructive/20">
+                      <p className="text-sm text-destructive">{popSearchError}</p>
                     </div>}
 
                   {/* Custom Entry Option */}
-                  {searchTerm.trim() && searchResults.length === 0 && !isSearching && !searchError && <div className="text-center">
+                  {popSearchTerm.trim() && popSearchResults.length === 0 && !isPopSearching && !popSearchError && <div className="text-center">
                       <Button onClick={() => {
-                  setSelectedPick(searchTerm.trim());
-                  setSearchTerm("");
+                  setSelectedPick(popSearchTerm.trim());
+                  setPopSearchTerm("");
                 }} variant="outline" size="lg" className="px-6 py-3">
-                        Use "{searchTerm.trim()}" as custom {selectedSubOption.toLowerCase()}
+                        Use "{popSearchTerm.trim()}" as custom {selectedSubOption.toLowerCase()}
                       </Button>
                     </div>}
                 </div>
