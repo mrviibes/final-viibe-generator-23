@@ -172,31 +172,23 @@ Always output valid JSON only.`;
       ? `\n• Aim to include or reference these tags naturally (paraphrasing is fine): ${inputs.tags.join(', ')}`
       : '';
 
-    const userPrompt = `Write 4 different lines for this context:
-
+    const corePrompt = `Generate 4 concise options under 100 chars each for:
 Category: ${inputs.category} > ${inputs.subcategory}
 Tone: ${inputs.tone}
-Tags: ${inputs.tags?.join(', ') || 'none specified'}
-${inputs.recipient_name && inputs.recipient_name !== "-" ? `Recipient: ${inputs.recipient_name}` : ''}
+Tags: ${inputs.tags?.join(', ') || 'none'}
+${inputs.recipient_name && inputs.recipient_name !== "-" ? `Target: ${inputs.recipient_name}` : ''}
 
-Requirements:
-• Each line must be under 100 characters
-• Make at least 1 short option (under 50 characters)  
-• Make at least 1 longer option (80-100 characters)
-• All 4 must be genuinely different - varied wording, not just punctuation
-• Match the ${inputs.tone} tone consistently across all options
-• No emojis, hashtags, or quotes${tagRequirement}${specialInstructions}
+${tagRequirement}${specialInstructions}
 
-Output only this JSON format:
-{"lines":["option1","option2","option3","option4"]}`;
+JSON array only: [{"line":"..."}, {"line":"..."}, {"line":"..."}, {"line":"..."}]`;
 
     const messages = [
-      { role: 'system', content: systemPromptUpdated },
-      { role: 'user', content: userPrompt }
+      { role: 'system', content: 'Generate short, witty text. JSON array only. No explanations.' },
+      { role: 'user', content: corePrompt }
     ];
     
     const result = await openAIService.chatJSON(messages, {
-      max_completion_tokens: 500,
+      max_completion_tokens: 220,
       model: 'gpt-5-mini-2025-08-07'
     });
     

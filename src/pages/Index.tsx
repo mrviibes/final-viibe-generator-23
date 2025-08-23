@@ -4014,6 +4014,7 @@ const Index = () => {
   const [customHeight, setCustomHeight] = useState<string>("");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState<string>("");
+  const [textGenerationStartTime, setTextGenerationStartTime] = useState<number>(0);
   const [generatedOptions, setGeneratedOptions] = useState<string[]>([]);
   const [selectedGeneratedOption, setSelectedGeneratedOption] = useState<string | null>(null);
   const [selectedGeneratedIndex, setSelectedGeneratedIndex] = useState<number | null>(null);
@@ -4486,6 +4487,7 @@ const Index = () => {
       }
     }
     setIsGenerating(true);
+    setTextGenerationStartTime(Date.now());
     try {
       // Map UI selections to vibe model inputs
       let category = '';
@@ -5688,7 +5690,17 @@ const Index = () => {
                 {/* Generated Text Options Grid - Show when options exist but no selection made */}
                 {generatedOptions.length > 0 && selectedCompletionOption === "ai-assist" && !selectedGeneratedOption && <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div className="text-center mb-6">
-                      <p className="text-xl text-muted-foreground">Choose one of the generated text options</p>
+                      <div className="flex items-center justify-center gap-3 mb-2">
+                        <p className="text-xl text-muted-foreground">Choose one of the generated text options</p>
+                        <Button variant="outline" size="sm" onClick={handleGenerateText} disabled={isGenerating} className="text-xs">
+                          {isGenerating ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : "Regenerate"}
+                        </Button>
+                      </div>
+                      {generatedOptions.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          Using gpt-5-mini • Generated in {((Date.now() - textGenerationStartTime) / 1000).toFixed(1)}s
+                        </p>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-6">
