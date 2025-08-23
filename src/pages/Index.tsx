@@ -4064,10 +4064,10 @@ const Index = () => {
   const [selectedRecommendation, setSelectedRecommendation] = useState<number | null>(null);
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
 
-  // Auto-generate 5 images when Step 4 loads
+  // Auto-generate 1 image when Step 4 loads
   useEffect(() => {
     if (currentStep === 4 && !isGeneratingImage && generatedImages.length === 0 && !imageGenerationError) {
-      handleGenerateImage(5); // Generate 5 images automatically
+      handleGenerateImage(1); // Generate 1 image automatically
     }
   }, [currentStep]);
 
@@ -6155,7 +6155,7 @@ const Index = () => {
                         <p className="text-muted-foreground text-sm mt-1">{imageGenerationError}</p>
                       </div>
                       <div className="flex gap-2">
-                        <Button onClick={() => handleGenerateImage(5)} variant="outline" size="sm">
+                        <Button onClick={() => handleGenerateImage(1)} variant="outline" size="sm">
                           Try Again
                         </Button>
                         {imageGenerationError.includes('CORS proxy needs activation') && <Button variant="brand" size="sm" onClick={() => setShowCorsRetryDialog(true)}>
@@ -6169,7 +6169,7 @@ const Index = () => {
                  {generatedImages.length > 0 && textMisspellingDetected && <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 p-4 rounded-lg mb-4 text-center">
                      <p className="text-sm font-medium mb-2">⚠️ Text may be misspelled in the generated image</p>
                      <div className="flex gap-2 justify-center">
-                        <Button variant="outline" size="sm" onClick={() => handleGenerateImage(5)}>
+                        <Button variant="outline" size="sm" onClick={() => handleGenerateImage(1)}>
                           Regenerate
                         </Button>
                        <Button variant="outline" size="sm" onClick={() => setSpellingGuaranteeMode(true)}>
@@ -6185,7 +6185,7 @@ const Index = () => {
                       <Download className="h-4 w-4" />
                       Download Image
                     </Button>
-                    <Button variant="brand" className="flex items-center gap-2" onClick={() => handleGenerateImage(5)} disabled={isGeneratingImage}>
+                    <Button variant="brand" className="flex items-center gap-2" onClick={() => handleGenerateImage(1)} disabled={isGeneratingImage}>
                       {isGeneratingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>}
@@ -6513,14 +6513,14 @@ const Index = () => {
                   }
                 }
 
-                // Generate 5 images with Ideogram Turbo
+                // Generate 1 image with Ideogram Turbo
                 const result = await generateIdeogramImage({
                   prompt: promptText,
                   aspect_ratio: aspectRatioKey,
                   style_type: styleType,
                   model: 'V_2A_TURBO', // Use Turbo for speed
                   magic_prompt_option: 'AUTO',
-                  count: 5
+                  count: 1
                 });
                 if (result.data && result.data.length > 0) {
                   const imageUrls = result.data.map(img => img.url);
@@ -6608,7 +6608,7 @@ const Index = () => {
               setCurrentStep(prev => prev + 1);
             }
           }} disabled={currentStep === 1 && !isStep1Complete() || currentStep === 2 && !isStep2Complete() || currentStep === 3 && !isStep3Complete() || currentStep === 4 && !isStep4Complete()}>
-              {currentStep === 3 && isStep3Complete() && selectedDimension ? "GENERATE YOUR VIIBE" : currentStep === 4 && isStep4Complete() ? "GENERATE VIIBE NOW" : <>
+              {currentStep === 3 && isStep3Complete() && selectedDimension ? "GENERATE YOUR VIIBE" : <>
                   Continue
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </>}
