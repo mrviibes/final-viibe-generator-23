@@ -4018,6 +4018,7 @@ const Index = () => {
   const [generatedOptions, setGeneratedOptions] = useState<string[]>([]);
   const [selectedGeneratedOption, setSelectedGeneratedOption] = useState<string | null>(null);
   const [selectedGeneratedIndex, setSelectedGeneratedIndex] = useState<number | null>(null);
+  const [generationAudit, setGenerationAudit] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [subOptionSearchTerm, setSubOptionSearchTerm] = useState<string>("");
   const [isSearchFocused, setIsSearchFocused] = useState<boolean>(false);
@@ -4584,6 +4585,7 @@ const Index = () => {
       setSelectedGeneratedOption(null);
       setSelectedGeneratedIndex(null);
       setGeneratedOptions(vibeResult.candidates);
+      setGenerationAudit(vibeResult.audit);
 
       // Don't auto-select any option - let user choose
 
@@ -5696,9 +5698,10 @@ const Index = () => {
                           {isGenerating ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : "Regenerate"}
                         </Button>
                       </div>
-                      {generatedOptions.length > 0 && (
+                      {generatedOptions.length > 0 && generationAudit && (
                         <p className="text-xs text-muted-foreground">
-                          Using gpt-5-mini • Generated in {((Date.now() - textGenerationStartTime) / 1000).toFixed(1)}s
+                          Using {generationAudit.model} • Generated in {((Date.now() - textGenerationStartTime) / 1000).toFixed(1)}s
+                          {generationAudit.usedFallback && " • Used fallback"}
                         </p>
                       )}
                     </div>

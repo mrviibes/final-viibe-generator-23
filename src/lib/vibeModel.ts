@@ -180,7 +180,7 @@ ${inputs.recipient_name && inputs.recipient_name !== "-" ? `Target: ${inputs.rec
 
 ${tagRequirement}${specialInstructions}
 
-JSON array only: [{"line":"..."}, {"line":"..."}, {"line":"..."}, {"line":"..."}]`;
+Return only: {"lines":["option1","option2","option3","option4"]}`;
 
     const messages = [
       { role: 'system', content: 'Generate short, witty text. JSON array only. No explanations.' },
@@ -189,7 +189,7 @@ JSON array only: [{"line":"..."}, {"line":"..."}, {"line":"..."}, {"line":"..."}
     
     const result = await openAIService.chatJSON(messages, {
       max_completion_tokens: 220,
-      model: 'gpt-5-mini-2025-08-07'
+      model: 'gpt-4o-mini'
     });
     
     // Store the API metadata for later use
@@ -296,11 +296,11 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
     }
   }
   
-  return {
+    return {
     candidates: finalCandidates,
     picked,
     audit: {
-      model: apiMeta?.modelUsed || 'gpt-4.1-2025-04-14',
+      model: apiMeta?.modelUsed || 'gpt-4o-mini',
       usedFallback,
       blockedCount,
       reason,
