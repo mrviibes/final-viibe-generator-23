@@ -148,7 +148,8 @@ function postProcess(line: string, tone: string, requiredTags?: string[]): VibeC
 async function generateMultipleCandidates(inputs: VibeInputs): Promise<VibeCandidate[]> {
   try {
     const systemPromptUpdated = `You are a witty, creative copywriter specializing in short-form content. 
-Your task is to write 4 distinct options that vary in length and approach while maintaining the specified tone.
+Your task is to write 4 distinct options that vary significantly in structure, theme, and wording while maintaining the specified tone.
+Make each option distinctly different - avoid repeating similar phrases, structures, or concepts.
 Always output valid JSON only.`;
 
     // Enhanced instructions for movie/pop culture + quotes
@@ -190,7 +191,8 @@ Return only: {"lines":["option1","option2","option3","option4"]}`;
     
     const result = await openAIService.chatJSON(messages, {
       max_completion_tokens: 220,
-      model: 'gpt-4o-mini'
+      temperature: 1.0,
+      model: 'gpt-5-mini-2025-08-07'
     });
     
     // Store the API metadata for later use
