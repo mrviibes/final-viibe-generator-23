@@ -160,7 +160,12 @@ Always output valid JSON only.`;
       specialInstructions = "\n• When creating content about a specific movie with quote tags, reference the movie's iconic characters, themes, or memorable elements\n• Make it sound like it could be dialogue or a reference from that movie's universe";
     }
     if (hasPersonalRoast && inputs.recipient_name && inputs.recipient_name !== "-") {
-      specialInstructions += `\n• Incorporate ${inputs.recipient_name} naturally into the movie context while maintaining the roasting tone`;
+      specialInstructions += `\n• Incorporate ${inputs.recipient_name} naturally into the content while maintaining the roasting tone`;
+    }
+    
+    // Add stronger recipient targeting for any tone when recipient is specified
+    if (inputs.recipient_name && inputs.recipient_name !== "-" && inputs.tone === "savage") {
+      specialInstructions += `\n• CRITICAL: Every line must specifically target ${inputs.recipient_name} by name - make fun of them directly, not generic content`;
     }
 
     const tagRequirement = inputs.tags && inputs.tags.length > 0 
@@ -192,7 +197,7 @@ Output only this JSON format:
     
     const result = await openAIService.chatJSON(messages, {
       max_completion_tokens: 500,
-      model: 'gpt-4.1-2025-04-14'
+      model: 'gpt-5-mini-2025-08-07'
     });
     
     // Store the API metadata for later use

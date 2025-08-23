@@ -4565,7 +4565,8 @@ const Index = () => {
         category,
         subcategory,
         tone: tone.toLowerCase(),
-        tags: finalTagsForGeneration
+        tags: finalTagsForGeneration,
+        recipient_name: selectedPick || "-"
       }, 4);
 
       // Check for partial tag coverage and show notification
