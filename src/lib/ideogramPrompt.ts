@@ -87,11 +87,12 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   
   // Only add text visibility instructions if there's actual text content
   if (handoff.key_line && handoff.key_line.trim()) {
+    parts.push("CRITICAL: Only render the EXACT_TEXT specified above. Do not add any additional text, words, letters, captions, labels, or written content beyond what is explicitly provided.");
     parts.push("Ensure the text is clearly visible, balanced with the artwork, and styled to fit the chosen tone and tags.");
     if (cleanBackground) {
-      parts.push("NEGATIVE PROMPTS: No typos, no misspellings, no ligatures, no altered punctuation, no text variations, no glyphs, no pseudo-letters, no UI elements, no symbols, no decorative text elements, no watermarks, no logos.");
+      parts.push("NEGATIVE PROMPTS: No typos, no misspellings, no ligatures, no altered punctuation, no text variations, no glyphs, no pseudo-letters, no UI elements, no symbols, no decorative text elements, no watermarks, no logos, no additional captions, no lists, no bullet points, no fine print, no lorem ipsum, no fake Latin text, no paragraphs, no icons that look like letters.");
     } else {
-      parts.push("NEGATIVE PROMPTS: No typos, no misspellings, no ligatures, no altered punctuation, no text variations, no unwanted glyphs, no pseudo-letters.");
+      parts.push("NEGATIVE PROMPTS: No typos, no misspellings, no ligatures, no altered punctuation, no text variations, no unwanted glyphs, no pseudo-letters, no additional captions, no lists, no bullet points, no fine print, no lorem ipsum, no fake Latin text, no paragraphs, no icons that look like letters.");
     }
   } else {
     parts.push("Focus on creating a balanced visual composition that fits the chosen tone and tags.");
