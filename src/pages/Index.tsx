@@ -5043,9 +5043,26 @@ const Index = () => {
 
             // Add subcategory selection if it exists
             if (selectedSubOption) {
+              const getSubcategorySubtitle = () => {
+                if (selectedStyle === 'celebrations') {
+                  return 'Selected celebration';
+                } else if (selectedStyle === 'sports') {
+                  return 'Selected sport';
+                } else if (selectedStyle === 'daily-life') {
+                  return 'Selected daily life activity';
+                } else if (selectedStyle === 'vibes-punchlines') {
+                  return 'Selected vibe';
+                } else if (selectedStyle === 'pop-culture') {
+                  const popOption = popCultureOptions.find(p => p.id === selectedSubOption);
+                  return popOption?.subtitle || 'Selected pop culture';
+                } else {
+                  return 'Selected option';
+                }
+              };
+
               selections.push({
                 title: selectedSubOption,
-                subtitle: selectedStyle === 'celebrations' ? 'Selected celebration' : selectedStyle === 'sports' ? 'Selected sport' : selectedStyle === 'daily-life' ? 'Selected daily life activity' : selectedStyle === 'vibes-punchlines' ? 'Selected vibe' : selectedStyle === 'pop-culture' ? 'Selected pop culture' : 'Selected option',
+                subtitle: getSubcategorySubtitle(),
                 onChangeSelection: () => {
                   setSelectedSubOption(null);
                   setSelectedPick(null);
