@@ -301,12 +301,12 @@ JSON only.`;
     const startTime = Date.now();
     console.log('🚀 Starting visual generation with optimized settings...');
     
-    // Create a timeout promise with increased timeout
+    // Create a timeout promise with reduced timeout
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('TIMEOUT')), 45000);
+      setTimeout(() => reject(new Error('TIMEOUT')), 18000);
     });
 
-    // Primary attempt with optimized settings
+    // Primary attempt with gpt-4o-mini for reliable JSON
     let result;
     try {
         result = await Promise.race([
@@ -315,8 +315,8 @@ JSON only.`;
             { role: 'user', content: userPrompt }
           ], {
             temperature: 0.7,
-            max_tokens: 500,
-            model: 'gpt-5-mini-2025-08-07'
+            max_tokens: 600,
+            model: 'gpt-4o-mini'
           }),
           timeoutPromise
         ]);
@@ -332,8 +332,8 @@ JSON only.`;
             { role: 'user', content: compactUserPrompt }
           ], {
             temperature: 0.6,
-            max_tokens: 450,
-            model: 'gpt-5-mini-2025-08-07'
+            max_tokens: 600,
+            model: 'gpt-4o-mini'
           }),
           timeoutPromise
         ]);
@@ -370,7 +370,7 @@ JSON only.`;
 
     return {
       options: validOptions,
-      model: result._apiMeta?.modelUsed || 'gpt-5-mini-2025-08-07'
+      model: result._apiMeta?.modelUsed || 'gpt-4o-mini'
     };
   } catch (error) {
     console.error('Error generating visual recommendations:', error);
@@ -381,13 +381,13 @@ JSON only.`;
     if (error instanceof Error) {
       if (error.message === 'TIMEOUT') {
         errorCode = 'timeout';
-        console.warn('⚠️ Visual generation timed out after 45s');
+        console.warn('⚠️ Visual generation timed out after 18s');
       } else if (error.message.includes('401') || error.message.includes('unauthorized')) {
         errorCode = 'unauthorized';
         console.warn('⚠️ API key issue detected');
-      } else if (error.message.includes('JSON') || error.message.includes('parse')) {
+      } else if (error.message.includes('JSON') || error.message.includes('parse') || error.message.includes('truncated') || error.message.includes('No content')) {
         errorCode = 'parse_error';
-        console.warn('⚠️ Response parsing failed');
+        console.warn('⚠️ Response parsing failed or truncated');
       }
     }
     
