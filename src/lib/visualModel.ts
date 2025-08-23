@@ -43,6 +43,20 @@ function autoEnrichInputs(inputs: VisualInputs): VisualInputs {
     enriched.tags = [...inputs.tags, ...categoryTags].slice(0, 6);
   }
   
+  // Pride/LGBTQ+ theme enhancement
+  if (inputs.finalLine) {
+    const prideKeywords = ['pride', 'parade', 'rainbow', 'gay', 'lesbian', 'drag', 'queens', 'queer', 'lgbtq'];
+    const hasPrideTheme = prideKeywords.some(keyword => 
+      inputs.finalLine!.toLowerCase().includes(keyword) || 
+      inputs.tone.toLowerCase().includes(keyword)
+    );
+    
+    if (hasPrideTheme) {
+      const prideEnhancementTags = ['rainbow', 'parade', 'celebration', 'colorful', 'drag queens', 'fabulous'];
+      enriched.tags = [...enriched.tags, ...prideEnhancementTags].slice(0, 8);
+    }
+  }
+  
   return enriched;
 }
 
@@ -106,7 +120,7 @@ function hasVagueFillers(text: string): boolean {
   return vaguePatterns.some(pattern => pattern.test(text));
 }
 
-function validateVisualOptions(options: VisualOption[]): VisualOption[] {
+function validateVisualOptions(options: VisualOption[], inputs: VisualInputs): VisualOption[] {
   return options.filter(option => {
     // Reject options with vague fillers
     if (hasVagueFillers(option.subject) || hasVagueFillers(option.background)) {
@@ -118,6 +132,31 @@ function validateVisualOptions(options: VisualOption[]): VisualOption[] {
     if (option.prompt.length < 100) {
       console.warn('🚫 Rejected short prompt:', option.prompt.substring(0, 50));
       return false;
+    }
+    
+    // Pride/theme relevance check - reject if completely off-topic
+    if (inputs.finalLine) {
+      const prideKeywords = ['pride', 'parade', 'rainbow', 'gay', 'lesbian', 'drag', 'queens', 'queer', 'lgbtq'];
+      const hasPrideTheme = prideKeywords.some(keyword => 
+        inputs.finalLine!.toLowerCase().includes(keyword) || 
+        inputs.tone.toLowerCase().includes(keyword)
+      );
+      
+      if (hasPrideTheme) {
+        const isRelevant = prideKeywords.some(keyword => 
+          option.subject.toLowerCase().includes(keyword) ||
+          option.background.toLowerCase().includes(keyword) ||
+          option.prompt.toLowerCase().includes(keyword) ||
+          option.subject.toLowerCase().includes('rainbow') ||
+          option.subject.toLowerCase().includes('colorful') ||
+          option.background.toLowerCase().includes('celebration')
+        );
+        
+        if (!isRelevant) {
+          console.warn('🚫 Rejected off-topic Pride option:', option.subject);
+          return false;
+        }
+      }
     }
     
     return true;
@@ -216,12 +255,15 @@ export async function generateVisualRecommendations(
   const enrichedInputs = autoEnrichInputs(inputs);
   const { category, subcategory, tone, tags, visualStyle, finalLine, specificEntity, subjectOption, dimensions } = enrichedInputs;
   
-const systemPrompt = `Generate 4 visual concepts for graphics. Be concise.
+const systemPrompt = `Generate 4 visual concepts for graphics that MUST align with the provided text and tone. Be concise.
 
 RULES:
 - Return ONLY valid JSON - no markdown, no extra text
 - Each prompt: 40-60 words maximum
 - 4 slots: "background-only", "subject+background", "object", "tone-twist"
+- CRITICAL: Visual concepts MUST relate to the provided text/joke content and tone
+- For Pride themes: Include rainbow, drag queens, parades, celebrations, fabulous elements
+- For jokes: Match the humor and subject matter exactly
 
 Format:
 {
@@ -247,7 +289,9 @@ function getStyleKeywords(visualStyle?: string): string {
 
   const userPrompt = `${category}>${subcategory}, ${tone}, ${visualStyle || '3d-animated'}
 Tags: ${tags.slice(0, 4).join(', ')}
-${finalLine ? `Text: "${finalLine}"` : ''}
+${finalLine ? `JOKE/TEXT: "${finalLine}" - VISUAL CONCEPTS MUST MATCH THIS CONTENT AND TONE` : ''}
+
+IMPORTANT: Visual concepts must directly relate to the joke/text content above. For Pride themes, include rainbow colors, drag queens, parades, celebration elements.
 
 4 concepts. Each 40-60 words. Include [TAGS: ${tags.slice(0, 3).join(', ')}] [TEXT_SAFE_ZONE: center 60x35]
 
@@ -265,17 +309,17 @@ JSON only.`;
     // Primary attempt with optimized settings
     let result;
     try {
-      result = await Promise.race([
-        openAIService.chatJSON([
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ], {
-          temperature: 0.7,
-          max_tokens: 500,
-          model: 'gpt-4.1-2025-04-14'
-        }),
-        timeoutPromise
-      ]);
+        result = await Promise.race([
+          openAIService.chatJSON([
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ], {
+            temperature: 0.7,
+            max_tokens: 500,
+            model: 'gpt-5-mini-2025-08-07'
+          }),
+          timeoutPromise
+        ]);
     } catch (firstError) {
       // Retry with shorter prompt on failure
       if (firstError instanceof Error && (firstError.message.includes('JSON') || firstError.message.includes('parse') || firstError.message.includes('TIMEOUT'))) {
@@ -289,7 +333,7 @@ JSON only.`;
           ], {
             temperature: 0.6,
             max_tokens: 450,
-            model: 'gpt-4.1-2025-04-14'
+            model: 'gpt-5-mini-2025-08-07'
           }),
           timeoutPromise
         ]);
@@ -315,7 +359,7 @@ JSON only.`;
       }));
 
     // Apply quality validation to reject vague options
-    validOptions = validateVisualOptions(validOptions);
+    validOptions = validateVisualOptions(validOptions, enrichedInputs);
 
     // If we rejected too many options, fill with high-quality fallbacks
     if (validOptions.length < 4) {
@@ -326,7 +370,7 @@ JSON only.`;
 
     return {
       options: validOptions,
-      model: result._apiMeta?.modelUsed || 'gpt-4.1-2025-04-14'
+      model: result._apiMeta?.modelUsed || 'gpt-5-mini-2025-08-07'
     };
   } catch (error) {
     console.error('Error generating visual recommendations:', error);
