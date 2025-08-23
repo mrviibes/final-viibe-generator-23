@@ -4605,6 +4605,8 @@ const Index = () => {
       if (vibeResult.audit.usedFallback) {
         console.warn('⚠️ Text generation used fallback variants. API may be unavailable or having issues.');
         sonnerToast.warning('Text generation used fallback. Results may be less relevant to your tags.');
+      } else if (vibeResult.audit.candidateCount < 4) {
+        console.log(`✅ Generated ${vibeResult.audit.candidateCount} unique options from AI model`);
       }
     } catch (error) {
       console.error('❌ Error generating text:', error);
@@ -5718,8 +5720,8 @@ const Index = () => {
                       </div>
                       {generatedOptions.length > 0 && generationAudit && (
                         <p className="text-xs text-muted-foreground">
-                          Using {generationAudit.model} • Generated in {((Date.now() - textGenerationStartTime) / 1000).toFixed(1)}s
-                          {generationAudit.usedFallback && " • Used fallback"}
+                           Using {generationAudit.model} • Generated in {((Date.now() - textGenerationStartTime) / 1000).toFixed(1)}s
+                           {generationAudit.usedFallback ? " • Used fallback" : ` • Received ${generationAudit.candidateCount} options`}
                         </p>
                       )}
                     </div>
