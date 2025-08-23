@@ -4015,6 +4015,7 @@ const Index = () => {
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState<string>("");
   const [textGenerationStartTime, setTextGenerationStartTime] = useState<number>(0);
+  const [visualGenerationStartTime, setVisualGenerationStartTime] = useState<number>(0);
   const [generatedOptions, setGeneratedOptions] = useState<string[]>([]);
   const [selectedGeneratedOption, setSelectedGeneratedOption] = useState<string | null>(null);
   const [selectedGeneratedIndex, setSelectedGeneratedIndex] = useState<number | null>(null);
@@ -4378,6 +4379,7 @@ const Index = () => {
       setSubjectTagInput("");
     }
     setIsGeneratingSubject(true);
+    setVisualGenerationStartTime(Date.now());
     try {
       // Build inputs using the same mapping logic as text generation
       let category = '';
@@ -5871,15 +5873,18 @@ const Index = () => {
                      {/* Visual AI recommendations - always show if available */}
                      {selectedSubjectOption === "ai-assist" && visualOptions.length > 0 && selectedVisualIndex === null && <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                          <div className="text-center mb-6">
-                            <div className="flex items-center justify-center gap-3 mb-2">
-                              <h3 className="text-xl font-semibold text-foreground">Visual AI recommendations</h3>
-                              <Button variant="outline" size="sm" onClick={handleGenerateSubject} disabled={isGeneratingSubject} className="text-xs">
-                                {isGeneratingSubject ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : "Regenerate"}
-                              </Button>
-                              {visualModel === 'fallback' && <Button variant="outline" size="sm" onClick={testAIConnection} disabled={isTestingProxy} className="text-xs">
-                                  {isTestingProxy ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : "Test Connection"}
-                                </Button>}
-                            </div>
+                             <div className="flex items-center justify-center gap-3 mb-2">
+                               <h3 className="text-xl font-semibold text-foreground">Visual AI recommendations</h3>
+                               <Button variant="outline" size="sm" onClick={handleGenerateSubject} disabled={isGeneratingSubject} className="text-xs">
+                                 {isGeneratingSubject ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : "Regenerate"}
+                               </Button>
+                             </div>
+                             {visualOptions.length > 0 && visualModel && (
+                               <p className="text-xs text-muted-foreground mb-2">
+                                 Using {visualModel.includes('gpt-5-mini') ? 'gpt-5-mini' : visualModel} • Generated in {((Date.now() - visualGenerationStartTime) / 1000).toFixed(1)}s
+                                 {visualModel === 'fallback' && " • Used fallback"}
+                               </p>
+                             )}
                             {visualModel === 'fallback' && <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 text-xs p-2 rounded-lg mb-3 max-w-md mx-auto">
                                 {getErrorMessage(visualRecommendations?.errorCode)}
                               </div>}
