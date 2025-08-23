@@ -5070,6 +5070,36 @@ const Index = () => {
                 }
               });
             }
+
+            // Add specific pick selection if it exists
+            if (selectedPick) {
+              const getPickSubtitle = () => {
+                if (selectedStyle === 'pop-culture') {
+                  if (selectedSubOption === 'celebrities') return 'Selected celebrity';
+                  if (selectedSubOption === 'movies') return 'Selected movie';
+                  if (selectedSubOption === 'tv-shows') return 'Selected TV show';
+                  if (selectedSubOption === 'music') return 'Selected music';
+                  if (selectedSubOption === 'books') return 'Selected book';
+                  if (selectedSubOption === 'video-games') return 'Selected video game';
+                  return 'Selected pick';
+                } else if (selectedStyle === 'celebrations') {
+                  return 'Selected specific celebration';
+                } else if (selectedStyle === 'sports') {
+                  return 'Selected specific sport';
+                } else {
+                  return 'Selected specific option';
+                }
+              };
+
+              selections.push({
+                title: selectedPick,
+                subtitle: getPickSubtitle(),
+                onChangeSelection: () => {
+                  setSelectedPick(null);
+                }
+              });
+            }
+            
             return <StackedSelectionCard selections={selections} />;
           })()}
 
