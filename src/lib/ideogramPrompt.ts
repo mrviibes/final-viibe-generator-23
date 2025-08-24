@@ -14,9 +14,9 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     parts.push("If you cannot render the text exactly as specified, leave the text area completely blank rather than adding incorrect text.");
     
     if (cleanBackground) {
-      parts.push("Style and display this text clearly legible but not oversized; don't cover the canvas; keep text area ≤ 40% of image, maintain generous margins; integrate with the scene on a clean, minimal, high-contrast background with clear center area for text.");
+      parts.push("Style and display this text clearly legible but not oversized; don't cover the canvas; keep text area ≤ 25% of image, maintain generous margins; integrate with the scene on a clean, minimal, high-contrast background with clear center area for text. Place the text in available negative space (e.g., lower third or sky), do not block the main subject, keep generous margins.");
     } else {
-      parts.push("Style and display this text clearly legible but not oversized; don't cover the canvas; keep text area ≤ 40% of image, maintain generous margins; integrate with the scene on a realistic background.");
+      parts.push("Style and display this text clearly legible but not oversized; don't cover the canvas; keep text area ≤ 25% of image, maintain generous margins; integrate with the scene on a realistic background. Place the text in available negative space (e.g., lower third or sky), do not block the main subject, keep generous margins.");
     }
   } else {
     // For images without text, focus on visual elements only

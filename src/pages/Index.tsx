@@ -4701,15 +4701,17 @@ const Index = () => {
       }
       const aspectForIdeogram = getAspectRatioForIdeogram(aspectRatio);
       const styleForIdeogram = getStyleTypeForIdeogram(visualStyle);
+      const chosenModel = styleForIdeogram === 'REALISTIC' ? 'V_3' : 'V_2A_TURBO';
       console.log('=== Ideogram Generation Debug ===');
       console.log('Direct prompt provided:', !!directPrompt.trim());
       console.log('Final prompt:', prompt);
       console.log('Aspect ratio:', aspectForIdeogram);
       console.log('Style type:', styleForIdeogram);
+      console.log('Chosen model:', chosenModel);
       console.log('Final payload:', {
         prompt,
         aspect_ratio: aspectForIdeogram,
-        model: 'V_2A_TURBO',
+        model: chosenModel,
         magic_prompt_option: 'AUTO',
         style_type: styleForIdeogram
       });
@@ -4718,7 +4720,7 @@ const Index = () => {
         generateIdeogramImage({
           prompt,
           aspect_ratio: aspectForIdeogram,
-          model: 'V_2A_TURBO',
+          model: chosenModel,
           magic_prompt_option: 'AUTO',
           style_type: styleForIdeogram
         })
@@ -4735,9 +4737,10 @@ const Index = () => {
       if (allImageUrls.length > 0) {
         setGeneratedImages(allImageUrls);
         setSelectedImageIndex(0);
+        const modelDescription = chosenModel === 'V_3' ? 'Ideogram V3 (Realistic)' : 'Ideogram Turbo';
         toast({
           title: "Images Generated!",
-          description: `Your ${allImageUrls.length} VIIBE${allImageUrls.length > 1 ? 's have' : ' has'} been successfully created with Ideogram Turbo.`
+          description: `Your ${allImageUrls.length} VIIBE${allImageUrls.length > 1 ? 's have' : ' has'} been successfully created with ${modelDescription}.`
         });
       } else {
         throw new Error("No image data received from Ideogram API");
@@ -6506,11 +6509,9 @@ const Index = () => {
                 let styleType = getStyleTypeForIdeogram(visualStyle);
                 let model: 'V_1' | 'V_1_TURBO' | 'V_2' | 'V_2_TURBO' | 'V_2A' | 'V_2A_TURBO' | 'V_3' = 'V_2_TURBO';
 
-                // Optimize for text accuracy when text is present
-                if (finalText && finalText.trim()) {
-                  styleType = 'DESIGN'; // Better for text fidelity
-                  model = 'V_2A_TURBO'; // Better model for text
-                }
+                // Choose model based on style type
+                const chosenModel = styleType === 'REALISTIC' ? 'V_3' : 'V_2A_TURBO';
+                model = chosenModel;
 
                 // Handle spelling guarantee mode
                 if (spellingGuaranteeMode && finalText && finalText.trim()) {
@@ -6531,12 +6532,12 @@ const Index = () => {
                   }
                 }
 
-                // Generate 1 image with Ideogram Turbo
+                // Generate 1 image with appropriate model
                 const result = await generateIdeogramImage({
                   prompt: promptText,
                   aspect_ratio: aspectRatioKey,
                   style_type: styleType,
-                  model: 'V_2A_TURBO', // Use Turbo for speed
+                  model: model, // Use the chosen model
                   magic_prompt_option: 'AUTO',
                   count: 1
                 });
@@ -6544,7 +6545,8 @@ const Index = () => {
                   const imageUrls = result.data.map(img => img.url);
                   setGeneratedImages(imageUrls);
                   setSelectedImageIndex(0);
-                  sonnerToast.success(`Generated ${imageUrls.length} VIIBE options! Choose your favorite.`);
+                  const modelDescription = model === 'V_3' ? 'Ideogram V3 (Realistic)' : 'Ideogram Turbo';
+                  sonnerToast.success(`Generated ${imageUrls.length} VIIBE options with ${modelDescription}! Choose your favorite.`);
                 } else {
                   sonnerToast.error("Failed to generate your VIIBE. Please try again.");
                 }
