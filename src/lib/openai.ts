@@ -32,10 +32,12 @@ function safeParseArray(content: string): OpenAISearchResult[] {
 export class OpenAIService {
   private apiKey: string | null = null;
   private useBackendAPI: boolean = true; // Use Supabase backend by default
+  private textSpeed: 'fast' | 'creative' = 'fast'; // Default to fast
 
   constructor() {
     // Still support localStorage for fallback, but prefer backend
     this.apiKey = localStorage.getItem('openai_api_key');
+    this.textSpeed = (localStorage.getItem('text_speed') as 'fast' | 'creative') || 'fast';
   }
 
   setApiKey(key: string) {
@@ -60,6 +62,15 @@ export class OpenAIService {
 
   isUsingBackend(): boolean {
     return this.useBackendAPI;
+  }
+
+  setTextSpeed(speed: 'fast' | 'creative') {
+    this.textSpeed = speed;
+    localStorage.setItem('text_speed', speed);
+  }
+
+  getTextSpeed(): 'fast' | 'creative' {
+    return this.textSpeed;
   }
 
   private async callBackendAPI(messages: Array<{role: string; content: string}>, options: {
@@ -187,11 +198,14 @@ export class OpenAIService {
       model = 'gpt-5-mini-2025-08-07'
     } = options;
 
-    // Retry strategy: try current model, then fallback models
+    // Retry strategy based on text speed preference
+    const fastModels = ['gpt-4o-mini', 'gpt-5-mini-2025-08-07', 'gpt-4.1-2025-04-14'];
+    const creativeModels = ['gpt-5-mini-2025-08-07', 'gpt-5-2025-08-07', 'gpt-4.1-2025-04-14'];
+    
+    const preferredModels = this.textSpeed === 'fast' ? fastModels : creativeModels;
     const retryModels = [
-      model,
-      model.startsWith('gpt-5-mini') ? 'gpt-5-2025-08-07' : model,
-      'gpt-4.1-2025-04-14'
+      model, // Always try the requested model first
+      ...preferredModels.filter(m => m !== model) // Add others based on speed preference
     ].filter((m, i, arr) => arr.indexOf(m) === i); // Remove duplicates
 
     let lastError: Error | null = null;
@@ -211,7 +225,8 @@ export class OpenAIService {
           result._apiMeta = {
             modelUsed: tryModel,
             retryAttempt,
-            originalModel: model
+            originalModel: model,
+            textSpeed: this.textSpeed
           };
         }
         
@@ -414,8 +429,8 @@ Return as a JSON object with this exact format:
       const result = await this.chatJSON([
         { role: 'user', content: prompt }
       ], {
-        max_completion_tokens: 300, // Reduced to prevent reasoning overruns
-        model: 'gpt-5-mini-2025-08-07'
+        max_completion_tokens: this.textSpeed === 'fast' ? 200 : 300,
+        model: this.textSpeed === 'fast' ? 'gpt-4o-mini' : 'gpt-5-mini-2025-08-07'
       });
 
       const options = result?.options || [];

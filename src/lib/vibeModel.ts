@@ -20,6 +20,7 @@ export interface VibeResult {
   picked: string;
   audit: {
     model: string;
+    textSpeed?: string;
     usedFallback: boolean;
     blockedCount: number;
     candidateCount: number;
@@ -293,6 +294,7 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
     picked,
     audit: {
       model: apiMeta?.modelUsed || 'gpt-4o-mini',
+      textSpeed: apiMeta?.textSpeed || 'fast',
       usedFallback,
       blockedCount,
       candidateCount: finalCandidates.length,
