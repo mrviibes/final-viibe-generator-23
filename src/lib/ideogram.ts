@@ -22,6 +22,10 @@ export interface IdeogramHandoff {
   // Visual AI Recommendations fields
   rec_subject?: string;        // AI recommended subject
   rec_background?: string;     // AI recommended background
+  
+  // New fields for improved generation
+  people_count_hint?: 'single' | 'multiple';  // Hint for person count in image
+  text_placement_preference?: 'bottom' | 'side' | 'banner'; // Preferred text placement
 }
 
 export function buildIdeogramHandoff(params: {
@@ -45,6 +49,10 @@ export function buildIdeogramHandoff(params: {
   // Visual AI Recommendations
   rec_subject?: string;
   rec_background?: string;
+  
+  // New parameters
+  people_count_hint?: 'single' | 'multiple';
+  text_placement_preference?: 'bottom' | 'side' | 'banner';
 }): IdeogramHandoff {
   const { 
     visual_style, 
@@ -61,7 +69,9 @@ export function buildIdeogramHandoff(params: {
     ai_text_assist_used,
     ai_visual_assist_used,
     rec_subject,
-    rec_background
+    rec_background,
+    people_count_hint,
+    text_placement_preference
   } = params;
   
   const baseNotes = "high contrast, clean layout, social safe margins, no logos";
@@ -91,6 +101,10 @@ export function buildIdeogramHandoff(params: {
     
     // Visual AI Recommendations
     rec_subject: rec_subject,
-    rec_background: rec_background
+    rec_background: rec_background,
+    
+    // New fields
+    people_count_hint: people_count_hint,
+    text_placement_preference: text_placement_preference
   };
 }

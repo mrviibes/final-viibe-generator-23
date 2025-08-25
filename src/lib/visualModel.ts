@@ -17,6 +17,7 @@ export interface VisualOption {
   background: string;
   prompt: string;
   slot?: string;
+  isSinglePerson?: boolean; // Flag to indicate single-person option
 }
 
 export interface VisualResult {
@@ -242,7 +243,8 @@ function getSlotBasedFallbacks(inputs: VisualInputs): VisualOption[] {
       slot: "singing",
       subject: "Solo person singing or performing",
       background: `Concert or performance stage with ${tone} lighting, ${primaryTags} elements, and visible audience`,
-      prompt: `One person singing or performing positioned off-center on concert stage with ${tone} lighting, ${primaryTags} elements, audience clearly visible in background [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: limbs crossing center, harsh shadows in safe zone, multiple performers, groups] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: light text]`
+      prompt: `One person singing or performing positioned off-center on concert stage with ${tone} lighting, ${primaryTags} elements, audience clearly visible in background [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: limbs crossing center, harsh shadows in safe zone, multiple performers, groups] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: light text]`,
+      isSinglePerson: true
     }
   ];
 }
@@ -366,6 +368,7 @@ JSON only.`;
     // Ensure at least one single-person option exists
     const hasSinglePersonOption = validOptions.some(opt => 
       opt.slot === 'singing' || 
+      opt.isSinglePerson ||
       (opt.subject.toLowerCase().includes('person ') && !opt.subject.toLowerCase().includes('people'))
     );
 
@@ -381,7 +384,8 @@ JSON only.`;
         validOptions[groupOptionIndex] = {
           ...validOptions[groupOptionIndex],
           subject: validOptions[groupOptionIndex].subject.replace(/people|group|crowd/gi, 'person'),
-          prompt: validOptions[groupOptionIndex].prompt.replace(/people|group|crowd/gi, 'person').replace(/multiple/gi, 'single')
+          prompt: validOptions[groupOptionIndex].prompt.replace(/people|group|crowd/gi, 'person').replace(/multiple/gi, 'single'),
+          isSinglePerson: true
         };
       }
     }

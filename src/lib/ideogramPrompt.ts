@@ -46,7 +46,11 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     handoff.rec_subject?.toLowerCase().includes(keyword) ||
     handoff.rec_background?.toLowerCase().includes(keyword)
   );
-  if (needsPeople) {
+  
+  // Override with explicit people count hint
+  if (handoff.people_count_hint === 'single') {
+    parts.push("Show exactly ONE person only - no groups, crowds, or multiple people.");
+  } else if (handoff.people_count_hint === 'multiple' || needsPeople) {
     parts.push("Include multiple people clearly visible in the scene.");
   }
   
@@ -63,11 +67,27 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   
   // TEXT PLACEMENT (if present)
   if (handoff.key_line && handoff.key_line.trim()) {
-    if (needsPeople) {
-      parts.push("Place text in empty space, margins, or banner areas - avoid covering faces or blocking people.");
-    } else {
-      parts.push("Place text clearly visible in available space, not blocking main subject.");
+    let textPlacement = "Place text clearly visible in available space";
+    
+    // Use text placement preference if provided
+    if (handoff.text_placement_preference === 'bottom') {
+      textPlacement = "Place text at bottom in a banner or margin area";
+    } else if (handoff.text_placement_preference === 'side') {
+      textPlacement = "Place text on left or right side in available space";
+    } else if (handoff.text_placement_preference === 'banner') {
+      textPlacement = "Place text in a banner overlay area";
     }
+    
+    // Add people-specific guidance
+    if (needsPeople || handoff.people_count_hint === 'multiple') {
+      textPlacement += " - CRITICAL: avoid covering faces, bodies, or blocking people entirely";
+    } else if (handoff.people_count_hint === 'single') {
+      textPlacement += " - ensure single person remains clearly visible and unobstructed";
+    } else {
+      textPlacement += " - do not block main subject";
+    }
+    
+    parts.push(textPlacement + ".");
   }
   
   // AVOID LIST
@@ -78,7 +98,9 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   if (cleanBackground) {
     avoidList.push("visual clutter", "decorative elements");
   }
-  if (needsPeople) {
+  if (handoff.people_count_hint === 'single') {
+    avoidList.push("multiple people", "groups", "crowds", "families", "teams");
+  } else if (handoff.people_count_hint === 'multiple' || needsPeople) {
     avoidList.push("empty scenes", "isolated backgrounds");
   }
   parts.push(`Avoid: ${avoidList.join(', ')}.`);

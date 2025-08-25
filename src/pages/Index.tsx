@@ -5933,8 +5933,9 @@ const Index = () => {
                   setShowSubjectTagEditor(false); // Keep tag editor hidden once visual is selected
                 }}>
                               <CardHeader className="pb-2">
-                                <CardTitle className="text-base font-semibold text-card-foreground">
+                                <CardTitle className="text-base font-semibold text-card-foreground flex items-center gap-2">
                                   Option {index + 1} ({option.slot?.replace('-', ' ') || 'Visual'})
+                                  {option.isSinglePerson && <Badge variant="secondary" className="text-xs">Solo</Badge>}
                                 </CardTitle>
                               </CardHeader>
                               <CardContent className="pt-0">
@@ -6586,6 +6587,13 @@ const Index = () => {
 
                 // Get secondary subcategory for pop culture
                 const subcategorySecondary = selectedStyle === 'pop-culture' && selectedPick ? selectedPick : undefined;
+                // Determine people count hint and text placement preference
+                const selectedVisualOption = selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex] : undefined;
+                const peopleCountHint: 'single' | 'multiple' | undefined = selectedVisualOption?.isSinglePerson ? 'single' : 
+                  (selectedVisualOption && ['friends', 'crowd', 'people', 'group', 'party', 'audience', 'performers', 'celebrating'].some(keyword => 
+                    selectedVisualOption.subject.toLowerCase().includes(keyword) || selectedVisualOption.background.toLowerCase().includes(keyword)
+                  )) ? 'multiple' : undefined;
+                
                 const ideogramPayload = buildIdeogramHandoff({
                   // Core parameters
                   visual_style: visualStyle,
@@ -6604,7 +6612,10 @@ const Index = () => {
                   ai_visual_assist_used: selectedSubjectOption === "ai-assist",
                   // Visual AI Recommendations
                   rec_subject: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].subject : selectedSubjectOption === "design-myself" ? subjectDescription : undefined,
-                  rec_background: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined
+                  rec_background: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined,
+                  // New hints
+                  people_count_hint: peopleCountHint,
+                  text_placement_preference: 'bottom' // Default to bottom placement for better text readability
                 });
 
                 // Generate the Ideogram prompt
@@ -6636,23 +6647,68 @@ const Index = () => {
                   }
                 }
 
-                // Generate 1 image with appropriate model
-                const result = await generateIdeogramImage({
-                  prompt: promptText,
-                  aspect_ratio: aspectRatioKey,
-                  style_type: styleType,
-                  model: model, // Use the chosen model
-                  magic_prompt_option: 'AUTO',
-                  count: 1
-                });
-                if (result.data && result.data.length > 0) {
-                  const imageUrls = result.data.map(img => img.url);
-                  setGeneratedImages(imageUrls);
-                  setSelectedImageIndex(0);
-                  const modelDescription = model === 'V_3' ? 'Ideogram V3 (Realistic)' : 'Ideogram Turbo';
-                  sonnerToast.success(`Generated ${imageUrls.length} VIIBE options with ${modelDescription}! Choose your favorite.`);
+                // Generate images - multiple if we need both group and solo versions
+                const shouldGenerateBothVersions = peopleCountHint === 'multiple' && finalText.trim();
+                
+                if (shouldGenerateBothVersions) {
+                  // Generate two versions: one group, one solo
+                  const groupPayload = { ...ideogramPayload, people_count_hint: 'multiple' as const };
+                  const soloPayload = { ...ideogramPayload, people_count_hint: 'single' as const };
+                  
+                  const groupPrompt = buildIdeogramPrompt(groupPayload);
+                  const soloPrompt = buildIdeogramPrompt(soloPayload);
+                  
+                  const [groupResult, soloResult] = await Promise.all([
+                    generateIdeogramImage({
+                      prompt: groupPrompt,
+                      aspect_ratio: aspectRatioKey,
+                      style_type: styleType,
+                      model: model,
+                      magic_prompt_option: 'AUTO',
+                      count: 1
+                    }),
+                    generateIdeogramImage({
+                      prompt: soloPrompt,
+                      aspect_ratio: aspectRatioKey,
+                      style_type: styleType,
+                      model: model,
+                      magic_prompt_option: 'AUTO',
+                      count: 1
+                    })
+                  ]);
+                  
+                  const allImages = [];
+                  if (groupResult.data?.[0]?.url) allImages.push(groupResult.data[0].url);
+                  if (soloResult.data?.[0]?.url) allImages.push(soloResult.data[0].url);
+                  
+                  if (allImages.length > 0) {
+                    setGeneratedImages(allImages);
+                    setSelectedImageIndex(0);
+                    const modelDescription = model === 'V_3' ? 'Ideogram V3 (Realistic)' : 'Ideogram Turbo';
+                    sonnerToast.success(`Generated ${allImages.length} VIIBE options with ${modelDescription}! Choose your favorite.`);
+                  } else {
+                    sonnerToast.error("Failed to generate your VIIBE. Please try again.");
+                  }
                 } else {
-                  sonnerToast.error("Failed to generate your VIIBE. Please try again.");
+                  // Generate single image with current settings
+                  const result = await generateIdeogramImage({
+                    prompt: promptText,
+                    aspect_ratio: aspectRatioKey,
+                    style_type: styleType,
+                    model: model,
+                    magic_prompt_option: 'AUTO',
+                    count: 1
+                  });
+                  
+                  if (result.data && result.data.length > 0) {
+                    const imageUrls = result.data.map(img => img.url);
+                    setGeneratedImages(imageUrls);
+                    setSelectedImageIndex(0);
+                    const modelDescription = model === 'V_3' ? 'Ideogram V3 (Realistic)' : 'Ideogram Turbo';
+                    sonnerToast.success(`Generated ${imageUrls.length} VIIBE options with ${modelDescription}! Choose your favorite.`);
+                  } else {
+                    sonnerToast.error("Failed to generate your VIIBE. Please try again.");
+                  }
                 }
               } catch (error) {
                 console.error("Error generating image:", error);
@@ -6687,6 +6743,14 @@ const Index = () => {
 
               // Get secondary subcategory for pop culture
               const subcategorySecondary = selectedStyle === 'pop-culture' && selectedPick ? selectedPick : undefined;
+              
+              // Determine people count hint and text placement preference
+              const selectedVisualOption = selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex] : undefined;
+              const peopleCountHint: 'single' | 'multiple' | undefined = selectedVisualOption?.isSinglePerson ? 'single' : 
+                (selectedVisualOption && ['friends', 'crowd', 'people', 'group', 'party', 'audience', 'performers', 'celebrating'].some(keyword => 
+                  selectedVisualOption.subject.toLowerCase().includes(keyword) || selectedVisualOption.background.toLowerCase().includes(keyword)
+                )) ? 'multiple' : undefined;
+              
               const ideogramPayload = buildIdeogramHandoff({
                 // Core parameters
                 visual_style: visualStyle,
@@ -6705,7 +6769,10 @@ const Index = () => {
                 ai_visual_assist_used: selectedSubjectOption === "ai-assist",
                 // Visual AI Recommendations
                 rec_subject: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].subject : selectedSubjectOption === "design-myself" ? subjectDescription : undefined,
-                rec_background: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined
+                rec_background: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined,
+                // New hints
+                people_count_hint: peopleCountHint,
+                text_placement_preference: 'bottom' // Default to bottom placement for better text readability
               });
               console.log("VIIBE Generated!", {
                 category: selectedStyle || "",
