@@ -149,7 +149,7 @@ function postProcess(line: string, tone: string, requiredTags?: string[]): VibeC
 async function generateMultipleCandidates(inputs: VibeInputs): Promise<VibeCandidate[]> {
   try {
     const systemPromptUpdated = `You are a witty, creative copywriter specializing in short-form content. 
-Your task is to write 4 distinct options that vary significantly in structure, theme, and wording while maintaining the specified tone.
+Your task is to write 6 distinct options that vary significantly in structure, theme, and wording while maintaining the specified tone.
 Make each option distinctly different - avoid repeating similar phrases, structures, or concepts.
 Always output valid JSON only.`;
 
@@ -175,7 +175,7 @@ Always output valid JSON only.`;
       ? `\n• Aim to include or reference these tags naturally (paraphrasing is fine): ${inputs.tags.join(', ')}`
       : '';
 
-    const corePrompt = `Generate 4 concise options under 100 chars each for:
+    const corePrompt = `Generate 6 concise options under 100 chars each for:
 Category: ${inputs.category} > ${inputs.subcategory}
 Tone: ${inputs.tone}
 Tags: ${inputs.tags?.join(', ') || 'none'}
@@ -183,7 +183,7 @@ ${inputs.recipient_name && inputs.recipient_name !== "-" ? `Target: ${inputs.rec
 
 ${tagRequirement}${specialInstructions}
 
-Return only: {"lines":["option1","option2","option3","option4"]}`;
+Return only: {"lines":["option1","option2","option3","option4","option5","option6"]}`;
 
     const messages = [
       { role: 'system', content: 'Generate short, witty text. JSON array only. No explanations.' },
@@ -191,9 +191,9 @@ Return only: {"lines":["option1","option2","option3","option4"]}`;
     ];
     
     const result = await openAIService.chatJSON(messages, {
-      max_completion_tokens: 220,
-      temperature: 1.0,
-      model: 'gpt-5-mini-2025-08-07'
+      max_tokens: 150,
+      temperature: 0.9,
+      model: 'gpt-4o-mini'
     });
     
     // Store the API metadata for later use
@@ -257,6 +257,20 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
       finalCandidates.push(...tagBlockedLines);
     }
     
+    // Ensure we have exactly 4 options by adding fallbacks if needed
+    while (finalCandidates.length < 4) {
+      const fallbackVariants = getFallbackVariants(inputs.tone, inputs.category, inputs.subcategory);
+      const nextFallback = fallbackVariants[finalCandidates.length % fallbackVariants.length];
+      if (!finalCandidates.includes(nextFallback)) {
+        finalCandidates.push(nextFallback);
+      } else {
+        finalCandidates.push(`${nextFallback} ${finalCandidates.length}`);
+      }
+    }
+    
+    // Take only first 4 if we have more
+    finalCandidates = finalCandidates.slice(0, 4);
+    
     // Shuffle the array to avoid always showing short ones first
     for (let i = finalCandidates.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -275,14 +289,18 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
     
     if (allTagOnlyBlocked && candidateResults.length > 0) {
       // Use the model's original lines since they were only blocked for tags
-      finalCandidates = candidateResults.map(c => c.line);
+      finalCandidates = candidateResults.map(c => c.line).slice(0, 4);
+      // Ensure exactly 4 options
+      while (finalCandidates.length < 4) {
+        const fallbackVariants = getFallbackVariants(inputs.tone, inputs.category, inputs.subcategory);
+        finalCandidates.push(fallbackVariants[finalCandidates.length % fallbackVariants.length]);
+      }
       picked = finalCandidates[0];
       usedFallback = false;
       reason = 'Used model output with partial tag coverage';
     } else {
       // Genuine blocks (banned words, etc.) - use tone-based fallbacks
-      const fallback = fallbackByTone[inputs.tone.toLowerCase()] || fallbackByTone.humorous;
-      finalCandidates = [fallback, `${fallback} today`, `${fallback} vibes`, `${fallback} energy`];
+      finalCandidates = getFallbackVariants(inputs.tone, inputs.category, inputs.subcategory);
       picked = finalCandidates[0];
       usedFallback = true;
       reason = candidateResults.find(c => c.reason)?.reason || 'All candidates blocked';
