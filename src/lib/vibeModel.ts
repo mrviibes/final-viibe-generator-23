@@ -1,4 +1,5 @@
 import { openAIService } from './openai';
+import { normalizeTypography } from './textUtils';
 import { 
   systemPrompt, 
   buildDeveloperPrompt, 
@@ -53,12 +54,20 @@ function postProcess(line: string, tone: string, requiredTags?: string[]): VibeC
     cleaned = cleaned.replace(pattern, '');
   }
   
+  // Apply text normalization from textUtils
+  cleaned = normalizeTypography(cleaned);
+  
   // Fix common text generation errors
   // Remove duplicate words (e.g., "to beance to become" -> "to become")
   cleaned = cleaned.replace(/\b(\w+)\s+\w*\1/gi, '$1');
   
   // Fix repeated "to" patterns specifically
   cleaned = cleaned.replace(/\bto\s+\w*to\b/gi, 'to');
+  
+  // Fix common spelling errors specific to generation
+  cleaned = cleaned.replace(/\basement\b/gi, 'basement')
+    .replace(/\bcarrer\b/gi, 'career')
+    .replace(/\bskils\b/gi, 'skills');
   
   // Remove double spaces and clean up
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
@@ -87,6 +96,20 @@ function postProcess(line: string, tone: string, requiredTags?: string[]): VibeC
       blocked: true,
       reason: 'Empty after cleaning'
     };
+  }
+  
+  // Enforce savage tone quality - block joke-like content for savage
+  if (tone.toLowerCase() === 'savage') {
+    // Block obvious joke patterns that don't fit savage tone
+    if (cleaned.match(/^(why did|what do you call|knock knock)/i) || 
+        cleaned.match(/\?\!*$/i) ||
+        cleaned.match(/\bhaha\b|\blol\b|\bmeh\b/i)) {
+      return {
+        line: fallbackByTone.savage,
+        blocked: true,
+        reason: 'Not savage enough - too joke-like'
+      };
+    }
   }
   
   // Check tag coverage for important tags (skip visual-only tags) - relaxed approach
@@ -185,14 +208,18 @@ ${tagRequirement}${specialInstructions}
 
 Return only: {"lines":["option1","option2","option3","option4","option5","option6"]}`;
 
+    const systemMessage = inputs.tone === 'savage' 
+      ? 'Generate short, savage roasts/burns. Make them cutting and direct, NOT joke-like. JSON array only.'
+      : 'Generate short, witty text. JSON array only. No explanations.';
+    
     const messages = [
-      { role: 'system', content: 'Generate short, witty text. JSON array only. No explanations.' },
+      { role: 'system', content: systemMessage },
       { role: 'user', content: corePrompt }
     ];
     
     const result = await openAIService.chatJSON(messages, {
       max_tokens: 150,
-      temperature: 0.9,
+      temperature: 0.7, // Reduced from 0.9 to reduce joke drift
       model: 'gpt-4o-mini'
     });
     
