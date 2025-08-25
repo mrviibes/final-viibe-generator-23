@@ -239,10 +239,10 @@ function getSlotBasedFallbacks(inputs: VisualInputs): VisualOption[] {
       prompt: `${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${occasion} symbols and elements anchored bottom third on bold ${tone} ${randomScene} with ${primaryTags} accents [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: reflective glare in center, busy patterns] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: dark text]`
     },
     {
-      slot: "tone-twist",
-      subject: `${needsPeople ? `${peopleContext} expressing ` : ''}${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${tone} energy for ${occasion}`,
-      background: `Imaginative ${visualStyle || 'artistic'} world with ${primaryTags} influences`,
-      prompt: `${needsPeople ? `${peopleContext} expressing ` : ''}${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${tone} energy for ${occasion} positioned off-center in imaginative ${visualStyle || 'artistic'} world with ${primaryTags} influences [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: limbs crossing center, harsh shadows in safe zone] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: light text]`
+      slot: "singing",
+      subject: `${needsPeople ? `${peopleContext} singing or performing` : 'Musical performance scene'}`,
+      background: `Concert or performance stage with ${tone} lighting and ${primaryTags} elements`,
+      prompt: `${needsPeople ? `${peopleContext} singing or performing` : 'Musical performance scene'} positioned off-center on concert stage with ${tone} lighting and ${primaryTags} elements [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: limbs crossing center, harsh shadows in safe zone] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: light text]`
     }
   ];
 }
@@ -260,10 +260,11 @@ const systemPrompt = `Generate 4 visual concepts for graphics that MUST align wi
 RULES:
 - Return ONLY valid JSON - no markdown, no extra text
 - Each prompt: 40-60 words maximum
-- 4 slots: "background-only", "subject+background", "object", "tone-twist"
+- 4 slots: "background-only", "subject+background", "object", "singing"
 - CRITICAL: Visual concepts MUST relate to the provided text/joke content and tone
 - For Pride themes: Include rainbow, drag queens, parades, celebrations, fabulous elements
 - For jokes: Match the humor and subject matter exactly
+- SINGING SLOT: Always include musical/performance elements in the 4th option
 
 Format:
 {
@@ -350,7 +351,7 @@ JSON only.`;
       throw new Error('Invalid response format from AI - expected exactly 4 options');
     }
 
-    const expectedSlots = ['background-only', 'subject+background', 'object', 'tone-twist'];
+    const expectedSlots = ['background-only', 'subject+background', 'object', 'singing'];
     let validOptions = result.options
       .filter((opt: any) => opt.subject && opt.background && opt.prompt && opt.slot)
       .map((opt: any, index: number) => ({

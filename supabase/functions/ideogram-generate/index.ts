@@ -44,15 +44,22 @@ serve(async (req) => {
       });
     }
 
+    // Force V_2A_TURBO model to avoid V_3 legacy endpoint issues
+    let modelToUse = request.model;
+    if (request.model === 'V_3') {
+      modelToUse = 'V_2A_TURBO';
+      console.log('⚠️ Forcing model downgrade from V_3 to V_2A_TURBO for compatibility');
+    }
+
     const count = request.count || 1;
-    console.log(`Ideogram API call - Model: ${request.model}, Count: ${count}, Prompt: ${request.prompt.substring(0, 50)}...`);
+    console.log(`Ideogram API call - Model: ${modelToUse}, Count: ${count}, Prompt: ${request.prompt.substring(0, 50)}...`);
 
     if (count === 1) {
       // Single image generation (existing logic)
       const payload: any = {
         prompt: request.prompt,
         aspect_ratio: request.aspect_ratio,
-        model: request.model,
+        model: modelToUse,
         magic_prompt_option: request.magic_prompt_option,
       };
       
@@ -119,7 +126,7 @@ serve(async (req) => {
         const payload: any = {
           prompt: request.prompt,
           aspect_ratio: request.aspect_ratio,
-          model: request.model,
+          model: modelToUse,
           magic_prompt_option: request.magic_prompt_option,
         };
         

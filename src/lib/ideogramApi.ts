@@ -232,10 +232,17 @@ async function generateIdeogramImageFrontend(request: IdeogramGenerateRequest): 
     }
 
     // Always use JSON format wrapped in image_request
+    // Force V_2A_TURBO model for Step 4 compatibility
+    let modelToUse = currentModel;
+    if (currentModel === 'V_3') {
+      modelToUse = 'V_2A_TURBO';
+      console.log('⚠️ Forcing model downgrade from V_3 to V_2A_TURBO for compatibility');
+    }
+
     const payload: any = {
       prompt: request.prompt,
       aspect_ratio: request.aspect_ratio,
-      model: currentModel,
+      model: modelToUse,
       magic_prompt_option: request.magic_prompt_option,
     };
     
