@@ -63,7 +63,11 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   
   // TEXT PLACEMENT (if present)
   if (handoff.key_line && handoff.key_line.trim()) {
-    parts.push("Place text clearly visible in available space, not blocking main subject.");
+    if (needsPeople) {
+      parts.push("Place text in empty space, margins, or banner areas - avoid covering faces or blocking people.");
+    } else {
+      parts.push("Place text clearly visible in available space, not blocking main subject.");
+    }
   }
   
   // AVOID LIST

@@ -6508,54 +6508,52 @@ const Index = () => {
             {currentStep < 4 && (
               <Button variant={currentStep === 1 && !isStep1Complete() || currentStep === 2 && !isStep2Complete() || currentStep === 3 && !isStep3Complete() ? "outline" : "brand"} onClick={async () => {
             if (currentStep === 3 && isStep3Complete() && selectedDimension) {
-               // Generate visual recommendations first, then move to Step 4
+               // Immediately move to Step 4, then generate visual recommendations in background
+               setCurrentStep(4);
                setIsLoadingRecommendations(true);
                
-               try {
-                 // Generate visual recommendations
-                 const category = selectedStyle ? styleOptions.find(s => s.id === selectedStyle)?.name || "" : "";
-                 let subcategory = 'general';
-                 const finalTags = [...tags, ...subjectTags];
-                 
-                 if (selectedStyle === 'celebrations' && selectedSubOption) {
-                   const celebOption = celebrationOptions.find(c => c.id === selectedSubOption);
-                   subcategory = celebOption?.name || selectedSubOption;
-                 } else if (selectedStyle === 'pop-culture' && selectedSubOption) {
-                   const popOption = popCultureOptions.find(p => p.id === selectedSubOption);
-                   subcategory = popOption?.name || selectedSubOption;
-                   if (selectedPick) {
-                     finalTags.push(selectedPick);
+               // Generate visual recommendations in background
+               (async () => {
+                 try {
+                   const category = selectedStyle ? styleOptions.find(s => s.id === selectedStyle)?.name || "" : "";
+                   let subcategory = 'general';
+                   const finalTags = [...tags, ...subjectTags];
+                   
+                   if (selectedStyle === 'celebrations' && selectedSubOption) {
+                     const celebOption = celebrationOptions.find(c => c.id === selectedSubOption);
+                     subcategory = celebOption?.name || selectedSubOption;
+                   } else if (selectedStyle === 'pop-culture' && selectedSubOption) {
+                     const popOption = popCultureOptions.find(p => p.id === selectedSubOption);
+                     subcategory = popOption?.name || selectedSubOption;
+                     if (selectedPick) {
+                       finalTags.push(selectedPick);
+                     }
+                   } else if (selectedSubOption) {
+                     subcategory = selectedSubOption;
                    }
-                 } else if (selectedSubOption) {
-                   subcategory = selectedSubOption;
+                   
+                   const selectedTextStyleObj = textStyleOptions.find(ts => ts.id === selectedTextStyle);
+                   const tone = selectedTextStyleObj?.name || 'Humorous';
+                   const finalLine = selectedGeneratedOption || (isCustomTextConfirmed ? stepTwoText : undefined);
+                   
+                   const visualResult = await generateVisualRecommendations({
+                     category,
+                     subcategory,
+                     tone: tone.toLowerCase(),
+                     tags: finalTags,
+                     visualStyle: selectedVisualStyle || undefined,
+                     finalLine,
+                     subjectOption: selectedSubjectOption || undefined,
+                     dimensions: selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || undefined
+                   }, 4);
+                   
+                   setVisualRecommendations(visualResult);
+                   setIsLoadingRecommendations(false);
+                 } catch (error) {
+                   console.error('Failed to generate visual recommendations:', error);
+                   setIsLoadingRecommendations(false);
                  }
-                 
-                 const selectedTextStyleObj = textStyleOptions.find(ts => ts.id === selectedTextStyle);
-                 const tone = selectedTextStyleObj?.name || 'Humorous';
-                 const finalLine = selectedGeneratedOption || (isCustomTextConfirmed ? stepTwoText : undefined);
-                 
-                 const visualResult = await generateVisualRecommendations({
-                   category,
-                   subcategory,
-                   tone: tone.toLowerCase(),
-                   tags: finalTags,
-                   visualStyle: selectedVisualStyle || undefined,
-                   finalLine,
-                   subjectOption: selectedSubjectOption || undefined,
-                   dimensions: selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || undefined
-                 }, 4);
-                 
-                 setVisualRecommendations(visualResult);
-                 setIsLoadingRecommendations(false);
-                 
-                 // Now move to Step 4 (auto-generation will trigger via useEffect)
-                 setCurrentStep(4);
-               } catch (error) {
-                 console.error('Failed to generate visual recommendations:', error);
-                 setIsLoadingRecommendations(false);
-                 // Move to Step 4 anyway with fallback
-                 setCurrentStep(4);
-               }
+               })();
                return;
              }
              
