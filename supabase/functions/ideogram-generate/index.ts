@@ -44,12 +44,9 @@ serve(async (req) => {
       });
     }
 
-    // Force V_2A_TURBO model to avoid V_3 legacy endpoint issues
+    // Use requested model, with fallback logic for V_3 if needed
     let modelToUse = request.model;
-    if (request.model === 'V_3') {
-      modelToUse = 'V_2A_TURBO';
-      console.log('⚠️ Forcing model downgrade from V_3 to V_2A_TURBO for compatibility');
-    }
+    let shouldRetryWithTurbo = false;
 
     const count = request.count || 1;
     console.log(`Ideogram API call - Model: ${modelToUse}, Count: ${count}, Prompt: ${request.prompt.substring(0, 50)}...`);
@@ -86,38 +83,110 @@ serve(async (req) => {
         const errorText = await response.text();
         console.error(`Ideogram API error (${response.status}):`, errorText);
         
-        let errorMessage = `HTTP ${response.status}`;
-        try {
-          const errorData = JSON.parse(errorText);
-          errorMessage = errorData.error?.message || errorMessage;
-        } catch {
-          errorMessage = errorText || errorMessage;
-        }
+        // If V_3 fails with certain errors, try fallback to Turbo
+        if (modelToUse === 'V_3' && (response.status === 400 || response.status === 500)) {
+          console.log('⚠️ V_3 failed, attempting fallback to V_2A_TURBO');
+          shouldRetryWithTurbo = true;
+        } else {
+          let errorMessage = `HTTP ${response.status}`;
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.error?.message || errorMessage;
+          } catch {
+            errorMessage = errorText || errorMessage;
+          }
 
-        // Handle specific error cases
-        if (response.status === 400 && errorText.includes('content_filtering')) {
-          errorMessage = 'Content was filtered by Ideogram. Try rephrasing your prompt.';
-        } else if (response.status === 429) {
-          errorMessage = 'Rate limit exceeded. Please try again later.';
-        } else if (response.status === 401) {
-          errorMessage = 'Invalid API key. Please check your Ideogram API key.';
-        }
+          // Handle specific error cases
+          if (response.status === 400 && errorText.includes('content_filtering')) {
+            errorMessage = 'Content was filtered by Ideogram. Try rephrasing your prompt.';
+          } else if (response.status === 429) {
+            errorMessage = 'Rate limit exceeded. Please try again later.';
+          } else if (response.status === 401) {
+            errorMessage = 'Invalid API key. Please check your Ideogram API key.';
+          }
 
-        return new Response(JSON.stringify({ 
-          error: errorMessage,
-          status: response.status 
-        }), {
-          status: response.status,
+          return new Response(JSON.stringify({ 
+            error: errorMessage,
+            status: response.status 
+          }), {
+            status: response.status,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+
+      if (!shouldRetryWithTurbo) {
+        const data = await response.json();
+        console.log(`Ideogram API success - Generated ${data.data?.length || 0} image(s) with model ${modelToUse}`);
+        
+        return new Response(JSON.stringify(data), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-
-      const data = await response.json();
-      console.log(`Ideogram API success - Generated ${data.data?.length || 0} image(s)`);
       
-      return new Response(JSON.stringify(data), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      // Retry with Turbo if V_3 failed
+      if (shouldRetryWithTurbo) {
+        console.log('Retrying with V_2A_TURBO model...');
+        modelToUse = 'V_2A_TURBO';
+        
+        const fallbackPayload: any = {
+          prompt: request.prompt,
+          aspect_ratio: request.aspect_ratio,
+          model: modelToUse,
+          magic_prompt_option: request.magic_prompt_option,
+        };
+        
+        if (request.seed !== undefined) {
+          fallbackPayload.seed = request.seed;
+        }
+        
+        if (request.style_type) {
+          fallbackPayload.style_type = request.style_type;
+        }
+
+        const fallbackRequestBody = JSON.stringify({ image_request: fallbackPayload });
+
+        const fallbackResponse = await fetch(IDEOGRAM_API_BASE, {
+          method: 'POST',
+          headers: {
+            'Api-Key': ideogramApiKey,
+            'Content-Type': 'application/json',
+          },
+          body: fallbackRequestBody,
+        });
+
+        if (!fallbackResponse.ok) {
+          const errorText = await fallbackResponse.text();
+          console.error(`Fallback to Turbo also failed (${fallbackResponse.status}):`, errorText);
+          
+          let errorMessage = `HTTP ${fallbackResponse.status}`;
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.error?.message || errorMessage;
+          } catch {
+            errorMessage = errorText || errorMessage;
+          }
+
+          return new Response(JSON.stringify({ 
+            error: `V3 failed, Turbo fallback also failed: ${errorMessage}`,
+            status: fallbackResponse.status 
+          }), {
+            status: fallbackResponse.status,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const fallbackData = await fallbackResponse.json();
+        console.log(`Fallback success - Generated ${fallbackData.data?.length || 0} image(s) with Turbo`);
+        
+        // Add a note about the fallback
+        return new Response(JSON.stringify({
+          ...fallbackData,
+          _fallback_note: 'V3 had an issue; used Turbo instead'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     } else {
       // Multiple image generation
       const promises: Promise<any>[] = [];

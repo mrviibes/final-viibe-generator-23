@@ -144,17 +144,16 @@ export async function findBestProxy(): Promise<ProxySettings['type']> {
 }
 
 export async function generateIdeogramImage(request: IdeogramGenerateRequest): Promise<IdeogramGenerateResponse> {
-  // Choose model based on style - use V_3 for realistic, V_2A_TURBO otherwise
-  const chosenModel: 'V_3' | 'V_2A_TURBO' = request.style_type === 'REALISTIC' ? 'V_3' : 'V_2A_TURBO';
-  const requestWithChosenModel: IdeogramGenerateRequest = { ...request, model: chosenModel };
+  // Use the model specified in the request (no automatic override)
+  const requestWithModel: IdeogramGenerateRequest = { ...request };
   
   // Try backend API first if enabled
   if (useBackendAPI) {
-    console.log(`Calling Ideogram backend API - Model: ${chosenModel}, Style: ${request.style_type || 'AUTO'}, Prompt: ${request.prompt.substring(0, 50)}...`);
+    console.log(`Calling Ideogram backend API - Model: ${request.model}, Style: ${request.style_type || 'AUTO'}, Prompt: ${request.prompt.substring(0, 50)}...`);
     
     try {
       const { data, error } = await supabase.functions.invoke('ideogram-generate', {
-        body: requestWithChosenModel
+        body: requestWithModel
       });
 
       if (error) {
@@ -166,7 +165,13 @@ export async function generateIdeogramImage(request: IdeogramGenerateRequest): P
         throw new IdeogramAPIError('No data received from backend API');
       }
 
-      console.log(`Backend Ideogram API success - Generated ${data.data?.length || 0} image(s) with Model: ${chosenModel}, Style: ${request.style_type || 'AUTO'}`);
+      // Check for fallback notification
+      if (data._fallback_note) {
+        console.log('⚠️ Backend used fallback:', data._fallback_note);
+        // You could show a toast here if needed
+      }
+
+      console.log(`Backend Ideogram API success - Generated ${data.data?.length || 0} image(s) with Model: ${request.model}, Style: ${request.style_type || 'AUTO'}`);
       return data as IdeogramGenerateResponse;
 
     } catch (error) {
@@ -177,7 +182,7 @@ export async function generateIdeogramImage(request: IdeogramGenerateRequest): P
       if (key) {
         console.log('Falling back to frontend Ideogram API...');
         useBackendAPI = false;
-        const result = await generateIdeogramImageFrontend(requestWithChosenModel);
+        const result = await generateIdeogramImageFrontend(requestWithModel);
         useBackendAPI = true; // Reset for next call
         return result;
       }
@@ -189,7 +194,7 @@ export async function generateIdeogramImage(request: IdeogramGenerateRequest): P
   }
 
   // Frontend mode
-  return generateIdeogramImageFrontend(requestWithChosenModel);
+  return generateIdeogramImageFrontend(requestWithModel);
 }
 
 async function generateIdeogramImageFrontend(request: IdeogramGenerateRequest): Promise<IdeogramGenerateResponse> {
@@ -232,12 +237,8 @@ async function generateIdeogramImageFrontend(request: IdeogramGenerateRequest): 
     }
 
     // Always use JSON format wrapped in image_request
-    // Force V_2A_TURBO model for Step 4 compatibility
+    // Use the model as requested (no forced downgrade)
     let modelToUse = currentModel;
-    if (currentModel === 'V_3') {
-      modelToUse = 'V_2A_TURBO';
-      console.log('⚠️ Forcing model downgrade from V_3 to V_2A_TURBO for compatibility');
-    }
 
     const payload: any = {
       prompt: request.prompt,
