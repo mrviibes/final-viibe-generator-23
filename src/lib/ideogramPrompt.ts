@@ -7,7 +7,7 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   // EXACT TEXT RENDERING (if present)
   if (handoff.key_line && handoff.key_line.trim()) {
     const cleanText = handoff.key_line.replace(/[""]/g, '"').replace(/['']/g, "'").replace(/[—–]/g, '-').trim();
-    parts.push(`EXACT TEXT: "${cleanText}"`);
+    parts.push(`Render this exact text: "${cleanText}"`);
   }
   
   // OCCASION/CATEGORY
@@ -91,7 +91,7 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   }
   
   // AVOID LIST
-  const avoidList = ["typos", "misspellings", "extra text", "wrong spelling"];
+  const avoidList = ["typos", "misspellings", "extra text", "wrong spelling", "text covering more than 30% of image area"];
   if (handoff.visual_style?.toLowerCase() === 'realistic') {
     avoidList.push("cartoon style", "flat colors");
   }
@@ -103,7 +103,16 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   } else if (handoff.people_count_hint === 'multiple' || needsPeople) {
     avoidList.push("empty scenes", "isolated backgrounds");
   }
+  
+  // Add instruction labels to avoid list to prevent them from being drawn
+  avoidList.push("instruction labels", "drawing the words 'EXACT TEXT'", "drawing 'Render this exact text'", "showing prompt instructions");
+  
   parts.push(`Avoid: ${avoidList.join(', ')}.`);
+  
+  // Add final instruction to only render the quoted text, not the instruction labels
+  if (handoff.key_line && handoff.key_line.trim()) {
+    parts.push("Only render the text inside quotes as visible typography - do not draw instruction words.");
+  }
   
   return parts.join(' ');
 }
@@ -130,4 +139,92 @@ export function getStyleTypeForIdeogram(visualStyle: string): 'AUTO' | 'GENERAL'
   };
   
   return styleMap[visualStyle?.toLowerCase()] || 'AUTO';
+}
+
+// Parse direct prompts to extract structured data and apply guardrails
+export function parseDirectPrompt(directPrompt: string): { parsedHandoff: Partial<IdeogramHandoff>; additionalNotes: string } {
+  const lines = directPrompt.split('.').map(line => line.trim()).filter(line => line.length > 0);
+  const parsedHandoff: Partial<IdeogramHandoff> = {};
+  const unparsedLines: string[] = [];
+  
+  for (const line of lines) {
+    // Extract exact text
+    const exactTextMatch = line.match(/(?:EXACT TEXT|Render this exact text):\s*["']([^"']+)["']/i);
+    if (exactTextMatch) {
+      parsedHandoff.key_line = exactTextMatch[1];
+      continue;
+    }
+    
+    // Extract occasion/category
+    const occasionMatch = line.match(/Occasion:\s*([^,]+),\s*([^(]+)(?:\s*\(([^)]+)\))?/i);
+    if (occasionMatch) {
+      parsedHandoff.category = occasionMatch[1].trim();
+      parsedHandoff.subcategory_primary = occasionMatch[2].trim();
+      if (occasionMatch[3]) {
+        parsedHandoff.subcategory_secondary = occasionMatch[3].trim();
+      }
+      continue;
+    }
+    
+    // Extract subject
+    const subjectMatch = line.match(/Subject:\s*(.+)/i);
+    if (subjectMatch) {
+      parsedHandoff.rec_subject = subjectMatch[1].trim();
+      continue;
+    }
+    
+    // Extract background
+    const backgroundMatch = line.match(/Background:\s*(.+)/i);
+    if (backgroundMatch) {
+      parsedHandoff.rec_background = backgroundMatch[1].trim();
+      continue;
+    }
+    
+    // Extract style
+    const styleMatch = line.match(/Style:\s*(.+)/i);
+    if (styleMatch) {
+      parsedHandoff.visual_style = styleMatch[1].trim().toLowerCase();
+      continue;
+    }
+    
+    // Extract tone
+    const toneMatch = line.match(/Tone:\s*(.+)/i);
+    if (toneMatch) {
+      parsedHandoff.tone = toneMatch[1].trim().toLowerCase();
+      continue;
+    }
+    
+    // Extract format/aspect ratio
+    const formatMatch = line.match(/Format:\s*(.+)/i);
+    if (formatMatch) {
+      parsedHandoff.aspect_ratio = formatMatch[1].trim();
+      continue;
+    }
+    
+    // Extract people count hints
+    if (line.toLowerCase().includes('include multiple people') || line.toLowerCase().includes('multiple people clearly visible')) {
+      parsedHandoff.people_count_hint = 'multiple';
+      continue;
+    }
+    if (line.toLowerCase().includes('exactly one person') || line.toLowerCase().includes('single person')) {
+      parsedHandoff.people_count_hint = 'single';
+      continue;
+    }
+    
+    // Skip avoid lists and instruction lines
+    if (line.toLowerCase().startsWith('avoid:') || 
+        line.toLowerCase().includes('place text') || 
+        line.toLowerCase().includes('never cover') ||
+        line.toLowerCase().includes('only render')) {
+      continue;
+    }
+    
+    // Everything else goes to additional notes
+    unparsedLines.push(line);
+  }
+  
+  return {
+    parsedHandoff,
+    additionalNotes: unparsedLines.join('. ').trim()
+  };
 }

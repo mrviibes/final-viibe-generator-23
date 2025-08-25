@@ -19,7 +19,7 @@ import { generateCandidates, VibeResult } from "@/lib/vibeModel";
 import { buildIdeogramHandoff } from "@/lib/ideogram";
 import { generateVisualRecommendations, VisualOption } from "@/lib/visualModel";
 import { generateIdeogramImage, setIdeogramApiKey, getIdeogramApiKey, hasIdeogramApiKey, isUsingBackend as ideogramIsUsingBackend, IdeogramAPIError, getProxySettings, setProxySettings, testProxyConnection, ProxySettings } from "@/lib/ideogramApi";
-import { buildIdeogramPrompt, getAspectRatioForIdeogram, getStyleTypeForIdeogram } from "@/lib/ideogramPrompt";
+import { buildIdeogramPrompt, getAspectRatioForIdeogram, getStyleTypeForIdeogram, parseDirectPrompt } from "@/lib/ideogramPrompt";
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
 import { normalizeTypography, suggestContractions, isTextMisspelled } from "@/lib/textUtils";
@@ -4701,38 +4701,79 @@ const Index = () => {
         rec_background: recBackground
       });
 
-      // Use direct prompt if provided, otherwise use selected recommendation prompt, otherwise build from structured inputs
-      let prompt = directPrompt.trim();
-      if (!prompt && selectedRecommendation !== null && visualRecommendations) {
+      // Always use structured approach with guardrails
+      let prompt: string;
+      let finalPayload = ideogramPayload;
+      
+      if (directPrompt.trim()) {
+        // Parse direct prompt and merge with existing payload to apply guardrails
+        console.log('=== Parsing Direct Prompt ===');
+        console.log('Original direct prompt:', directPrompt);
+        
+        const { parsedHandoff, additionalNotes } = parseDirectPrompt(directPrompt);
+        console.log('Parsed handoff data:', parsedHandoff);
+        console.log('Additional style notes:', additionalNotes);
+        
+        // Merge parsed data with existing payload (parsed data takes priority)
+        finalPayload = {
+          ...ideogramPayload,
+          ...parsedHandoff
+        };
+        
+        // Add additional notes to design_notes if present
+        if (additionalNotes) {
+          finalPayload.design_notes = finalPayload.design_notes 
+            ? `${finalPayload.design_notes}. ${additionalNotes}`
+            : additionalNotes;
+        }
+        
+        prompt = buildIdeogramPrompt(finalPayload);
+        console.log('Rebuilt prompt with guardrails:', prompt);
+      } else if (selectedRecommendation !== null && visualRecommendations) {
         prompt = visualRecommendations.options[selectedRecommendation].prompt;
+      } else {
+        prompt = buildIdeogramPrompt(finalPayload);
       }
-      if (!prompt) {
-        prompt = buildIdeogramPrompt(ideogramPayload);
-      }
-      const aspectForIdeogram = getAspectRatioForIdeogram(aspectRatio);
-      const styleForIdeogram = getStyleTypeForIdeogram(visualStyle);
+      const aspectForIdeogram = getAspectRatioForIdeogram(finalPayload.aspect_ratio || aspectRatio);
+      const styleForIdeogram = getStyleTypeForIdeogram(finalPayload.visual_style || visualStyle);
+      
       // Use user-selected model instead of automatic selection
       const chosenModel = ideogramModel;
+      
+      // Determine magic_prompt_option based on content
+      let magicPromptOption: 'AUTO' | 'OFF' = 'AUTO';
+      if (finalPayload.key_line && finalPayload.key_line.trim()) {
+        // Disable magic prompt for exact text to prevent drift
+        magicPromptOption = 'OFF';
+      }
+      
       console.log('=== Ideogram Generation Debug ===');
       console.log('Direct prompt provided:', !!directPrompt.trim());
+      console.log('Final structured payload:', finalPayload);
       console.log('Final prompt:', prompt);
       console.log('Aspect ratio:', aspectForIdeogram);
       console.log('Style type:', styleForIdeogram);
       console.log('Chosen model:', chosenModel);
-      console.log('Final payload:', {
+      console.log('Magic prompt option:', magicPromptOption);
+      console.log('Final API payload:', {
         prompt,
         aspect_ratio: aspectForIdeogram,
         model: chosenModel,
-        magic_prompt_option: 'AUTO',
+        magic_prompt_option: magicPromptOption,
         style_type: styleForIdeogram
       });
+      
+      // Add copy button for debugging (console helper)
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        console.log('📋 To copy prompt to clipboard, run: navigator.clipboard.writeText(`' + prompt.replace(/`/g, '\\`') + '`)');
+      }
       // Generate multiple images
       const imagePromises = Array(numImages).fill(null).map(() => 
         generateIdeogramImage({
           prompt,
           aspect_ratio: aspectForIdeogram,
           model: chosenModel,
-          magic_prompt_option: 'AUTO',
+          magic_prompt_option: magicPromptOption,
           style_type: styleForIdeogram
         })
       );
@@ -6637,7 +6678,7 @@ const Index = () => {
                     aspect_ratio: aspectRatioKey,
                     style_type: styleType,
                     model: model,
-                    magic_prompt_option: 'AUTO'
+                    magic_prompt_option: 'OFF' // Disable magic prompt for background-only
                   });
                   if (backgroundResult.data?.[0]?.url) {
                     setBackgroundOnlyImageUrl(backgroundResult.data[0].url);
@@ -6664,7 +6705,7 @@ const Index = () => {
                       aspect_ratio: aspectRatioKey,
                       style_type: styleType,
                       model: model,
-                      magic_prompt_option: 'AUTO',
+                      magic_prompt_option: finalText?.trim() ? 'OFF' : 'AUTO',
                       count: 1
                     }),
                     generateIdeogramImage({
@@ -6672,7 +6713,7 @@ const Index = () => {
                       aspect_ratio: aspectRatioKey,
                       style_type: styleType,
                       model: model,
-                      magic_prompt_option: 'AUTO',
+                      magic_prompt_option: finalText?.trim() ? 'OFF' : 'AUTO',
                       count: 1
                     })
                   ]);
@@ -6696,7 +6737,7 @@ const Index = () => {
                     aspect_ratio: aspectRatioKey,
                     style_type: styleType,
                     model: model,
-                    magic_prompt_option: 'AUTO',
+                    magic_prompt_option: finalText?.trim() ? 'OFF' : 'AUTO',
                     count: 1
                   });
                   
