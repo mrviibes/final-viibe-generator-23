@@ -4,149 +4,80 @@ import { normalizeTypography } from './textUtils';
 export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: boolean = false): string {
   const parts: string[] = [];
   
-  // Detect if people should be included based on AI recommendations
-  const peopleKeywords = ['friends', 'crowd', 'people', 'group', 'party', 'audience', 'performers', 'laughing', 'singing', 'dancing', 'celebrating'];
+  // EXACT TEXT RENDERING (if present)
+  if (handoff.key_line && handoff.key_line.trim()) {
+    const cleanText = handoff.key_line.replace(/[""]/g, '"').replace(/['']/g, "'").replace(/[—–]/g, '-').trim();
+    parts.push(`EXACT TEXT: "${cleanText}"`);
+  }
+  
+  // OCCASION/CATEGORY
+  if (handoff.category && handoff.subcategory_primary) {
+    parts.push(`Occasion: ${handoff.category}, ${handoff.subcategory_primary}${handoff.subcategory_secondary ? ` (${handoff.subcategory_secondary})` : ''}.`);
+  }
+  
+  // MAIN SUBJECT
+  let subject = handoff.rec_subject;
+  if (!subject && handoff.chosen_visual) {
+    const visualParts = handoff.chosen_visual.split(' - ');
+    subject = visualParts.length >= 2 ? visualParts[0].trim() : handoff.chosen_visual;
+  }
+  if (subject) {
+    parts.push(`Subject: ${subject}.`);
+  }
+  
+  // BACKGROUND WITH ON-THEME ELEMENTS
+  let background = handoff.rec_background;
+  if (!background && handoff.chosen_visual) {
+    const visualParts = handoff.chosen_visual.split(' - ');
+    background = visualParts.length >= 2 ? visualParts[1].trim() : `${handoff.category} themed background`;
+  }
+  if (!background) {
+    background = `${handoff.category || 'contextually appropriate'} themed background`;
+  }
+  if (cleanBackground) {
+    background = "clean, minimal background with high contrast for text";
+  }
+  parts.push(`Background: ${background}.`);
+  
+  // PEOPLE INCLUSION (when recommended)
+  const peopleKeywords = ['friends', 'crowd', 'people', 'group', 'party', 'audience', 'performers', 'celebrating'];
   const needsPeople = peopleKeywords.some(keyword => 
     handoff.chosen_visual?.toLowerCase().includes(keyword) || 
     handoff.rec_subject?.toLowerCase().includes(keyword) ||
     handoff.rec_background?.toLowerCase().includes(keyword)
   );
-  
-  // Put the exact text as the VERY FIRST sentence to ensure it renders
-  if (handoff.key_line && handoff.key_line.trim()) {
-    const normalizedText = normalizeTypography(handoff.key_line);
-    const sanitizedText = normalizedText.replace(/"/g, '\\"');
-    parts.push(`EXACT_TEXT (VERBATIM): "${sanitizedText}"`);
-    parts.push("Render this text EXACTLY as written, character-for-character, with no spelling changes, no extra words, no missing words.");
-    parts.push("Use only standard ASCII punctuation (straight quotes, regular apostrophes, hyphens). Maintain exact case and spacing.");
-    parts.push("If you cannot render the text exactly as specified, leave the text area completely blank rather than adding incorrect text.");
-    
-    if (cleanBackground) {
-      parts.push("Style and display this text clearly legible but not oversized; don't cover the canvas; keep text area ≤ 25% of image, maintain generous margins; integrate with the scene on a clean, minimal, high-contrast background with clear center area for text. Place the text in available negative space (e.g., lower third or sky), do not block the main subject, keep generous margins.");
-    } else {
-      parts.push("Style and display this text clearly legible but not oversized; don't cover the canvas; keep text area ≤ 25% of image, maintain generous margins; integrate with the scene on a realistic background. Place the text in available negative space (e.g., lower third or sky), do not block the main subject, keep generous margins.");
-    }
-  } else {
-    // For images without text, focus on visual elements only
-    parts.push("Create a visual composition without any text or typography overlays.");
-  }
-
-  // Extract and handle subject from various sources
-  let subject = handoff.rec_subject;
-  if (!subject && handoff.chosen_visual) {
-    // Try to split "subject - background" format
-    const parts_visual = handoff.chosen_visual.split(' - ');
-    if (parts_visual.length >= 2) {
-      subject = parts_visual[0].trim();
-    }
-  }
-
-  // Include subject in the scene description if available
-  if (subject && subject.trim()) {
-    // Enhance subject with people if detected
-    if (needsPeople && !subject.toLowerCase().includes('people') && !subject.toLowerCase().includes('friends') && !subject.toLowerCase().includes('group')) {
-      parts.push(`The main subject should feature ${subject} with visible people in the scene.`);
-    } else {
-      parts.push(`The main subject should feature ${subject}.`);
-    }
+  if (needsPeople) {
+    parts.push("Include multiple people clearly visible in the scene.");
   }
   
-  // This content is for [CATEGORY], specifically [SUBCATEGORY][ (SECOND SUBCATEGORY if Pop Culture) ].
-  let contentLine = `This content is for ${handoff.category}, specifically ${handoff.subcategory_primary}`;
-  if (handoff.category === 'pop-culture' && handoff.subcategory_secondary) {
-    contentLine += ` (${handoff.subcategory_secondary})`;
-  }
-  contentLine += '.';
-  parts.push(contentLine);
-  
-  // The overall tone is [TONE].
-  if (handoff.tone) {
-    parts.push(`The overall tone is ${handoff.tone}.`);
-  }
-  
-  // Apply these text tags as guides: [TEXT TAGS].
-  const textTags = handoff.text_tags_csv && handoff.text_tags_csv !== "None" ? handoff.text_tags_csv : "none";
-  parts.push(`Apply these text tags as guides: ${textTags}.`);
-  
-  // Render the scene in [VISUAL LOOK] style.
+  // COMPOSITION & STYLE
   if (handoff.visual_style) {
-    if (handoff.visual_style.toLowerCase() === 'realistic') {
-      parts.push(`Render the scene in ${handoff.visual_style} style with photorealistic lighting, real-world textures; camera depth of field; natural colors.`);
-    } else {
-      parts.push(`Render the scene in ${handoff.visual_style} style.`);
-    }
+    parts.push(`Style: ${handoff.visual_style}.`);
+  }
+  if (handoff.tone) {
+    parts.push(`Tone: ${handoff.tone}.`);
+  }
+  if (handoff.aspect_ratio) {
+    parts.push(`Format: ${handoff.aspect_ratio}.`);
   }
   
-  // Include these visual tags: [VISUAL TAGS].
-  if (handoff.visual_tags_csv) {
-    parts.push(`Include these visual tags: ${handoff.visual_tags_csv}.`);
+  // TEXT PLACEMENT (if present)
+  if (handoff.key_line && handoff.key_line.trim()) {
+    parts.push("Place text clearly visible in available space, not blocking main subject.");
   }
   
-  // Background should be [AI GENERATED BACKGROUND].
-  let background = handoff.rec_background;
-  if (!background && handoff.chosen_visual) {
-    // Try to extract background from "subject - background" format
-    const parts_visual = handoff.chosen_visual.split(' - ');
-    background = parts_visual.length >= 2 ? parts_visual[1].trim() : handoff.chosen_visual;
-  }
-  if (!background) {
-    background = "a clean, contextually appropriate background";
+  // AVOID LIST
+  const avoidList = ["typos", "misspellings", "extra text", "wrong spelling"];
+  if (handoff.visual_style?.toLowerCase() === 'realistic') {
+    avoidList.push("cartoon style", "flat colors");
   }
   if (cleanBackground) {
-    background = "a clean, minimal, high-contrast background with no visual clutter, no decorative elements, no patterns, and a clear center area";
-  } else if (needsPeople) {
-    // Ensure people are explicitly mentioned in background for realistic + savage tone
-    const tone = handoff.tone?.toLowerCase() || '';
-    if (tone.includes('savage') || tone.includes('sassy')) {
-      background = `${background} with multiple people visible in the background, moody dramatic lighting, realistic crowd atmosphere`;
-    } else {
-      background = `${background} with people clearly visible in the background scene`;
-    }
+    avoidList.push("visual clutter", "decorative elements");
   }
-  parts.push(`Background should be ${background}.`);
-  
-  // Output format should use aspect ratio [ASPECT RATIO].
-  if (handoff.aspect_ratio) {
-    parts.push(`Output format should use aspect ratio ${handoff.aspect_ratio}.`);
-  }
-  
-  // Add people enforcement if detected
   if (needsPeople) {
-    parts.push("CRITICAL: Include multiple people clearly visible in the scene as specified in the recommendations. Do not create empty backgrounds when people are mentioned.");
+    avoidList.push("empty scenes", "isolated backgrounds");
   }
-  
-  // Only add text visibility instructions if there's actual text content
-  if (handoff.key_line && handoff.key_line.trim()) {
-    parts.push("CRITICAL: Only render the EXACT_TEXT specified above. Do not add any additional text, words, letters, captions, labels, or written content beyond what is explicitly provided.");
-    parts.push("Ensure the text is clearly visible, balanced with the artwork, and styled to fit the chosen tone and tags.");
-    const baseNegatives = "No typos, no misspellings, no ligatures, no altered punctuation, no text variations, no unwanted glyphs, no pseudo-letters, no additional captions, no lists, no bullet points, no fine print, no lorem ipsum, no fake Latin text, no paragraphs, no icons that look like letters.";
-    
-    if (needsPeople) {
-      const peopleNegatives = baseNegatives + " No empty scenes, no isolated backgrounds when people are required.";
-      if (handoff.visual_style?.toLowerCase() === 'realistic') {
-        parts.push(`NEGATIVE PROMPTS: ${peopleNegatives} No cartoon, no illustration, no vector art, no cel-shading, no flat colors.`);
-      } else if (cleanBackground) {
-        parts.push(`NEGATIVE PROMPTS: ${peopleNegatives} No UI elements, no symbols, no decorative text elements, no watermarks, no logos.`);
-      } else {
-        parts.push(`NEGATIVE PROMPTS: ${peopleNegatives}`);
-      }
-    } else {
-      if (handoff.visual_style?.toLowerCase() === 'realistic') {
-        parts.push(`NEGATIVE PROMPTS: ${baseNegatives} No cartoon, no illustration, no vector art, no cel-shading, no flat colors.`);
-      } else if (cleanBackground) {
-        parts.push(`NEGATIVE PROMPTS: ${baseNegatives} No UI elements, no symbols, no decorative text elements, no watermarks, no logos.`);
-      } else {
-        parts.push(`NEGATIVE PROMPTS: ${baseNegatives}`);
-      }
-    }
-  } else {
-    parts.push("Focus on creating a balanced visual composition that fits the chosen tone and tags.");
-    if (needsPeople) {
-      parts.push("NEGATIVE PROMPTS: No text, no typography, no words, no letters, no characters, no glyphs, no symbols overlaid on the image. No empty scenes, no isolated backgrounds when people are required.");
-    } else {
-      parts.push("NEGATIVE PROMPTS: No text, no typography, no words, no letters, no characters, no glyphs, no symbols overlaid on the image.");
-    }
-  }
+  parts.push(`Avoid: ${avoidList.join(', ')}.`);
   
   return parts.join(' ');
 }

@@ -4072,12 +4072,12 @@ const Index = () => {
 
   // Text speed locked to fast (removed state)
 
-  // Auto-generate 1 image when Step 4 loads
+  // Auto-generate 1 image when Step 4 loads AND visual recommendations are ready
   useEffect(() => {
-    if (currentStep === 4 && !isGeneratingImage && generatedImages.length === 0 && !imageGenerationError) {
+    if (currentStep === 4 && !isGeneratingImage && generatedImages.length === 0 && !imageGenerationError && visualRecommendations) {
       handleGenerateImage(1); // Generate 1 image automatically
     }
-  }, [currentStep]);
+  }, [currentStep, visualRecommendations]);
 
   // Visual AI recommendations state
   const [isTestingProxy, setIsTestingProxy] = useState(false);
@@ -6507,11 +6507,60 @@ const Index = () => {
             
             <Button variant={currentStep === 1 && !isStep1Complete() || currentStep === 2 && !isStep2Complete() || currentStep === 3 && !isStep3Complete() || currentStep === 4 && !isStep4Complete() ? "outline" : "brand"} onClick={async () => {
             if (currentStep === 3 && isStep3Complete() && selectedDimension) {
-              // Move to Step 4 and automatically start generating the image
-              setCurrentStep(4);
-
-              // Start automatic image generation
-              setIsGeneratingImage(true);
+               // Generate visual recommendations first, then move to Step 4
+               setIsLoadingRecommendations(true);
+               
+               try {
+                 // Generate visual recommendations
+                 const category = selectedStyle ? styleOptions.find(s => s.id === selectedStyle)?.name || "" : "";
+                 let subcategory = 'general';
+                 const finalTags = [...tags, ...subjectTags];
+                 
+                 if (selectedStyle === 'celebrations' && selectedSubOption) {
+                   const celebOption = celebrationOptions.find(c => c.id === selectedSubOption);
+                   subcategory = celebOption?.name || selectedSubOption;
+                 } else if (selectedStyle === 'pop-culture' && selectedSubOption) {
+                   const popOption = popCultureOptions.find(p => p.id === selectedSubOption);
+                   subcategory = popOption?.name || selectedSubOption;
+                   if (selectedPick) {
+                     finalTags.push(selectedPick);
+                   }
+                 } else if (selectedSubOption) {
+                   subcategory = selectedSubOption;
+                 }
+                 
+                 const selectedTextStyleObj = textStyleOptions.find(ts => ts.id === selectedTextStyle);
+                 const tone = selectedTextStyleObj?.name || 'Humorous';
+                 const finalLine = selectedGeneratedOption || (isCustomTextConfirmed ? stepTwoText : undefined);
+                 
+                 const visualResult = await generateVisualRecommendations({
+                   category,
+                   subcategory,
+                   tone: tone.toLowerCase(),
+                   tags: finalTags,
+                   visualStyle: selectedVisualStyle || undefined,
+                   finalLine,
+                   subjectOption: selectedSubjectOption || undefined,
+                   dimensions: selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || undefined
+                 }, 4);
+                 
+                 setVisualRecommendations(visualResult);
+                 setIsLoadingRecommendations(false);
+                 
+                 // Now move to Step 4 (auto-generation will trigger via useEffect)
+                 setCurrentStep(4);
+               } catch (error) {
+                 console.error('Failed to generate visual recommendations:', error);
+                 setIsLoadingRecommendations(false);
+                 // Move to Step 4 anyway with fallback
+                 setCurrentStep(4);
+               }
+               return;
+             }
+             
+             if (currentStep === 4 && isStep4Complete()) {
+               // Start manual image generation on Step 4
+               setIsGeneratingImage(true);
               try {
                 const finalText = selectedGeneratedOption || stepTwoText || "";
                 const visualStyle = selectedVisualStyle || "";

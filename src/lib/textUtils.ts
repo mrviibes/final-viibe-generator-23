@@ -5,17 +5,6 @@ export function normalizeTypography(text: string): string {
     .replace(/['']/g, "'")
     // Convert em/en dashes to regular hyphens
     .replace(/[—–]/g, '-')
-    // Fix common spelling errors and missing apostrophes
-    .replace(/\b(\w+)s\b/g, (match, name) => {
-      // Add apostrophe for possessives (e.g., "Johnnys" -> "Johnny's")
-      if (name.length > 2 && !match.includes("'")) {
-        return `${name}'s`;
-      }
-      return match;
-    })
-    .replace(/\basement\b/gi, 'basement')
-    .replace(/\bcarrer\b/gi, 'career')
-    .replace(/\bskils\b/gi, 'skills')
     // Remove any trailing/leading whitespace
     .trim();
 }
