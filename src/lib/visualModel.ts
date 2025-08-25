@@ -229,8 +229,8 @@ function getSlotBasedFallbacks(inputs: VisualInputs): VisualOption[] {
     {
       slot: "subject+background", 
       subject: `${needsPeople ? `${peopleContext} immersed in ` : ''}${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${occasion} moment`,
-      background: `${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${tone} atmosphere with ${primaryTags}`,
-      prompt: `${needsPeople ? `${peopleContext} immersed in ` : ''}${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${occasion} moment positioned on right third in ${randomEnergy} ${tone} atmosphere with ${primaryTags} [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: faces crossing center, busy patterns in center] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: light text]`
+      background: `${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${tone} atmosphere with ${primaryTags}${needsPeople ? ' and visible crowd' : ''}`,
+      prompt: `${needsPeople ? `${peopleContext} immersed in ` : ''}${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${occasion} moment positioned on right third in ${randomEnergy} ${tone} atmosphere with ${primaryTags}${needsPeople ? ', multiple people clearly visible in background' : ''} [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: faces crossing center, busy patterns in center${needsPeople ? ', empty backgrounds' : ''}] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: light text]`
     },
     {
       slot: "object",
@@ -240,9 +240,9 @@ function getSlotBasedFallbacks(inputs: VisualInputs): VisualOption[] {
     },
     {
       slot: "singing",
-      subject: `${needsPeople ? `${peopleContext} singing or performing` : 'Musical performance scene'}`,
-      background: `Concert or performance stage with ${tone} lighting and ${primaryTags} elements`,
-      prompt: `${needsPeople ? `${peopleContext} singing or performing` : 'Musical performance scene'} positioned off-center on concert stage with ${tone} lighting and ${primaryTags} elements [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: limbs crossing center, harsh shadows in safe zone] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: light text]`
+      subject: `${needsPeople ? `${peopleContext} singing or performing` : 'Musical performance scene with performers'}`,
+      background: `Concert or performance stage with ${tone} lighting, ${primaryTags} elements, and visible audience`,
+      prompt: `${needsPeople ? `${peopleContext} singing or performing` : 'Musical performance scene with performers'} positioned off-center on concert stage with ${tone} lighting, ${primaryTags} elements, audience clearly visible in background [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: limbs crossing center, harsh shadows in safe zone, empty audience areas] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: light text]`
     }
   ];
 }

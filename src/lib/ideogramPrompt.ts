@@ -4,6 +4,14 @@ import { normalizeTypography } from './textUtils';
 export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: boolean = false): string {
   const parts: string[] = [];
   
+  // Detect if people should be included based on AI recommendations
+  const peopleKeywords = ['friends', 'crowd', 'people', 'group', 'party', 'audience', 'performers', 'laughing', 'singing', 'dancing', 'celebrating'];
+  const needsPeople = peopleKeywords.some(keyword => 
+    handoff.chosen_visual?.toLowerCase().includes(keyword) || 
+    handoff.rec_subject?.toLowerCase().includes(keyword) ||
+    handoff.rec_background?.toLowerCase().includes(keyword)
+  );
+  
   // Put the exact text as the VERY FIRST sentence to ensure it renders
   if (handoff.key_line && handoff.key_line.trim()) {
     const normalizedText = normalizeTypography(handoff.key_line);
@@ -35,7 +43,12 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
 
   // Include subject in the scene description if available
   if (subject && subject.trim()) {
-    parts.push(`The main subject should feature ${subject}.`);
+    // Enhance subject with people if detected
+    if (needsPeople && !subject.toLowerCase().includes('people') && !subject.toLowerCase().includes('friends') && !subject.toLowerCase().includes('group')) {
+      parts.push(`The main subject should feature ${subject} with visible people in the scene.`);
+    } else {
+      parts.push(`The main subject should feature ${subject}.`);
+    }
   }
   
   // This content is for [CATEGORY], specifically [SUBCATEGORY][ (SECOND SUBCATEGORY if Pop Culture) ].
@@ -81,6 +94,14 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   }
   if (cleanBackground) {
     background = "a clean, minimal, high-contrast background with no visual clutter, no decorative elements, no patterns, and a clear center area";
+  } else if (needsPeople) {
+    // Ensure people are explicitly mentioned in background for realistic + savage tone
+    const tone = handoff.tone?.toLowerCase() || '';
+    if (tone.includes('savage') || tone.includes('sassy')) {
+      background = `${background} with multiple people visible in the background, moody dramatic lighting, realistic crowd atmosphere`;
+    } else {
+      background = `${background} with people clearly visible in the background scene`;
+    }
   }
   parts.push(`Background should be ${background}.`);
   
@@ -89,22 +110,42 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     parts.push(`Output format should use aspect ratio ${handoff.aspect_ratio}.`);
   }
   
+  // Add people enforcement if detected
+  if (needsPeople) {
+    parts.push("CRITICAL: Include multiple people clearly visible in the scene as specified in the recommendations. Do not create empty backgrounds when people are mentioned.");
+  }
+  
   // Only add text visibility instructions if there's actual text content
   if (handoff.key_line && handoff.key_line.trim()) {
     parts.push("CRITICAL: Only render the EXACT_TEXT specified above. Do not add any additional text, words, letters, captions, labels, or written content beyond what is explicitly provided.");
     parts.push("Ensure the text is clearly visible, balanced with the artwork, and styled to fit the chosen tone and tags.");
     const baseNegatives = "No typos, no misspellings, no ligatures, no altered punctuation, no text variations, no unwanted glyphs, no pseudo-letters, no additional captions, no lists, no bullet points, no fine print, no lorem ipsum, no fake Latin text, no paragraphs, no icons that look like letters.";
     
-    if (handoff.visual_style?.toLowerCase() === 'realistic') {
-      parts.push(`NEGATIVE PROMPTS: ${baseNegatives} No cartoon, no illustration, no vector art, no cel-shading, no flat colors.`);
-    } else if (cleanBackground) {
-      parts.push(`NEGATIVE PROMPTS: ${baseNegatives} No UI elements, no symbols, no decorative text elements, no watermarks, no logos.`);
+    if (needsPeople) {
+      const peopleNegatives = baseNegatives + " No empty scenes, no isolated backgrounds when people are required.";
+      if (handoff.visual_style?.toLowerCase() === 'realistic') {
+        parts.push(`NEGATIVE PROMPTS: ${peopleNegatives} No cartoon, no illustration, no vector art, no cel-shading, no flat colors.`);
+      } else if (cleanBackground) {
+        parts.push(`NEGATIVE PROMPTS: ${peopleNegatives} No UI elements, no symbols, no decorative text elements, no watermarks, no logos.`);
+      } else {
+        parts.push(`NEGATIVE PROMPTS: ${peopleNegatives}`);
+      }
     } else {
-      parts.push(`NEGATIVE PROMPTS: ${baseNegatives}`);
+      if (handoff.visual_style?.toLowerCase() === 'realistic') {
+        parts.push(`NEGATIVE PROMPTS: ${baseNegatives} No cartoon, no illustration, no vector art, no cel-shading, no flat colors.`);
+      } else if (cleanBackground) {
+        parts.push(`NEGATIVE PROMPTS: ${baseNegatives} No UI elements, no symbols, no decorative text elements, no watermarks, no logos.`);
+      } else {
+        parts.push(`NEGATIVE PROMPTS: ${baseNegatives}`);
+      }
     }
   } else {
     parts.push("Focus on creating a balanced visual composition that fits the chosen tone and tags.");
-    parts.push("NEGATIVE PROMPTS: No text, no typography, no words, no letters, no characters, no glyphs, no symbols overlaid on the image.");
+    if (needsPeople) {
+      parts.push("NEGATIVE PROMPTS: No text, no typography, no words, no letters, no characters, no glyphs, no symbols overlaid on the image. No empty scenes, no isolated backgrounds when people are required.");
+    } else {
+      parts.push("NEGATIVE PROMPTS: No text, no typography, no words, no letters, no characters, no glyphs, no symbols overlaid on the image.");
+    }
   }
   
   return parts.join(' ');
