@@ -67,24 +67,24 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   
   // TEXT PLACEMENT (if present)
   if (handoff.key_line && handoff.key_line.trim()) {
-    let textPlacement = "Place text clearly visible in available space";
+    let textPlacement = "Place text in banner or margin area, covering maximum 25-30% of total image area";
     
     // Use text placement preference if provided
     if (handoff.text_placement_preference === 'bottom') {
-      textPlacement = "Place text at bottom in a banner or margin area";
+      textPlacement = "Place text at bottom in a banner or margin area, covering maximum 25% of image height";
     } else if (handoff.text_placement_preference === 'side') {
-      textPlacement = "Place text on left or right side in available space";
+      textPlacement = "Place text on left or right side in margin area, covering maximum 30% of image width";
     } else if (handoff.text_placement_preference === 'banner') {
-      textPlacement = "Place text in a banner overlay area";
+      textPlacement = "Place text in a banner overlay area, covering maximum 25-30% of total image area";
     }
     
     // Add people-specific guidance
     if (needsPeople || handoff.people_count_hint === 'multiple') {
-      textPlacement += " - CRITICAL: avoid covering faces, bodies, or blocking people entirely";
+      textPlacement += " - CRITICAL: never cover faces, heads, or bodies of people";
     } else if (handoff.people_count_hint === 'single') {
-      textPlacement += " - ensure single person remains clearly visible and unobstructed";
-    } else {
-      textPlacement += " - do not block main subject";
+      textPlacement += " - never cover the person's face, head, or body";
+    } else if (subject) {
+      textPlacement += " - never cover the main subject or focal point";
     }
     
     parts.push(textPlacement + ".");
