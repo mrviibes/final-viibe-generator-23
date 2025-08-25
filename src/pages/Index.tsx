@@ -4064,8 +4064,7 @@ const Index = () => {
   const [selectedRecommendation, setSelectedRecommendation] = useState<number | null>(null);
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
 
-  // Text speed state
-  const [textSpeed, setTextSpeed] = useState<'fast' | 'creative'>(() => openAIService.getTextSpeed());
+  // Text speed locked to fast (removed state)
 
   // Auto-generate 1 image when Step 4 loads
   useEffect(() => {
@@ -4622,10 +4621,7 @@ const Index = () => {
     openAIService.setApiKey(apiKey);
   };
 
-  const handleTextSpeedChange = (speed: 'fast' | 'creative') => {
-    setTextSpeed(speed);
-    openAIService.setTextSpeed(speed);
-  };
+  // Text speed handling removed - locked to fast
   const handleIdeogramApiKeySet = (apiKey: string) => {
     setIdeogramApiKey(apiKey);
     toast({
@@ -4924,19 +4920,7 @@ const Index = () => {
         <div className="flex justify-between items-center mb-4">
           <div></div>
           <StepProgress currentStep={currentStep} />
-          {/* Text Speed Toggle */}
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-muted-foreground">Text Speed:</span>
-            <Select value={textSpeed} onValueChange={handleTextSpeedChange}>
-              <SelectTrigger className="w-24 h-7 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="fast">Fast</SelectItem>
-                <SelectItem value="creative">Creative</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <div></div>
         </div>
         
         {currentStep === 1 && <>
@@ -5747,7 +5731,7 @@ const Index = () => {
                       </div>
                        {generatedOptions.length > 0 && generationAudit && (
                         <p className="text-xs text-muted-foreground">
-                           Using {generationAudit.model} ({generationAudit.textSpeed} mode) • Generated in {((Date.now() - textGenerationStartTime) / 1000).toFixed(1)}s
+                           Using {generationAudit.model} • Generated in {((Date.now() - textGenerationStartTime) / 1000).toFixed(1)}s
                            {generationAudit.usedFallback ? " • Used fallback" : ` • Received ${generationAudit.candidateCount} options`}
                         </p>
                       )}

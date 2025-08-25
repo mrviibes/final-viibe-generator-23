@@ -32,12 +32,13 @@ function safeParseArray(content: string): OpenAISearchResult[] {
 export class OpenAIService {
   private apiKey: string | null = null;
   private useBackendAPI: boolean = true; // Use Supabase backend by default
-  private textSpeed: 'fast' | 'creative' = 'fast'; // Default to fast
+  private textSpeed: 'fast' | 'creative' = 'fast'; // Locked to fast
 
   constructor() {
     // Still support localStorage for fallback, but prefer backend
     this.apiKey = localStorage.getItem('openai_api_key');
-    this.textSpeed = (localStorage.getItem('text_speed') as 'fast' | 'creative') || 'fast';
+    // Always use fast mode - ignore localStorage
+    this.textSpeed = 'fast';
   }
 
   setApiKey(key: string) {
@@ -65,12 +66,12 @@ export class OpenAIService {
   }
 
   setTextSpeed(speed: 'fast' | 'creative') {
-    this.textSpeed = speed;
-    localStorage.setItem('text_speed', speed);
+    // Always locked to fast - ignore any changes
+    this.textSpeed = 'fast';
   }
 
   getTextSpeed(): 'fast' | 'creative' {
-    return this.textSpeed;
+    return 'fast'; // Always return fast
   }
 
   private async callBackendAPI(messages: Array<{role: string; content: string}>, options: {
