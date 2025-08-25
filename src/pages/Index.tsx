@@ -6505,7 +6505,8 @@ const Index = () => {
               Back
             </Button>
             
-            <Button variant={currentStep === 1 && !isStep1Complete() || currentStep === 2 && !isStep2Complete() || currentStep === 3 && !isStep3Complete() || currentStep === 4 && !isStep4Complete() ? "outline" : "brand"} onClick={async () => {
+            {currentStep < 4 && (
+              <Button variant={currentStep === 1 && !isStep1Complete() || currentStep === 2 && !isStep2Complete() || currentStep === 3 && !isStep3Complete() ? "outline" : "brand"} onClick={async () => {
             if (currentStep === 3 && isStep3Complete() && selectedDimension) {
                // Generate visual recommendations first, then move to Step 4
                setIsLoadingRecommendations(true);
@@ -6729,15 +6730,16 @@ const Index = () => {
 
               // You can add your VIIBE generation logic here
               alert("VIIBE Generated Successfully! Check console for Ideogram handoff payload.");
-            } else {
+            } else if (currentStep < 4) {
               setCurrentStep(prev => prev + 1);
             }
-          }} disabled={currentStep === 1 && !isStep1Complete() || currentStep === 2 && !isStep2Complete() || currentStep === 3 && !isStep3Complete() || currentStep === 4 && !isStep4Complete()}>
+          }} disabled={currentStep === 1 && !isStep1Complete() || currentStep === 2 && !isStep2Complete() || currentStep === 3 && !isStep3Complete()}>
               {currentStep === 3 && isStep3Complete() && selectedDimension ? "GENERATE YOUR VIIBE" : <>
                   Continue
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </>}
             </Button>
+            )}
           </div>
         </div>
 
