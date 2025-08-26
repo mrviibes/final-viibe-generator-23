@@ -1,5 +1,3 @@
-import { supabase } from "@/integrations/supabase/client";
-
 export interface OpenAISearchResult {
   title: string;
   description: string;
@@ -16,31 +14,58 @@ export interface GenerateTextParams {
 
 export class OpenAIService {
   hasApiKey(): boolean {
-    return true; // Always true since keys are stored server-side
+    return Boolean(localStorage.getItem('openai_api_key'));
+  }
+
+  getApiKey(): string | null {
+    return localStorage.getItem('openai_api_key');
+  }
+
+  setApiKey(key: string): void {
+    localStorage.setItem('openai_api_key', key);
+  }
+
+  removeApiKey(): void {
+    localStorage.removeItem('openai_api_key');
   }
 
   async chatJSON(messages: Array<{role: string; content: string}>, options: any = {}): Promise<any> {
+    const apiKey = this.getApiKey();
+    if (!apiKey) {
+      throw new Error('No OpenAI API key found. Please set your API key.');
+    }
+
     try {
       const requestOptions = {
-        ...options,
-        response_format: { type: "json_object" }
+        model: 'gpt-4o-mini',
+        messages,
+        response_format: { type: "json_object" },
+        ...options
       };
 
-      const { data, error } = await supabase.functions.invoke('openai-chat', {
-        body: { messages, options: requestOptions }
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify(requestOptions)
       });
 
-      if (error) {
-        console.error('Supabase edge function error:', error);
-        throw new Error(error.message || 'Failed to call OpenAI via edge function');
+      if (!response.ok) {
+        let errorMessage = 'Failed to call OpenAI API';
+        if (response.status === 401) {
+          errorMessage = 'Invalid API key. Please check your OpenAI API key.';
+        } else if (response.status === 429) {
+          errorMessage = 'Rate limit exceeded. Please try again later.';
+        }
+        throw new Error(errorMessage);
       }
 
-      if (!data) {
-        throw new Error('No data received from edge function');
-      }
+      const data = await response.json();
 
       if (data.error) {
-        throw new Error(data.error);
+        throw new Error(data.error.message || 'OpenAI API error');
       }
 
       const content = data.choices?.[0]?.message?.content;

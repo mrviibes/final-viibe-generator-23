@@ -10,6 +10,8 @@ import { Search, Loader2, AlertCircle, ArrowLeft, ArrowRight, X, Download } from
 import { openAIService, OpenAISearchResult } from "@/lib/openai";
 import { StepProgress } from "@/components/StepProgress";
 import { StackedSelectionCard } from "@/components/StackedSelectionCard";
+import { ApiKeyManager } from "@/components/ApiKeyManager";
+import { hasIdeogramApiKey } from "@/lib/ideogramApi";
 
 import { TextOverlay } from "@/components/TextOverlay";
 import { useNavigate } from "react-router-dom";
@@ -4072,6 +4074,7 @@ const Index = () => {
 
   // Visual AI recommendations state
   const [isTestingProxy, setIsTestingProxy] = useState(false);
+  const [showApiKeyDialog, setShowApiKeyDialog] = useState<boolean>(false);
   const navigate = useNavigate();
   const {
     toast
@@ -4365,7 +4368,7 @@ const Index = () => {
   // Generate subject using AI
   const handleGenerateSubject = async () => {
     if (!openAIService.hasApiKey()) {
-      console.warn('OpenAI API key not found. Please add it to src/config/secrets.ts');
+      setShowApiKeyDialog(true);
       return;
     }
 
@@ -4479,7 +4482,7 @@ const Index = () => {
   // Generate text using Vibe Model
   const handleGenerateText = async () => {
     if (!openAIService.hasApiKey()) {
-      console.warn('OpenAI API key not found. Please add it to src/config/secrets.ts');
+      setShowApiKeyDialog(true);
       return;
     }
     setIsGenerating(true);
@@ -4609,6 +4612,11 @@ const Index = () => {
     }
   };
   const handleGenerateImage = async (numImages = 1) => {
+    if (!hasIdeogramApiKey()) {
+      setShowApiKeyDialog(true);
+      return;
+    }
+
     setIsGeneratingImage(true);
     setImageGenerationError("");
     setGeneratedImages([]);
@@ -4797,7 +4805,7 @@ const Index = () => {
   const handleSearch = async (searchTerm: string) => {
     if (!searchTerm.trim() || !selectedSubOption) return;
     if (!openAIService.hasApiKey()) {
-      console.warn('OpenAI API key not found. Please add it to src/config/secrets.ts');
+      setShowApiKeyDialog(true);
       return;
     }
     setIsSearching(true);
@@ -4821,7 +4829,7 @@ const Index = () => {
   const handlePopSearch = async (searchTerm: string) => {
     if (!searchTerm.trim() || !selectedSubOption) return;
     if (!openAIService.hasApiKey()) {
-      console.warn('OpenAI API key not found. Please add it to src/config/secrets.ts');
+      setShowApiKeyDialog(true);
       return;
     }
     setIsPopSearching(true);
@@ -4918,7 +4926,14 @@ const Index = () => {
         <div className="flex justify-between items-center mb-4">
           <div></div>
           <StepProgress currentStep={currentStep} />
-          <div></div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowApiKeyDialog(true)}
+            className="text-xs"
+          >
+            API Keys
+          </Button>
         </div>
         
         {currentStep === 1 && <>
@@ -6719,6 +6734,14 @@ const Index = () => {
 
 
       </div>
+
+      <ApiKeyManager
+        open={showApiKeyDialog}
+        onOpenChange={setShowApiKeyDialog}
+        onKeysSet={() => {
+          // Refresh any UI state that depends on API keys
+        }}
+      />
     </div>;
 };
 export default Index;
