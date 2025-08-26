@@ -16,7 +16,7 @@ import { useNavigate } from "react-router-dom";
 import { generateCandidates, VibeResult } from "@/lib/vibeModel";
 import { buildIdeogramHandoff } from "@/lib/ideogram";
 import { generateVisualRecommendations, VisualOption } from "@/lib/visualModel";
-import { generateIdeogramImage, hasIdeogramApiKey, isUsingBackend as ideogramIsUsingBackend, IdeogramAPIError } from "@/lib/ideogramApi";
+import { generateIdeogramImage, IdeogramAPIError } from "@/lib/ideogramApi";
 import { buildIdeogramPrompt, getAspectRatioForIdeogram, getStyleTypeForIdeogram, parseDirectPrompt } from "@/lib/ideogramPrompt";
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
@@ -4609,10 +4609,6 @@ const Index = () => {
     }
   };
   const handleGenerateImage = async (numImages = 1) => {
-    if (!hasIdeogramApiKey()) {
-      console.warn('Ideogram API key not found. Please add it to src/config/secrets.ts');
-      return;
-    }
     setIsGeneratingImage(true);
     setImageGenerationError("");
     setGeneratedImages([]);
