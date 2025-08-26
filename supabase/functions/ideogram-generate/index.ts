@@ -14,7 +14,7 @@ interface IdeogramGenerateRequest {
   prompt: string;
   aspect_ratio: 'ASPECT_10_16' | 'ASPECT_16_10' | 'ASPECT_9_16' | 'ASPECT_16_9' | 'ASPECT_3_2' | 'ASPECT_2_3' | 'ASPECT_4_3' | 'ASPECT_3_4' | 'ASPECT_1_1' | 'ASPECT_1_3' | 'ASPECT_3_1';
   model: 'V_1' | 'V_1_TURBO' | 'V_2' | 'V_2_TURBO' | 'V_2A' | 'V_2A_TURBO' | 'V_3';
-  magic_prompt_option: 'AUTO' | 'OFF';
+  magic_prompt_option: 'AUTO';
   seed?: number;
   style_type?: 'AUTO' | 'GENERAL' | 'REALISTIC' | 'DESIGN' | 'RENDER_3D' | 'ANIME';
   count?: number;
@@ -44,100 +44,103 @@ serve(async (req) => {
       });
     }
 
-    // Always use the requested model (V_3)
-    const modelToUse = request.model;
-
     const count = request.count || 1;
-    console.log(`Ideogram API call - Model: ${modelToUse}, Count: ${count}, Prompt: ${request.prompt.substring(0, 50)}...`);
+    console.log(`Ideogram API call - Model: ${request.model}, Count: ${count}, Prompt: ${request.prompt.substring(0, 50)}...`);
 
     if (count === 1) {
-      // Single image generation with FormData for V3 API
-      const formData = new FormData();
-      formData.append('prompt', request.prompt);
-      formData.append('aspect_ratio', request.aspect_ratio);
-      formData.append('model', modelToUse);
-      formData.append('magic_prompt', request.magic_prompt_option);
+      // Single image generation (existing logic)
+      const payload: any = {
+        prompt: request.prompt,
+        aspect_ratio: request.aspect_ratio,
+        model: request.model,
+        magic_prompt_option: request.magic_prompt_option,
+      };
       
       if (request.seed !== undefined) {
-        formData.append('seed', request.seed.toString());
+        payload.seed = request.seed;
       }
       
       if (request.style_type) {
-        formData.append('style_type', request.style_type);
+        payload.style_type = request.style_type;
       }
+
+      const requestBody = JSON.stringify({ image_request: payload });
 
       const response = await fetch(IDEOGRAM_API_BASE, {
         method: 'POST',
         headers: {
           'Api-Key': ideogramApiKey,
+          'Content-Type': 'application/json',
         },
-        body: formData,
+        body: requestBody,
       });
 
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`Ideogram API error (${response.status}):`, errorText);
         
-        {
-          let errorMessage = `HTTP ${response.status}`;
-          try {
-            const errorData = JSON.parse(errorText);
-            errorMessage = errorData.error?.message || errorMessage;
-          } catch {
-            errorMessage = errorText || errorMessage;
-          }
-
-          // Handle specific error cases
-          if (response.status === 400 && errorText.includes('content_filtering')) {
-            errorMessage = 'Content was filtered by Ideogram. Try rephrasing your prompt.';
-          } else if (response.status === 429) {
-            errorMessage = 'Rate limit exceeded. Please try again later.';
-          } else if (response.status === 401) {
-            errorMessage = 'Invalid API key. Please check your Ideogram API key.';
-          }
-
-          return new Response(JSON.stringify({ 
-            error: errorMessage,
-            status: response.status 
-          }), {
-            status: response.status,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error?.message || errorMessage;
+        } catch {
+          errorMessage = errorText || errorMessage;
         }
+
+        // Handle specific error cases
+        if (response.status === 400 && errorText.includes('content_filtering')) {
+          errorMessage = 'Content was filtered by Ideogram. Try rephrasing your prompt.';
+        } else if (response.status === 429) {
+          errorMessage = 'Rate limit exceeded. Please try again later.';
+        } else if (response.status === 401) {
+          errorMessage = 'Invalid API key. Please check your Ideogram API key.';
+        }
+
+        return new Response(JSON.stringify({ 
+          error: errorMessage,
+          status: response.status 
+        }), {
+          status: response.status,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
 
       const data = await response.json();
-      console.log(`Ideogram API success - Generated ${data.data?.length || 0} image(s) with model ${modelToUse}`);
+      console.log(`Ideogram API success - Generated ${data.data?.length || 0} image(s)`);
       
       return new Response(JSON.stringify(data), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     } else {
-      // Multiple image generation with FormData for V3 API
+      // Multiple image generation
       const promises: Promise<any>[] = [];
       
       for (let i = 0; i < count; i++) {
-        const formData = new FormData();
-        formData.append('prompt', request.prompt);
-        formData.append('aspect_ratio', request.aspect_ratio);
-        formData.append('model', modelToUse);
-        formData.append('magic_prompt', request.magic_prompt_option);
+        const payload: any = {
+          prompt: request.prompt,
+          aspect_ratio: request.aspect_ratio,
+          model: request.model,
+          magic_prompt_option: request.magic_prompt_option,
+        };
         
         if (request.seed !== undefined) {
-          formData.append('seed', (request.seed + i).toString()); // Vary seed for different results
+          payload.seed = request.seed + i; // Vary seed for different results
         }
         
         if (request.style_type) {
-          formData.append('style_type', request.style_type);
+          payload.style_type = request.style_type;
         }
+
+        const requestBody = JSON.stringify({ image_request: payload });
 
         promises.push(
           fetch(IDEOGRAM_API_BASE, {
             method: 'POST',
             headers: {
               'Api-Key': ideogramApiKey,
+              'Content-Type': 'application/json',
             },
-            body: formData,
+            body: requestBody,
           }).then(async (response) => {
             if (!response.ok) {
               const errorText = await response.text();

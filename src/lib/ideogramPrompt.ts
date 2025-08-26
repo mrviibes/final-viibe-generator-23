@@ -4,127 +4,75 @@ import { normalizeTypography } from './textUtils';
 export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: boolean = false): string {
   const parts: string[] = [];
   
-  // EXACT TEXT RENDERING (if present)
+  // Put the exact text as the VERY FIRST sentence to ensure it renders
   if (handoff.key_line && handoff.key_line.trim()) {
-    const cleanText = handoff.key_line.replace(/[""]/g, '"').replace(/['']/g, "'").replace(/[—–]/g, '-').trim();
-    parts.push(`Render this exact text: "${cleanText}"`);
+    const normalizedText = normalizeTypography(handoff.key_line);
+    const sanitizedText = normalizedText.replace(/"/g, '\\"');
+    parts.push(`EXACT_TEXT (VERBATIM): "${sanitizedText}"`);
+    parts.push("Render this text EXACTLY as written, character-for-character, with no spelling changes, no extra words, no missing words.");
+    parts.push("Use only standard ASCII punctuation (straight quotes, regular apostrophes, hyphens). Maintain exact case and spacing.");
+    parts.push("If you cannot render the text exactly as specified, leave the text area completely blank rather than adding incorrect text.");
+    
+    if (cleanBackground) {
+      parts.push("Style and display this text prominently with clear, legible typography on a clean, minimal, high-contrast background with clear center area for text.");
+    } else {
+      parts.push("Style and display this text prominently with clear, legible typography on a realistic background.");
+    }
+  } else {
+    // For images without text, focus on visual elements only
+    parts.push("Create a visual composition without any text or typography overlays.");
   }
   
-  // OCCASION/CATEGORY
-  if (handoff.category && handoff.subcategory_primary) {
-    parts.push(`Occasion: ${handoff.category}, ${handoff.subcategory_primary}${handoff.subcategory_secondary ? ` (${handoff.subcategory_secondary})` : ''}.`);
+  // This content is for [CATEGORY], specifically [SUBCATEGORY][ (SECOND SUBCATEGORY if Pop Culture) ].
+  let contentLine = `This content is for ${handoff.category}, specifically ${handoff.subcategory_primary}`;
+  if (handoff.category === 'pop-culture' && handoff.subcategory_secondary) {
+    contentLine += ` (${handoff.subcategory_secondary})`;
   }
+  contentLine += '.';
+  parts.push(contentLine);
   
-  // MAIN SUBJECT
-  let subject = handoff.rec_subject;
-  if (!subject && handoff.chosen_visual) {
-    const visualParts = handoff.chosen_visual.split(' - ');
-    subject = visualParts.length >= 2 ? visualParts[0].trim() : handoff.chosen_visual;
-  }
-  if (subject) {
-    parts.push(`Subject: ${subject}.`);
-  }
-  
-  // BACKGROUND WITH ON-THEME ELEMENTS
-  let background = handoff.rec_background;
-  if (!background && handoff.chosen_visual) {
-    const visualParts = handoff.chosen_visual.split(' - ');
-    background = visualParts.length >= 2 ? visualParts[1].trim() : `${handoff.category} themed background`;
-  }
-  if (!background) {
-    background = `${handoff.category || 'contextually appropriate'} themed background`;
-  }
-  if (cleanBackground) {
-    background = "clean, minimal background with high contrast for text";
-  }
-  parts.push(`Background: ${background}.`);
-  
-  // PEOPLE INCLUSION (when recommended)
-  const peopleKeywords = ['friends', 'crowd', 'people', 'group', 'party', 'audience', 'performers', 'celebrating'];
-  const needsPeople = peopleKeywords.some(keyword => 
-    handoff.chosen_visual?.toLowerCase().includes(keyword) || 
-    handoff.rec_subject?.toLowerCase().includes(keyword) ||
-    handoff.rec_background?.toLowerCase().includes(keyword)
-  );
-  
-  // Override with explicit people count hint
-  if (handoff.people_count_hint === 'single') {
-    parts.push("Show exactly ONE person only - no groups, crowds, or multiple people.");
-  } else if (handoff.people_count_hint === 'multiple' || needsPeople) {
-    parts.push("Include multiple people clearly visible in the scene.");
-  }
-  
-  // COMPOSITION & STYLE
-  if (handoff.visual_style) {
-    parts.push(`Style: ${handoff.visual_style}.`);
-  }
+  // The overall tone is [TONE].
   if (handoff.tone) {
-    parts.push(`Tone: ${handoff.tone}.`);
-  }
-  if (handoff.aspect_ratio) {
-    parts.push(`Format: ${handoff.aspect_ratio}.`);
+    parts.push(`The overall tone is ${handoff.tone}.`);
   }
   
-  // TEXT PLACEMENT (if present) - Smart overlay approach
-  if (handoff.key_line && handoff.key_line.trim()) {
-    let textPlacement = "Place text in a slim, translucent lower-third or side ribbon overlay";
-    
-    // Enhanced placement with background-preserving guidelines
-    if (handoff.text_placement_preference === 'bottom') {
-      textPlacement = "Place text in a slim translucent banner at the bottom edge, maximum 20% of image height";
-    } else if (handoff.text_placement_preference === 'side') {
-      textPlacement = "Place text in a vertical translucent ribbon on left or right edge, maximum 25% of image width";
-    } else if (handoff.text_placement_preference === 'banner') {
-      textPlacement = "Place text in a thin translucent banner overlay, maximum 20% of total image area";
-    } else if (needsPeople || handoff.people_count_hint === 'multiple') {
-      // For people-heavy scenes, prefer minimal overlay
-      textPlacement = "Place text in a minimal translucent lower-third strip, maximum 15% of image height";
-    }
-    
-    // Add strict anti-blocking guidelines
-    textPlacement += " with subtle transparency to preserve background visibility";
-    
-    if (needsPeople || handoff.people_count_hint === 'multiple') {
-      textPlacement += " - CRITICAL: never cover faces, heads, or bodies of people";
-    } else if (handoff.people_count_hint === 'single') {
-      textPlacement += " - never cover the person's face, head, or body";
-    } else if (subject) {
-      textPlacement += " - never cover the main subject or focal point";
-    }
-    
-    parts.push(textPlacement + ".");
+  // Apply these text tags as guides: [TEXT TAGS].
+  const textTags = handoff.text_tags_csv && handoff.text_tags_csv !== "None" ? handoff.text_tags_csv : "none";
+  parts.push(`Apply these text tags as guides: ${textTags}.`);
+  
+  // Render the scene in [VISUAL LOOK] style.
+  if (handoff.visual_style) {
+    parts.push(`Render the scene in ${handoff.visual_style} style.`);
   }
   
-  // AVOID LIST - Enhanced to prevent background blocking
-  const avoidList = [
-    "typos", "misspellings", "extra text", "wrong spelling", 
-    "text covering more than 25% of image area",
-    "solid text backgrounds that block the scene",
-    "opaque speech bubbles", "large text blocks", 
-    "text obscuring important visual elements",
-    "completely covering the background with text"
-  ];
-  
-  if (handoff.visual_style?.toLowerCase() === 'realistic') {
-    avoidList.push("cartoon style", "flat colors");
+  // Include these visual tags: [VISUAL TAGS].
+  if (handoff.visual_tags_csv) {
+    parts.push(`Include these visual tags: ${handoff.visual_tags_csv}.`);
   }
+  
+  // Background should be [AI GENERATED BACKGROUND].
+  let background = handoff.rec_background || handoff.chosen_visual || "a clean, contextually appropriate background";
   if (cleanBackground) {
-    avoidList.push("visual clutter", "decorative elements");
+    background = "a clean, minimal, high-contrast background with no visual clutter, no decorative elements, no patterns, and a clear center area";
   }
-  if (handoff.people_count_hint === 'single') {
-    avoidList.push("multiple people", "groups", "crowds", "families", "teams");
-  } else if (handoff.people_count_hint === 'multiple' || needsPeople) {
-    avoidList.push("empty scenes", "isolated backgrounds");
+  parts.push(`Background should be ${background}.`);
+  
+  // Output format should use aspect ratio [ASPECT RATIO].
+  if (handoff.aspect_ratio) {
+    parts.push(`Output format should use aspect ratio ${handoff.aspect_ratio}.`);
   }
   
-  // Add instruction labels to avoid list to prevent them from being drawn
-  avoidList.push("instruction labels", "drawing the words 'EXACT TEXT'", "drawing 'Render this exact text'", "showing prompt instructions");
-  
-  parts.push(`Avoid: ${avoidList.join(', ')}.`);
-  
-  // Add final instruction to only render the quoted text, not the instruction labels
+  // Only add text visibility instructions if there's actual text content
   if (handoff.key_line && handoff.key_line.trim()) {
-    parts.push("Only render the text inside quotes as visible typography - do not draw instruction words.");
+    parts.push("Ensure the text is clearly visible, balanced with the artwork, and styled to fit the chosen tone and tags.");
+    if (cleanBackground) {
+      parts.push("NEGATIVE PROMPTS: No typos, no misspellings, no ligatures, no altered punctuation, no text variations, no glyphs, no pseudo-letters, no UI elements, no symbols, no decorative text elements, no watermarks, no logos.");
+    } else {
+      parts.push("NEGATIVE PROMPTS: No typos, no misspellings, no ligatures, no altered punctuation, no text variations, no unwanted glyphs, no pseudo-letters.");
+    }
+  } else {
+    parts.push("Focus on creating a balanced visual composition that fits the chosen tone and tags.");
+    parts.push("NEGATIVE PROMPTS: No text, no typography, no words, no letters, no characters, no glyphs, no symbols overlaid on the image.");
   }
   
   return parts.join(' ');
@@ -152,92 +100,4 @@ export function getStyleTypeForIdeogram(visualStyle: string): 'AUTO' | 'GENERAL'
   };
   
   return styleMap[visualStyle?.toLowerCase()] || 'AUTO';
-}
-
-// Parse direct prompts to extract structured data and apply guardrails
-export function parseDirectPrompt(directPrompt: string): { parsedHandoff: Partial<IdeogramHandoff>; additionalNotes: string } {
-  const lines = directPrompt.split('.').map(line => line.trim()).filter(line => line.length > 0);
-  const parsedHandoff: Partial<IdeogramHandoff> = {};
-  const unparsedLines: string[] = [];
-  
-  for (const line of lines) {
-    // Extract exact text
-    const exactTextMatch = line.match(/(?:EXACT TEXT|Render this exact text):\s*["']([^"']+)["']/i);
-    if (exactTextMatch) {
-      parsedHandoff.key_line = exactTextMatch[1];
-      continue;
-    }
-    
-    // Extract occasion/category
-    const occasionMatch = line.match(/Occasion:\s*([^,]+),\s*([^(]+)(?:\s*\(([^)]+)\))?/i);
-    if (occasionMatch) {
-      parsedHandoff.category = occasionMatch[1].trim();
-      parsedHandoff.subcategory_primary = occasionMatch[2].trim();
-      if (occasionMatch[3]) {
-        parsedHandoff.subcategory_secondary = occasionMatch[3].trim();
-      }
-      continue;
-    }
-    
-    // Extract subject
-    const subjectMatch = line.match(/Subject:\s*(.+)/i);
-    if (subjectMatch) {
-      parsedHandoff.rec_subject = subjectMatch[1].trim();
-      continue;
-    }
-    
-    // Extract background
-    const backgroundMatch = line.match(/Background:\s*(.+)/i);
-    if (backgroundMatch) {
-      parsedHandoff.rec_background = backgroundMatch[1].trim();
-      continue;
-    }
-    
-    // Extract style
-    const styleMatch = line.match(/Style:\s*(.+)/i);
-    if (styleMatch) {
-      parsedHandoff.visual_style = styleMatch[1].trim().toLowerCase();
-      continue;
-    }
-    
-    // Extract tone
-    const toneMatch = line.match(/Tone:\s*(.+)/i);
-    if (toneMatch) {
-      parsedHandoff.tone = toneMatch[1].trim().toLowerCase();
-      continue;
-    }
-    
-    // Extract format/aspect ratio
-    const formatMatch = line.match(/Format:\s*(.+)/i);
-    if (formatMatch) {
-      parsedHandoff.aspect_ratio = formatMatch[1].trim();
-      continue;
-    }
-    
-    // Extract people count hints
-    if (line.toLowerCase().includes('include multiple people') || line.toLowerCase().includes('multiple people clearly visible')) {
-      parsedHandoff.people_count_hint = 'multiple';
-      continue;
-    }
-    if (line.toLowerCase().includes('exactly one person') || line.toLowerCase().includes('single person')) {
-      parsedHandoff.people_count_hint = 'single';
-      continue;
-    }
-    
-    // Skip avoid lists and instruction lines
-    if (line.toLowerCase().startsWith('avoid:') || 
-        line.toLowerCase().includes('place text') || 
-        line.toLowerCase().includes('never cover') ||
-        line.toLowerCase().includes('only render')) {
-      continue;
-    }
-    
-    // Everything else goes to additional notes
-    unparsedLines.push(line);
-  }
-  
-  return {
-    parsedHandoff,
-    additionalNotes: unparsedLines.join('. ').trim()
-  };
 }

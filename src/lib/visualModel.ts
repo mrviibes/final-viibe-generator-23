@@ -17,7 +17,6 @@ export interface VisualOption {
   background: string;
   prompt: string;
   slot?: string;
-  isSinglePerson?: boolean; // Flag to indicate single-person option
 }
 
 export interface VisualResult {
@@ -230,8 +229,8 @@ function getSlotBasedFallbacks(inputs: VisualInputs): VisualOption[] {
     {
       slot: "subject+background", 
       subject: `${needsPeople ? `${peopleContext} immersed in ` : ''}${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${occasion} moment`,
-      background: `${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${tone} atmosphere with ${primaryTags}${needsPeople ? ' and visible crowd' : ''}`,
-      prompt: `${needsPeople ? `${peopleContext} immersed in ` : ''}${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${occasion} moment positioned on right third in ${randomEnergy} ${tone} atmosphere with ${primaryTags}${needsPeople ? ', multiple people clearly visible in background' : ''} [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: faces crossing center, busy patterns in center${needsPeople ? ', empty backgrounds' : ''}] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: light text]`
+      background: `${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${tone} atmosphere with ${primaryTags}`,
+      prompt: `${needsPeople ? `${peopleContext} immersed in ` : ''}${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${occasion} moment positioned on right third in ${randomEnergy} ${tone} atmosphere with ${primaryTags} [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: faces crossing center, busy patterns in center] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: light text]`
     },
     {
       slot: "object",
@@ -240,11 +239,10 @@ function getSlotBasedFallbacks(inputs: VisualInputs): VisualOption[] {
       prompt: `${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${occasion} symbols and elements anchored bottom third on bold ${tone} ${randomScene} with ${primaryTags} accents [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: reflective glare in center, busy patterns] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: dark text]`
     },
     {
-      slot: "singing",
-      subject: "Solo person singing or performing",
-      background: `Concert or performance stage with ${tone} lighting, ${primaryTags} elements, and visible audience`,
-      prompt: `One person singing or performing positioned off-center on concert stage with ${tone} lighting, ${primaryTags} elements, audience clearly visible in background [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: limbs crossing center, harsh shadows in safe zone, multiple performers, groups] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: light text]`,
-      isSinglePerson: true
+      slot: "tone-twist",
+      subject: `${needsPeople ? `${peopleContext} expressing ` : ''}${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${tone} energy for ${occasion}`,
+      background: `Imaginative ${visualStyle || 'artistic'} world with ${primaryTags} influences`,
+      prompt: `${needsPeople ? `${peopleContext} expressing ` : ''}${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${tone} energy for ${occasion} positioned off-center in imaginative ${visualStyle || 'artistic'} world with ${primaryTags} influences [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: limbs crossing center, harsh shadows in safe zone] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: light text]`
     }
   ];
 }
@@ -262,12 +260,10 @@ const systemPrompt = `Generate 4 visual concepts for graphics that MUST align wi
 RULES:
 - Return ONLY valid JSON - no markdown, no extra text
 - Each prompt: 40-60 words maximum
-- 4 slots: "background-only", "subject+background", "object", "singing"
+- 4 slots: "background-only", "subject+background", "object", "tone-twist"
 - CRITICAL: Visual concepts MUST relate to the provided text/joke content and tone
 - For Pride themes: Include rainbow, drag queens, parades, celebrations, fabulous elements
 - For jokes: Match the humor and subject matter exactly
-- SINGING SLOT: Always show ONE solo person singing/performing (not groups or crowds)
-- SINGLE-PERSON PRIORITY: At least one concept must feature a single individual as the main subject
 
 Format:
 {
@@ -354,7 +350,7 @@ JSON only.`;
       throw new Error('Invalid response format from AI - expected exactly 4 options');
     }
 
-    const expectedSlots = ['background-only', 'subject+background', 'object', 'singing'];
+    const expectedSlots = ['background-only', 'subject+background', 'object', 'tone-twist'];
     let validOptions = result.options
       .filter((opt: any) => opt.subject && opt.background && opt.prompt && opt.slot)
       .map((opt: any, index: number) => ({
@@ -364,31 +360,6 @@ JSON only.`;
 
     // Apply quality validation to reject vague options
     validOptions = validateVisualOptions(validOptions, enrichedInputs);
-
-    // Ensure at least one single-person option exists
-    const hasSinglePersonOption = validOptions.some(opt => 
-      opt.slot === 'singing' || 
-      opt.isSinglePerson ||
-      (opt.subject.toLowerCase().includes('person ') && !opt.subject.toLowerCase().includes('people'))
-    );
-
-    if (!hasSinglePersonOption && validOptions.length > 0) {
-      // Convert a group option to single-person if no solo option exists
-      const groupOptionIndex = validOptions.findIndex(opt => 
-        opt.subject.toLowerCase().includes('people') || 
-        opt.subject.toLowerCase().includes('group') ||
-        opt.subject.toLowerCase().includes('crowd')
-      );
-      
-      if (groupOptionIndex !== -1) {
-        validOptions[groupOptionIndex] = {
-          ...validOptions[groupOptionIndex],
-          subject: validOptions[groupOptionIndex].subject.replace(/people|group|crowd/gi, 'person'),
-          prompt: validOptions[groupOptionIndex].prompt.replace(/people|group|crowd/gi, 'person').replace(/multiple/gi, 'single'),
-          isSinglePerson: true
-        };
-      }
-    }
 
     // If we rejected too many options, fill with high-quality fallbacks
     if (validOptions.length < 4) {
