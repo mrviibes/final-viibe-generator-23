@@ -65,20 +65,25 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     parts.push(`Format: ${handoff.aspect_ratio}.`);
   }
   
-  // TEXT PLACEMENT (if present)
+  // TEXT PLACEMENT (if present) - Smart overlay approach
   if (handoff.key_line && handoff.key_line.trim()) {
-    let textPlacement = "Place text in banner or margin area, covering maximum 25-30% of total image area";
+    let textPlacement = "Place text in a slim, translucent lower-third or side ribbon overlay";
     
-    // Use text placement preference if provided
+    // Enhanced placement with background-preserving guidelines
     if (handoff.text_placement_preference === 'bottom') {
-      textPlacement = "Place text at bottom in a banner or margin area, covering maximum 25% of image height";
+      textPlacement = "Place text in a slim translucent banner at the bottom edge, maximum 20% of image height";
     } else if (handoff.text_placement_preference === 'side') {
-      textPlacement = "Place text on left or right side in margin area, covering maximum 30% of image width";
+      textPlacement = "Place text in a vertical translucent ribbon on left or right edge, maximum 25% of image width";
     } else if (handoff.text_placement_preference === 'banner') {
-      textPlacement = "Place text in a banner overlay area, covering maximum 25-30% of total image area";
+      textPlacement = "Place text in a thin translucent banner overlay, maximum 20% of total image area";
+    } else if (needsPeople || handoff.people_count_hint === 'multiple') {
+      // For people-heavy scenes, prefer minimal overlay
+      textPlacement = "Place text in a minimal translucent lower-third strip, maximum 15% of image height";
     }
     
-    // Add people-specific guidance
+    // Add strict anti-blocking guidelines
+    textPlacement += " with subtle transparency to preserve background visibility";
+    
     if (needsPeople || handoff.people_count_hint === 'multiple') {
       textPlacement += " - CRITICAL: never cover faces, heads, or bodies of people";
     } else if (handoff.people_count_hint === 'single') {
@@ -90,8 +95,16 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     parts.push(textPlacement + ".");
   }
   
-  // AVOID LIST
-  const avoidList = ["typos", "misspellings", "extra text", "wrong spelling", "text covering more than 30% of image area"];
+  // AVOID LIST - Enhanced to prevent background blocking
+  const avoidList = [
+    "typos", "misspellings", "extra text", "wrong spelling", 
+    "text covering more than 25% of image area",
+    "solid text backgrounds that block the scene",
+    "opaque speech bubbles", "large text blocks", 
+    "text obscuring important visual elements",
+    "completely covering the background with text"
+  ];
+  
   if (handoff.visual_style?.toLowerCase() === 'realistic') {
     avoidList.push("cartoon style", "flat colors");
   }

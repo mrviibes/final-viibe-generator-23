@@ -14,6 +14,8 @@ import { ProxySettingsDialog } from "@/components/ProxySettingsDialog";
 import { CorsRetryDialog } from "@/components/CorsRetryDialog";
 import { StepProgress } from "@/components/StepProgress";
 import { StackedSelectionCard } from "@/components/StackedSelectionCard";
+import { SmartOverlayToggle } from "@/components/SmartOverlayToggle";
+import { TextOverlay } from "@/components/TextOverlay";
 import { useNavigate } from "react-router-dom";
 import { generateCandidates, VibeResult } from "@/lib/vibeModel";
 import { buildIdeogramHandoff } from "@/lib/ideogram";
@@ -4064,6 +4066,9 @@ const Index = () => {
   const [finalImageWithText, setFinalImageWithText] = useState<string | null>(null);
   const [textMisspellingDetected, setTextMisspellingDetected] = useState<boolean>(false);
   const [cleanBackgroundMode, setCleanBackgroundMode] = useState<boolean>(true);
+  const [smartOverlayEnabled, setSmartOverlayEnabled] = useState<boolean>(true);
+  const [overlayPosition, setOverlayPosition] = useState<'bottom' | 'top' | 'left' | 'right' | 'center'>('bottom');
+  const [overlayStyle, setOverlayStyle] = useState<'translucent' | 'ribbon' | 'minimal'>('translucent');
 
   // Visual AI recommendations state
   const [visualRecommendations, setVisualRecommendations] = useState<any>(null);
@@ -6201,6 +6206,43 @@ const Index = () => {
                   {isGeneratingImage ? <div className="flex flex-col items-center gap-4">
                       <Loader2 className="h-8 w-8 animate-spin text-primary" />
                       <p className="text-muted-foreground text-lg">Generating image with Ideogram Turbo...</p>
+                    </div> : showTextOverlay && backgroundOnlyImageUrl ? <div className="max-w-full max-h-full relative">
+                      <div className="mb-4 relative">
+                        <img src={backgroundOnlyImageUrl} alt="Background for text overlay" className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
+                        <TextOverlay
+                          text={selectedGeneratedOption || stepTwoText || ""}
+                          position={overlayPosition}
+                          style={overlayStyle}
+                          className="rounded-lg"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-4">
+                        <p className="text-sm text-muted-foreground text-center">Smart overlay mode - Adjust text placement and style</p>
+                        <div className="flex flex-wrap gap-2 justify-center">
+                          <Select value={overlayPosition} onValueChange={(value: 'bottom' | 'top' | 'left' | 'right' | 'center') => setOverlayPosition(value)}>
+                            <SelectTrigger className="w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="bottom">Bottom</SelectItem>
+                              <SelectItem value="top">Top</SelectItem>
+                              <SelectItem value="left">Left</SelectItem>
+                              <SelectItem value="right">Right</SelectItem>
+                              <SelectItem value="center">Center</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Select value={overlayStyle} onValueChange={(value: 'translucent' | 'ribbon' | 'minimal') => setOverlayStyle(value)}>
+                            <SelectTrigger className="w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="translucent">Translucent</SelectItem>
+                              <SelectItem value="ribbon">Ribbon</SelectItem>
+                              <SelectItem value="minimal">Minimal</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
                     </div> : generatedImages.length > 0 ? <div className="max-w-full max-h-full">
                       <div className="mb-4">
                         <img src={generatedImages[selectedImageIndex]} alt={`Generated VIIBE ${selectedImageIndex + 1}`} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
@@ -6541,7 +6583,21 @@ const Index = () => {
 
         {/* Bottom Navigation */}
         <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t border-border p-4">
-          <div className="max-w-6xl mx-auto flex justify-between items-center">
+          <div className="max-w-6xl mx-auto">
+            {/* Smart Overlay Toggle for Step 3 */}
+            {currentStep === 3 && isStep3Complete() && selectedDimension && (selectedGeneratedOption || stepTwoText) && (
+              <div className="mb-4 max-w-md mx-auto">
+                <SmartOverlayToggle
+                  enabled={smartOverlayEnabled}
+                  onChange={setSmartOverlayEnabled}
+                  shouldRecommend={
+                    Boolean(selectedGeneratedOption || stepTwoText) && 
+                    (selectedGeneratedOption?.length || stepTwoText.length || 0) > 30
+                  }
+                />
+              </div>
+            )}
+            <div className="flex justify-between items-center">
             <Button variant="outline" onClick={() => setCurrentStep(prev => Math.max(1, prev - 1))} className={currentStep === 1 ? "invisible" : ""} disabled={currentStep === 1}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
@@ -6669,10 +6725,19 @@ const Index = () => {
                 const chosenModel = styleType === 'REALISTIC' ? 'V_3' : 'V_2A_TURBO';
                 model = chosenModel;
 
-                // Handle spelling guarantee mode
-                if (spellingGuaranteeMode && finalText && finalText.trim()) {
+                // Handle smart overlay or spelling guarantee mode
+                const shouldUseSmartOverlay = smartOverlayEnabled && finalText && finalText.trim() && (
+                  peopleCountHint === 'multiple' || // Complex scenes with people
+                  spellingGuaranteeMode || // Spelling guarantee mode
+                  finalText.length > 30 // Longer text
+                );
+                
+                if (shouldUseSmartOverlay) {
+                  console.log('🎯 Using smart overlay mode - generating background-only image');
                   // Generate background-only image first - remove ALL text-related instructions
-                  const backgroundPrompt = promptText.replace(/EXACT_TEXT \(VERBATIM\): ".*?"/g, '').replace(/Render this text EXACTLY.*?\./g, '').replace(/Use only standard ASCII.*?\./g, '').replace(/If you cannot render.*?\./g, '').replace(/Style and display this text.*?\./g, '').replace(/Ensure the text is.*?\./g, '').replace(/NEGATIVE PROMPTS:.*?\./g, '').replace(/\s+/g, ' ').trim() + ' No text, no typography, no words, no letters, no characters, no glyphs, no symbols, no UI elements overlaid on the image. Clean minimal background only.';
+                  const backgroundPayload = { ...ideogramPayload, key_line: '' }; // Remove text from payload
+                  const backgroundPrompt = buildIdeogramPrompt(backgroundPayload, true); // Use cleanBackground flag
+                  
                   const backgroundResult = await generateIdeogramImage({
                     prompt: backgroundPrompt,
                     aspect_ratio: aspectRatioKey,
@@ -6680,10 +6745,13 @@ const Index = () => {
                     model: model,
                     magic_prompt_option: 'OFF' // Disable magic prompt for background-only
                   });
+                  
                   if (backgroundResult.data?.[0]?.url) {
                     setBackgroundOnlyImageUrl(backgroundResult.data[0].url);
                     setShowTextOverlay(true);
                     setIsGeneratingImage(false);
+                    console.log('✅ Smart overlay background generated successfully');
+                    sonnerToast.success("Background generated! Text overlay ready for fine-tuning.");
                     return;
                   }
                 }
@@ -6846,6 +6914,7 @@ const Index = () => {
                 </>}
             </Button>
             )}
+            </div>
           </div>
         </div>
 
