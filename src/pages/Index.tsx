@@ -8,8 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Search, Loader2, AlertCircle, ArrowLeft, ArrowRight, X, Download } from "lucide-react";
 import { openAIService, OpenAISearchResult } from "@/lib/openai";
-import { ApiKeyDialog } from "@/components/ApiKeyDialog";
-import { IdeogramKeyDialog } from "@/components/IdeogramKeyDialog";
 import { ProxySettingsDialog } from "@/components/ProxySettingsDialog";
 import { CorsRetryDialog } from "@/components/CorsRetryDialog";
 import { StepProgress } from "@/components/StepProgress";
@@ -4028,7 +4026,7 @@ const Index = () => {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [finalSearchTerm, setFinalSearchTerm] = useState<string>("");
   const [isFinalSearchFocused, setIsFinalSearchFocused] = useState<boolean>(false);
-  const [showApiKeyDialog, setShowApiKeyDialog] = useState<boolean>(false);
+  
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [searchResults, setSearchResults] = useState<OpenAISearchResult[]>([]);
   const [searchError, setSearchError] = useState<string>("");
@@ -4041,7 +4039,7 @@ const Index = () => {
   const popSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [stepTwoText, setStepTwoText] = useState<string>("");
   const [isCustomTextConfirmed, setIsCustomTextConfirmed] = useState<boolean>(false);
-  const [showIdeogramKeyDialog, setShowIdeogramKeyDialog] = useState<boolean>(false);
+  
   const [showProxySettingsDialog, setShowProxySettingsDialog] = useState<boolean>(false);
   const [showCorsRetryDialog, setShowCorsRetryDialog] = useState<boolean>(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState<boolean>(false);
@@ -4374,7 +4372,7 @@ const Index = () => {
   // Generate subject using AI
   const handleGenerateSubject = async () => {
     if (!openAIService.hasApiKey()) {
-      setShowApiKeyDialog(true);
+      console.warn('OpenAI API key not found. Please add it to src/config/secrets.ts');
       return;
     }
 
@@ -4488,7 +4486,7 @@ const Index = () => {
   // Generate text using Vibe Model
   const handleGenerateText = async () => {
     if (!openAIService.hasApiKey()) {
-      setShowApiKeyDialog(true);
+      console.warn('OpenAI API key not found. Please add it to src/config/secrets.ts');
       return;
     }
     setIsGenerating(true);
@@ -4617,25 +4615,10 @@ const Index = () => {
       setIsGenerating(false);
     }
   };
-  const handleApiKeySet = (apiKey: string) => {
-    openAIService.setApiKey(apiKey);
-  };
-
-  // Text speed handling removed - locked to fast
-  const handleIdeogramApiKeySet = (apiKey: string) => {
-    setIdeogramApiKey(apiKey);
-    toast({
-      title: "API Key Saved",
-      description: "Your Ideogram API key has been saved securely."
-    });
-  };
   const handleGenerateImage = async (numImages = 1) => {
     if (!hasIdeogramApiKey()) {
-      // Only show dialog if not using backend API
-      if (!ideogramIsUsingBackend()) {
-        setShowIdeogramKeyDialog(true);
-        return;
-      }
+      console.warn('Ideogram API key not found. Please add it to src/config/secrets.ts');
+      return;
     }
     setIsGeneratingImage(true);
     setImageGenerationError("");
@@ -4836,7 +4819,7 @@ const Index = () => {
   const handleSearch = async (searchTerm: string) => {
     if (!searchTerm.trim() || !selectedSubOption) return;
     if (!openAIService.hasApiKey()) {
-      setShowApiKeyDialog(true);
+      console.warn('OpenAI API key not found. Please add it to src/config/secrets.ts');
       return;
     }
     setIsSearching(true);
@@ -4849,7 +4832,7 @@ const Index = () => {
       console.error('Search error:', error);
       setSearchError(error instanceof Error ? error.message : 'Search failed');
       if (error instanceof Error && error.message.includes('API key')) {
-        setShowApiKeyDialog(true);
+        console.warn('OpenAI API key not found. Please add it to src/config/secrets.ts');
       }
     } finally {
       setIsSearching(false);
@@ -4860,7 +4843,7 @@ const Index = () => {
   const handlePopSearch = async (searchTerm: string) => {
     if (!searchTerm.trim() || !selectedSubOption) return;
     if (!openAIService.hasApiKey()) {
-      setShowApiKeyDialog(true);
+      console.warn('OpenAI API key not found. Please add it to src/config/secrets.ts');
       return;
     }
     setIsPopSearching(true);
@@ -4873,7 +4856,7 @@ const Index = () => {
       console.error('Pop culture search error:', error);
       setPopSearchError(error instanceof Error ? error.message : 'Search failed');
       if (error instanceof Error && error.message.includes('API key')) {
-        setShowApiKeyDialog(true);
+        console.warn('OpenAI API key not found. Please add it to src/config/secrets.ts');
       }
     } finally {
       setIsPopSearching(false);
@@ -6848,11 +6831,6 @@ const Index = () => {
           </div>
         </div>
 
-        {/* API Key Dialog */}
-        <ApiKeyDialog open={showApiKeyDialog} onOpenChange={setShowApiKeyDialog} onApiKeySet={handleApiKeySet} />
-
-        {/* Ideogram API Key Dialog */}
-        <IdeogramKeyDialog open={showIdeogramKeyDialog} onOpenChange={setShowIdeogramKeyDialog} onApiKeySet={handleIdeogramApiKeySet} />
 
         {/* Proxy Settings Dialog */}
         <ProxySettingsDialog open={showProxySettingsDialog} onOpenChange={setShowProxySettingsDialog} />

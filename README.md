@@ -4,6 +4,26 @@
 
 **URL**: https://lovable.dev/projects/b1068f1f-496e-4444-aff6-a3ff5a1df71b
 
+## API Keys Setup
+
+This application uses OpenAI and Ideogram APIs for AI-powered features. To use the app without prompts:
+
+1. Open `src/config/secrets.ts`
+2. Add your API keys:
+
+```typescript
+export const HARDCODED_API_KEYS = {
+  OPENAI_API_KEY: "your-openai-api-key-here",
+  IDEOGRAM_API_KEY: "your-ideogram-api-key-here",
+};
+```
+
+**⚠️ Security Warning**: Hardcoding API keys in frontend code exposes them to all users. Only use this for development or if you understand the security risks.
+
+**Get your API keys:**
+- OpenAI: https://platform.openai.com/api-keys
+- Ideogram: https://ideogram.ai/api
+
 ## How can I edit this code?
 
 There are several ways of editing your application.
