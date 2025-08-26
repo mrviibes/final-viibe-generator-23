@@ -1,5 +1,3 @@
-import { supabase } from "@/integrations/supabase/client";
-
 export interface IdeogramGenerateRequest {
   prompt: string;
   aspect_ratio: 'ASPECT_10_16' | 'ASPECT_16_10' | 'ASPECT_9_16' | 'ASPECT_16_9' | 'ASPECT_3_2' | 'ASPECT_2_3' | 'ASPECT_4_3' | 'ASPECT_3_4' | 'ASPECT_1_1' | 'ASPECT_1_3' | 'ASPECT_3_1';
@@ -28,55 +26,122 @@ export class IdeogramAPIError extends Error {
   }
 }
 
-const IDEOGRAM_API_BASE = 'https://api.ideogram.ai/generate';
+const IDEOGRAM_API_V3_ENDPOINT = 'https://api.ideogram.ai/generate';
+const IDEOGRAM_API_LEGACY_ENDPOINT = 'https://api.ideogram.ai/generate';
+
+const IDEOGRAM_API_KEY_STORAGE = 'ideogram_api_key';
 
 export function hasIdeogramApiKey(): boolean {
-  // Always return true since API keys are managed server-side
-  return true;
+  return !!localStorage.getItem(IDEOGRAM_API_KEY_STORAGE);
 }
 
 export function isUsingBackend(): boolean {
-  return true; // Always use backend for Ideogram to avoid CORS
+  return false; // Direct frontend calls
 }
 
 export function getIdeogramApiKey(): string | null {
-  // Not needed since API keys are managed server-side
-  return null;
+  return localStorage.getItem(IDEOGRAM_API_KEY_STORAGE);
 }
 
 export function setIdeogramApiKey(key: string): void {
-  // Not needed since API keys are managed server-side
+  localStorage.setItem(IDEOGRAM_API_KEY_STORAGE, key);
 }
 
 export function removeIdeogramApiKey(): void {
-  // Not needed since API keys are managed server-side
+  localStorage.removeItem(IDEOGRAM_API_KEY_STORAGE);
 }
 
 export async function generateIdeogramImage(request: IdeogramGenerateRequest): Promise<IdeogramGenerateResponse> {
-  console.log('Ideogram generation request via Edge Function:', {
+  const apiKey = getIdeogramApiKey();
+  if (!apiKey) {
+    throw new IdeogramAPIError('Ideogram API key not found. Please add your API key.');
+  }
+
+  console.log('Ideogram generation request (direct API):', {
     prompt: request.prompt.substring(0, 100) + '...',
     aspect_ratio: request.aspect_ratio,
     model: request.model,
     count: request.count
   });
 
+  // Try V3 API first (JSON format)
   try {
-    const { data, error } = await supabase.functions.invoke('ideogram-generate', {
-      body: request
+    const response = await fetch(IDEOGRAM_API_V3_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Api-Key': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        image_request: {
+          prompt: request.prompt,
+          aspect_ratio: request.aspect_ratio,
+          model: request.model,
+          magic_prompt_option: request.magic_prompt_option,
+          seed: request.seed,
+          style_type: request.style_type || 'AUTO',
+        },
+        count: request.count || 1,
+      }),
     });
 
-    if (error) {
-      console.error('Ideogram Edge Function error:', error);
-      throw new IdeogramAPIError(error.message || 'Image generation failed');
+    if (response.ok) {
+      const data = await response.json();
+      console.log('Ideogram V3 API success');
+      return {
+        success: true,
+        images: data.data?.map((item: any) => ({
+          prompt: item.prompt,
+          resolution: item.resolution,
+          url: item.url,
+          is_image_safe: item.is_image_safe,
+        })) || [],
+      };
     }
 
-    if (data.error) {
-      console.error('Ideogram API error:', data.error);
-      throw new IdeogramAPIError(data.error);
+    console.log('V3 API failed, trying legacy format...');
+  } catch (error) {
+    console.log('V3 API error, trying legacy format:', error);
+  }
+
+  // Fallback to legacy API (multipart/form-data)
+  try {
+    const formData = new FormData();
+    formData.append('prompt', request.prompt);
+    formData.append('aspect_ratio', request.aspect_ratio);
+    formData.append('model', request.model);
+    formData.append('magic_prompt_option', request.magic_prompt_option);
+    if (request.seed) formData.append('seed', request.seed.toString());
+    if (request.style_type) formData.append('style_type', request.style_type);
+    if (request.count) formData.append('count', request.count.toString());
+
+    const response = await fetch(IDEOGRAM_API_LEGACY_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Api-Key': apiKey,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Ideogram API error:', response.status, errorText);
+      throw new IdeogramAPIError(`API error (${response.status}): ${errorText}`);
     }
 
-    console.log('Ideogram API success via Edge Function');
-    return data;
+    const data = await response.json();
+    console.log('Ideogram legacy API success');
+    
+    // Normalize legacy response format
+    return {
+      success: true,
+      images: data.data?.map((item: any) => ({
+        prompt: item.prompt,
+        resolution: item.resolution,
+        url: item.url,
+        is_image_safe: item.is_image_safe,
+      })) || [],
+    };
   } catch (error) {
     console.error('Error in generateIdeogramImage:', error);
     

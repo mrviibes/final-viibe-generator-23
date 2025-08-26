@@ -5,11 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, ExternalLink } from "lucide-react";
+import { setIdeogramApiKey } from "@/lib/ideogramApi";
 
 interface IdeogramKeyDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onApiKeySet: (apiKey: string) => void;
+  onApiKeySet?: () => void;
 }
 
 export function IdeogramKeyDialog({ open, onOpenChange, onApiKeySet }: IdeogramKeyDialogProps) {
@@ -24,10 +25,15 @@ export function IdeogramKeyDialog({ open, onOpenChange, onApiKeySet }: IdeogramK
       return;
     }
     
-    onApiKeySet(apiKey.trim());
-    onOpenChange(false);
-    setApiKey("");
-    setError("");
+    try {
+      setIdeogramApiKey(apiKey.trim());
+      onApiKeySet?.();
+      onOpenChange(false);
+      setApiKey("");
+      setError("");
+    } catch (error) {
+      setError("Failed to save API key");
+    }
   };
 
   const handleCancel = () => {

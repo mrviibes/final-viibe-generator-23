@@ -4077,8 +4077,8 @@ const Index = () => {
   const [isTestingProxy, setIsTestingProxy] = useState(false);
   const [showApiKeyDialog, setShowApiKeyDialog] = useState<boolean>(false);
   
-  // API keys are now managed server-side, so hide the UI
-  const hideApiKeyUI = true;
+  // Show API key UI since we're using direct frontend calls
+  const hideApiKeyUI = false;
   const navigate = useNavigate();
   const {
     toast
@@ -4930,16 +4930,14 @@ const Index = () => {
         <div className="flex justify-between items-center mb-4">
           <div></div>
           <StepProgress currentStep={currentStep} />
-          {!hideApiKeyUI && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowApiKeyDialog(true)}
-              className="text-xs"
-            >
-              API Keys
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowApiKeyDialog(true)}
+            className="text-xs"
+          >
+            API Keys
+          </Button>
         </div>
         
         {currentStep === 1 && <>
@@ -6741,15 +6739,13 @@ const Index = () => {
 
       </div>
 
-      {!hideApiKeyUI && (
-        <ApiKeyManager
-          open={showApiKeyDialog}
-          onOpenChange={setShowApiKeyDialog}
-          onKeysSet={() => {
-            // Refresh any UI state that depends on API keys
-          }}
-        />
-      )}
+      <ApiKeyManager
+        open={showApiKeyDialog}
+        onOpenChange={setShowApiKeyDialog}
+        onKeysSet={() => {
+          // Refresh any UI state that depends on API keys
+        }}
+      />
     </div>;
 };
 export default Index;
