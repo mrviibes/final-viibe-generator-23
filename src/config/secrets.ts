@@ -26,7 +26,7 @@ function decodeKey(key: string): string {
   } catch (e) {
     // Not base64, return as-is
   }
-  return key;
+  return key.trim();
 }
 
 export function getOpenAIKey(): string {

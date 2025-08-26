@@ -119,22 +119,13 @@ async function callIdeogramAPI(request: IdeogramGenerateRequest, proxyType: Prox
     throw new IdeogramAPIError("Rate limited - please wait", 429);
   }
 
-  const apiKey = getIdeogramKey();
-  
-  if (!apiKey || apiKey.includes("YOUR_REAL_IDEOGRAM_KEY_HERE")) {
-    toast({
-      title: "API Key needed", 
-      description: "Please paste your Ideogram API key in src/config/secrets.ts",
-      variant: "destructive"
-    });
-    throw new IdeogramAPIError("Ideogram API key not configured", 401);
-  }
+  const apiKey = getIdeogramKey().trim();
   const proxyPrefix = PROXY_CONFIGS[proxyType];
   const url = proxyPrefix ? `${proxyPrefix}${encodeURIComponent(IDEOGRAM_API_BASE)}` : IDEOGRAM_API_BASE;
   
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'Api-Key': getIdeogramKey(),
+    'Api-Key': apiKey,
   };
   
   if (proxyType === 'proxy-cors-sh' && currentProxySettings.apiKey) {

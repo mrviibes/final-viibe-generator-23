@@ -59,16 +59,7 @@ export class OpenAIService {
       throw new Error("Rate limited - please wait");
     }
 
-    const apiKey = getOpenAIKey();
-    
-    if (!apiKey || apiKey.includes("YOUR_REAL_OPENAI_KEY_HERE")) {
-      toast({
-        title: "API Key needed",
-        description: "Please paste your OpenAI API key in src/config/secrets.ts",
-        variant: "destructive"
-      });
-      throw new Error("OpenAI API key not configured");
-    }
+    const apiKey = getOpenAIKey().trim();
     const requestBody = {
       model: options.model || 'gpt-4o-mini',
       messages,
@@ -82,7 +73,7 @@ export class OpenAIService {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${getOpenAIKey()}`,
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify(requestBody),
     });
