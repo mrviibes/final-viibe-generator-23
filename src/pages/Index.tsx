@@ -4077,8 +4077,8 @@ const Index = () => {
   const [isTestingProxy, setIsTestingProxy] = useState(false);
   const [showApiKeyDialog, setShowApiKeyDialog] = useState<boolean>(false);
   
-  // Hide API key UI only if BOTH hardcoded keys are valid
-  const hideApiKeyUI = hasHardcodedOpenAIKey() && hasHardcodedIdeogramKey();
+  // API keys are now managed server-side, so hide the UI
+  const hideApiKeyUI = true;
   const navigate = useNavigate();
   const {
     toast

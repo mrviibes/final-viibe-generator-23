@@ -1,4 +1,4 @@
-import { HARDCODED_API_KEYS, hasHardcodedIdeogramKey } from "@/config/secrets";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface IdeogramGenerateRequest {
   prompt: string;
@@ -31,140 +31,59 @@ export class IdeogramAPIError extends Error {
 const IDEOGRAM_API_BASE = 'https://api.ideogram.ai/generate';
 
 export function hasIdeogramApiKey(): boolean {
-  return hasHardcodedIdeogramKey() || Boolean(localStorage.getItem('ideogram_api_key'));
+  // Always return true since API keys are managed server-side
+  return true;
 }
 
 export function isUsingBackend(): boolean {
-  return false; // Direct client-side API calls
+  return true; // Always use backend for Ideogram to avoid CORS
 }
 
 export function getIdeogramApiKey(): string | null {
-  if (hasHardcodedIdeogramKey()) {
-    return HARDCODED_API_KEYS.IDEOGRAM_API_KEY || null;
-  }
-  return localStorage.getItem('ideogram_api_key');
+  // Not needed since API keys are managed server-side
+  return null;
 }
 
 export function setIdeogramApiKey(key: string): void {
-  localStorage.setItem('ideogram_api_key', key);
+  // Not needed since API keys are managed server-side
 }
 
 export function removeIdeogramApiKey(): void {
-  localStorage.removeItem('ideogram_api_key');
+  // Not needed since API keys are managed server-side
 }
 
 export async function generateIdeogramImage(request: IdeogramGenerateRequest): Promise<IdeogramGenerateResponse> {
-  console.log('Starting Ideogram image generation with V3 API:', request);
-  
-  const apiKey = getIdeogramApiKey();
-  if (!apiKey) {
-    throw new IdeogramAPIError('No Ideogram API key found. Please set your API key.', 'NO_API_KEY');
-  }
+  console.log('Ideogram generation request via Edge Function:', {
+    prompt: request.prompt.substring(0, 100) + '...',
+    aspect_ratio: request.aspect_ratio,
+    model: request.model,
+    count: request.count
+  });
 
   try {
-    const count = request.count || 1;
-    
-    if (count === 1) {
-      // Single image generation with FormData for V3 API
-      const formData = new FormData();
-      formData.append('prompt', request.prompt);
-      formData.append('aspect_ratio', request.aspect_ratio);
-      formData.append('model', 'V_3'); // Always use V3
-      formData.append('magic_prompt', request.magic_prompt_option);
-      
-      if (request.seed !== undefined) {
-        formData.append('seed', request.seed.toString());
-      }
-      
-      if (request.style_type) {
-        formData.append('style_type', request.style_type);
-      }
+    const { data, error } = await supabase.functions.invoke('ideogram-generate', {
+      body: request
+    });
 
-      const response = await fetch(IDEOGRAM_API_BASE, {
-        method: 'POST',
-        headers: {
-          'Api-Key': apiKey,
-        },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Ideogram API error:', response.status, errorText);
-        
-        let errorMessage = 'Failed to generate image';
-        if (response.status === 401) {
-          errorMessage = 'Invalid API key. Please check your Ideogram API key.';
-        } else if (response.status === 429) {
-          errorMessage = 'Rate limit exceeded. Please try again later.';
-        }
-        
-        throw new IdeogramAPIError(
-          errorMessage,
-          `HTTP_${response.status}`
-        );
-      }
-
-      const data = await response.json();
-      
-      return {
-        success: true,
-        images: data.data || [],
-        message: 'Image generated successfully'
-      };
-    } else {
-      // Multiple image generation - generate them sequentially
-      const allImages: any[] = [];
-      
-      for (let i = 0; i < count; i++) {
-        const formData = new FormData();
-        formData.append('prompt', request.prompt);
-        formData.append('aspect_ratio', request.aspect_ratio);
-        formData.append('model', 'V_3');
-        formData.append('magic_prompt', request.magic_prompt_option);
-        
-        if (request.seed !== undefined) {
-          formData.append('seed', (request.seed + i).toString()); // Vary seed for different results
-        }
-        
-        if (request.style_type) {
-          formData.append('style_type', request.style_type);
-        }
-
-        const response = await fetch(IDEOGRAM_API_BASE, {
-          method: 'POST',
-          headers: {
-            'Api-Key': apiKey,
-          },
-          body: formData,
-        });
-
-        if (!response.ok) {
-          console.warn(`Failed to generate image ${i + 1}/${count}`);
-          continue; // Skip this one and continue
-        }
-
-        const data = await response.json();
-        if (data.data && data.data.length > 0) {
-          allImages.push(...data.data);
-        }
-      }
-
-      return {
-        success: true,
-        images: allImages,
-        message: `Generated ${allImages.length} images successfully`
-      };
+    if (error) {
+      console.error('Ideogram Edge Function error:', error);
+      throw new IdeogramAPIError(error.message || 'Image generation failed');
     }
+
+    if (data.error) {
+      console.error('Ideogram API error:', data.error);
+      throw new IdeogramAPIError(data.error);
+    }
+
+    console.log('Ideogram API success via Edge Function');
+    return data;
   } catch (error) {
+    console.error('Error in generateIdeogramImage:', error);
+    
     if (error instanceof IdeogramAPIError) {
       throw error;
     }
     
-    console.error('Unexpected error in generateIdeogramImage:', error);
-    throw new IdeogramAPIError(
-      error instanceof Error ? error.message : 'Unknown error occurred',
-      'UNKNOWN_ERROR'
-    );
+    throw new IdeogramAPIError(error instanceof Error ? error.message : 'Unknown error occurred');
   }
 }

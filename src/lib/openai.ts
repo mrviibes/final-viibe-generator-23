@@ -1,4 +1,4 @@
-import { HARDCODED_API_KEYS, hasHardcodedOpenAIKey } from "@/config/secrets";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface OpenAISearchResult {
   title: string;
@@ -16,29 +16,25 @@ export interface GenerateTextParams {
 
 export class OpenAIService {
   hasApiKey(): boolean {
-    return hasHardcodedOpenAIKey() || Boolean(localStorage.getItem('openai_api_key'));
+    // Always return true since API keys are managed server-side
+    return true;
   }
 
   getApiKey(): string | null {
-    if (hasHardcodedOpenAIKey()) {
-      return HARDCODED_API_KEYS.OPENAI_API_KEY || null;
-    }
-    return localStorage.getItem('openai_api_key');
+    // Not needed since API keys are managed server-side
+    return null;
   }
 
   setApiKey(key: string): void {
-    localStorage.setItem('openai_api_key', key);
+    // Not needed since API keys are managed server-side
   }
 
   removeApiKey(): void {
-    localStorage.removeItem('openai_api_key');
+    // Not needed since API keys are managed server-side
   }
 
   async chatJSON(messages: Array<{role: string; content: string}>, options: any = {}): Promise<any> {
-    const apiKey = this.getApiKey();
-    if (!apiKey) {
-      throw new Error('No OpenAI API key found. Please set your API key.');
-    }
+    console.log(`OpenAI API call via Edge Function - Messages: ${messages.length}`);
 
     try {
       const requestOptions = {
@@ -48,29 +44,21 @@ export class OpenAIService {
         ...options
       };
 
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify(requestOptions)
+      const { data, error } = await supabase.functions.invoke('openai-chat', {
+        body: {
+          messages,
+          options: requestOptions
+        }
       });
 
-      if (!response.ok) {
-        let errorMessage = 'Failed to call OpenAI API';
-        if (response.status === 401) {
-          errorMessage = 'Invalid API key. Please check your OpenAI API key.';
-        } else if (response.status === 429) {
-          errorMessage = 'Rate limit exceeded. Please try again later.';
-        }
-        throw new Error(errorMessage);
+      if (error) {
+        console.error('OpenAI Edge Function error:', error);
+        throw new Error(error.message || 'OpenAI API request failed');
       }
 
-      const data = await response.json();
-
       if (data.error) {
-        throw new Error(data.error.message || 'OpenAI API error');
+        console.error('OpenAI API error:', data.error);
+        throw new Error(data.error);
       }
 
       const content = data.choices?.[0]?.message?.content;
