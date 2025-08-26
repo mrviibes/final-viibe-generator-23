@@ -16,6 +16,15 @@
 const OPENAI_KEY_ENCODED = "sk-proj-YOUR_REAL_OPENAI_KEY_HERE";
 const IDEOGRAM_KEY_ENCODED = "YOUR_REAL_IDEOGRAM_KEY_HERE";
 
+// List of placeholder patterns to detect
+const PLACEHOLDER_PATTERNS = [
+  "YOUR_REAL_OPENAI_KEY_HERE",
+  "YOUR_REAL_IDEOGRAM_KEY_HERE", 
+  "sk-proj-YOUR_REAL_OPENAI_KEY_HERE",
+  "PASTE_YOUR_KEY_HERE",
+  "YOUR_KEY_HERE"
+];
+
 // Decode function (handles both plain and base64)
 function decodeKey(key: string): string {
   try {
@@ -29,12 +38,27 @@ function decodeKey(key: string): string {
   return key.trim();
 }
 
+// Check if a key is a placeholder
+function isPlaceholderKey(key: string): boolean {
+  return PLACEHOLDER_PATTERNS.some(pattern => key.includes(pattern));
+}
+
 export function getOpenAIKey(): string {
-  return decodeKey(OPENAI_KEY_ENCODED);
+  const decoded = decodeKey(OPENAI_KEY_ENCODED);
+  if (isPlaceholderKey(decoded)) {
+    console.warn("⚠️ OpenAI key is still a placeholder. Replace it in src/config/secrets.ts with your real key from https://platform.openai.com/api-keys");
+    return "";
+  }
+  return decoded;
 }
 
 export function getIdeogramKey(): string {
-  return decodeKey(IDEOGRAM_KEY_ENCODED);
+  const decoded = decodeKey(IDEOGRAM_KEY_ENCODED);
+  if (isPlaceholderKey(decoded)) {
+    console.warn("⚠️ Ideogram key is still a placeholder. Replace it in src/config/secrets.ts with your real key from https://ideogram.ai/api");
+    return "";
+  }
+  return decoded;
 }
 
 // Health check for development (no key logging)

@@ -292,7 +292,14 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
       finalCandidates = [fallback, `${fallback} today`, `${fallback} vibes`, `${fallback} energy`];
       picked = finalCandidates[0];
       usedFallback = true;
-      reason = candidateResults.find(c => c.reason)?.reason || 'All candidates blocked';
+      
+      // Check if this is due to missing API key
+      const hasValidKey = openAIService.hasApiKey();
+      if (!hasValidKey) {
+        reason = 'Missing API key. Add your OpenAI key in src/config/secrets.ts';
+      } else {
+        reason = candidateResults.find(c => c.reason)?.reason || 'All candidates blocked';
+      }
     }
   }
   
