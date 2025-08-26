@@ -8,7 +8,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const IDEOGRAM_API_BASE = 'https://api.ideogram.ai/generate';
+const IDEOGRAM_API_BASE = 'https://api.ideogram.ai/v3/generate';
 
 interface IdeogramGenerateRequest {
   prompt: string;
