@@ -1,7 +1,8 @@
 // Secure OpenAI client that calls server proxy instead of direct API
 
-// Use environment variable for server URL with fallback
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+// Hardcoded production URL with local development fallback
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 
+  (window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://your-api-server.com');
 
 export interface OpenAISearchResult {
   title: string;

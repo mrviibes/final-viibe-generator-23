@@ -1,5 +1,6 @@
 // Server health check service for API validation
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 
+  (window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://your-api-server.com');
 
 export interface ServerHealth {
   openaiAvailable: boolean;
@@ -33,8 +34,8 @@ class ServerHealthService {
       const data = await response.json();
       
       this.healthCache = {
-        openaiAvailable: !!data.openai,
-        ideogramAvailable: !!data.ideogram,
+        openaiAvailable: !!data.keys?.openai,
+        ideogramAvailable: !!data.keys?.ideogram,
         serverReachable: true,
       };
       

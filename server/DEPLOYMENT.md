@@ -29,15 +29,16 @@
 
 ## Configure Frontend
 
-After deploying your server, update your frontend:
+The frontend is pre-configured to use:
+- `http://localhost:3001` for local development 
+- `https://your-api-server.com` for production
 
-1. Set `VITE_SERVER_URL` environment variable:
-   ```bash
-   # For development
-   echo "VITE_SERVER_URL=https://your-deployed-server.railway.app" >> .env.local
-   ```
+**IMPORTANT**: Update the hardcoded production URL in these files:
+- `src/lib/ideogramClient.ts` (line 5)
+- `src/lib/openaiClient.ts` (line 5) 
+- `src/lib/serverHealth.ts` (line 3)
 
-2. Or directly in your hosting platform's environment variables
+Replace `https://your-api-server.com` with your actual deployed server URL.
 
 ## Security Checklist
 
