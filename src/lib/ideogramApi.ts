@@ -1,4 +1,4 @@
-import { HARDCODED_API_KEYS } from "@/config/secrets";
+import { HARDCODED_API_KEYS, hasHardcodedIdeogramKey } from "@/config/secrets";
 
 export interface IdeogramGenerateRequest {
   prompt: string;
@@ -31,7 +31,7 @@ export class IdeogramAPIError extends Error {
 const IDEOGRAM_API_BASE = 'https://api.ideogram.ai/generate';
 
 export function hasIdeogramApiKey(): boolean {
-  return Boolean(HARDCODED_API_KEYS.IDEOGRAM_API_KEY || localStorage.getItem('ideogram_api_key'));
+  return hasHardcodedIdeogramKey() || Boolean(localStorage.getItem('ideogram_api_key'));
 }
 
 export function isUsingBackend(): boolean {
@@ -39,7 +39,10 @@ export function isUsingBackend(): boolean {
 }
 
 export function getIdeogramApiKey(): string | null {
-  return HARDCODED_API_KEYS.IDEOGRAM_API_KEY || localStorage.getItem('ideogram_api_key');
+  if (hasHardcodedIdeogramKey()) {
+    return HARDCODED_API_KEYS.IDEOGRAM_API_KEY || null;
+  }
+  return localStorage.getItem('ideogram_api_key');
 }
 
 export function setIdeogramApiKey(key: string): void {

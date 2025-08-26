@@ -1,4 +1,4 @@
-import { HARDCODED_API_KEYS } from "@/config/secrets";
+import { HARDCODED_API_KEYS, hasHardcodedOpenAIKey } from "@/config/secrets";
 
 export interface OpenAISearchResult {
   title: string;
@@ -16,11 +16,14 @@ export interface GenerateTextParams {
 
 export class OpenAIService {
   hasApiKey(): boolean {
-    return Boolean(HARDCODED_API_KEYS.OPENAI_API_KEY || localStorage.getItem('openai_api_key'));
+    return hasHardcodedOpenAIKey() || Boolean(localStorage.getItem('openai_api_key'));
   }
 
   getApiKey(): string | null {
-    return HARDCODED_API_KEYS.OPENAI_API_KEY || localStorage.getItem('openai_api_key');
+    if (hasHardcodedOpenAIKey()) {
+      return HARDCODED_API_KEYS.OPENAI_API_KEY || null;
+    }
+    return localStorage.getItem('openai_api_key');
   }
 
   setApiKey(key: string): void {

@@ -12,11 +12,22 @@ export const HARDCODED_API_KEYS = {
   IDEOGRAM_API_KEY?: string;
 };
 
-// Check if hardcoded keys are available
+// Check if hardcoded keys are available and valid
 export const hasHardcodedOpenAIKey = (): boolean => {
-  return Boolean(HARDCODED_API_KEYS.OPENAI_API_KEY);
+  const key = HARDCODED_API_KEYS.OPENAI_API_KEY;
+  return Boolean(
+    key && 
+    key !== "your-openai-api-key-here" && 
+    key.startsWith("sk-") && 
+    key.length > 20
+  );
 };
 
 export const hasHardcodedIdeogramKey = (): boolean => {
-  return Boolean(HARDCODED_API_KEYS.IDEOGRAM_API_KEY);
+  const key = HARDCODED_API_KEYS.IDEOGRAM_API_KEY;
+  return Boolean(
+    key && 
+    key !== "your-ideogram-api-key-here" && 
+    key.length > 10
+  );
 };
