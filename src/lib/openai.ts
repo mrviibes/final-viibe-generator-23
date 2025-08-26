@@ -51,11 +51,7 @@ export class OpenAIService {
     model?: string;
   } = {}): Promise<any> {
     if (!checkRateLimit('openai')) {
-      toast({
-        title: "Rate limit",
-        description: "Please wait 3 seconds between requests",
-        variant: "destructive"
-      });
+      console.warn("Rate limit - please wait 3 seconds between requests");
       throw new Error("Rate limited - please wait");
     }
 
@@ -64,7 +60,7 @@ export class OpenAIService {
       model: options.model || 'gpt-4o-mini',
       messages,
       temperature: options.temperature ?? 0.7,
-      max_completion_tokens: options.max_completion_tokens || options.max_tokens || 4000,
+      max_tokens: options.max_completion_tokens || options.max_tokens || 4000,
     };
 
     console.log(`Calling OpenAI API directly - Model: ${requestBody.model}`);
@@ -134,7 +130,7 @@ Example format:
 
       const data = await this.callDirectAPI(messages, {
         temperature: 0.8,
-        max_completion_tokens: 1500,
+        max_tokens: 1500,
         model: 'gpt-4o-mini'
       });
 
@@ -175,7 +171,7 @@ Example format:
 
       const data = await this.callDirectAPI(messages, {
         temperature: 0.9,
-        max_completion_tokens: 2000,
+        max_tokens: 2000,
         model: 'gpt-4o-mini'
       });
 

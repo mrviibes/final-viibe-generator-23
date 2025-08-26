@@ -16,8 +16,6 @@ import { buildIdeogramHandoff } from "@/lib/ideogram";
 import { generateVisualRecommendations, VisualOption } from "@/lib/visualModel";
 import { generateIdeogramImage, hasIdeogramApiKey, isUsingBackend as ideogramIsUsingBackend, IdeogramAPIError, ProxySettings, getProxySettings, setProxySettings, testProxyConnection } from "@/lib/ideogramApi";
 import { buildIdeogramPrompt, getAspectRatioForIdeogram, getStyleTypeForIdeogram } from "@/lib/ideogramPrompt";
-import { useToast } from "@/hooks/use-toast";
-import { toast as sonnerToast } from "sonner";
 import { normalizeTypography, suggestContractions, isTextMisspelled } from "@/lib/textUtils";
 import { hasOpenAIKey, hasIdeogramKey } from "@/lib/keyManager";
 
@@ -4067,9 +4065,6 @@ const Index = () => {
 
   // Visual AI recommendations state
   const navigate = useNavigate();
-  const {
-    toast
-  } = useToast();
 
   // Helper function to truncate text to max words
   const truncateWords = (text: string, maxWords: number): string => {
@@ -4102,23 +4097,16 @@ const Index = () => {
         role: 'user',
         content: 'Test connection. Return JSON response: {"status": "ok"}'
       }], {
-        model: 'gpt-5-mini-2025-08-07',
-        max_completion_tokens: 50
+        model: 'gpt-4o-mini',
+        max_tokens: 50
       });
       if (testResult?.status === 'ok') {
-        toast({
-          title: "Connection Success",
-          description: "AI connection is working properly"
-        });
+        console.log("✅ AI connection is working properly");
       } else {
         throw new Error('Invalid response');
       }
     } catch (error) {
-      toast({
-        title: "Connection Failed",
-        description: "Check your API key and network connection",
-        variant: "destructive"
-      });
+      console.error("❌ AI connection failed:", error);
     }
     // Backend-only mode - no proxy testing needed
   };
@@ -4557,11 +4545,9 @@ const Index = () => {
         recipient_name: selectedPick || "-"
       }, 4);
 
-      // Check for partial tag coverage and show notification
+      // Check for partial tag coverage and log
       if (vibeResult.audit.reason?.includes('tag coverage') || vibeResult.audit.reason?.includes('partial tag coverage')) {
-        sonnerToast.info("Generated text with partial keyword match", {
-          description: "The AI created content that may not exactly match all your keywords but fits the tone and context."
-        });
+        console.log("ℹ️ Generated text with partial keyword match - AI created content that may not exactly match all keywords but fits the tone and context");
       }
       console.log('Vibe generation audit:', vibeResult.audit);
       console.log('✅ Generated text options:', vibeResult.candidates);
@@ -4577,21 +4563,17 @@ const Index = () => {
       // Log audit info for debugging
       console.log('🔍 Vibe generation audit:', vibeResult.audit);
 
-      // Show success toast with model information if retry occurred
+      // Log success with model information if retry occurred
       if (vibeResult.audit.retryAttempt && vibeResult.audit.retryAttempt > 0) {
-        sonnerToast.success("Generated text with model fallback", {
-          description: `Switched from ${vibeResult.audit.originalModel} to ${vibeResult.audit.model} for better results.`
-        });
+        console.log(`✅ Generated text with model fallback - switched from ${vibeResult.audit.originalModel} to ${vibeResult.audit.model} for better results`);
       }
 
       // Warn if fallbacks were used
       if (vibeResult.audit.usedFallback) {
         console.warn('⚠️ Text generation used fallback variants. API may be unavailable or having issues.');
-        sonnerToast.warning('Text generation used fallback. Results may be less relevant to your tags.');
       }
     } catch (error) {
       console.error('❌ Error generating text:', error);
-      sonnerToast.error('Failed to generate text options. Please try again.');
     } finally {
       setIsGenerating(false);
     }
@@ -4686,10 +4668,7 @@ const Index = () => {
       if (allImageUrls.length > 0) {
         setGeneratedImages(allImageUrls);
         setSelectedImageIndex(0);
-        toast({
-          title: "Images Generated!",
-          description: `Your ${allImageUrls.length} VIIBE${allImageUrls.length > 1 ? 's have' : ' has'} been successfully created with Ideogram Turbo.`
-        });
+        console.log(`✅ Images Generated! Your ${allImageUrls.length} VIIBE${allImageUrls.length > 1 ? 's have' : ' has'} been successfully created with Ideogram Turbo.`);
       } else {
         throw new Error("No image data received from Ideogram API");
       }
@@ -4700,11 +4679,7 @@ const Index = () => {
       } else {
         setImageGenerationError('An unexpected error occurred while generating the image.');
       }
-      toast({
-        title: "Generation Failed",
-        description: imageGenerationError || "Failed to generate image. Please try again.",
-        variant: "destructive"
-      });
+      console.error("❌ Generation Failed:", imageGenerationError || "Failed to generate image. Please try again.");
     } finally {
       setIsGeneratingImage(false);
     }
@@ -4718,10 +4693,7 @@ const Index = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast({
-      title: "Download Started",
-      description: "Your VIIBE image is being downloaded."
-    });
+    console.log("📥 Download Started - Your VIIBE image is being downloaded.");
   };
   const handleSearch = async (searchTerm: string) => {
     if (!searchTerm.trim() || !selectedSubOption) return;
@@ -6375,13 +6347,12 @@ const Index = () => {
                   const imageUrls = result.data.map(img => img.url);
                   setGeneratedImages(imageUrls);
                   setSelectedImageIndex(0);
-                  sonnerToast.success(`Generated ${imageUrls.length} VIIBE options! Choose your favorite.`);
+                  console.log(`✅ Generated ${imageUrls.length} VIIBE options! Choose your favorite.`);
                 } else {
-                  sonnerToast.error("Failed to generate your VIIBE. Please try again.");
+                  console.error("❌ Failed to generate your VIIBE. Please try again.");
                 }
               } catch (error) {
-                console.error("Error generating image:", error);
-                sonnerToast.error("Failed to generate your VIIBE. Please try again.");
+                console.error("❌ Error generating image:", error);
               } finally {
                 setIsGeneratingImage(false);
               }
