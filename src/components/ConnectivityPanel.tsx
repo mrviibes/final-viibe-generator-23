@@ -3,10 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle, XCircle, AlertCircle, RefreshCw, Settings } from "lucide-react";
-import { hasOpenAIKey, hasIdeogramKey, checkRateLimit } from "@/lib/keyManager";
-import { openAIService } from "@/lib/openai";
-import { testProxyConnection } from "@/lib/ideogramApi";
+import { CheckCircle, XCircle, AlertCircle, RefreshCw, Settings, Server } from "lucide-react";
+import { openAIProxyService } from "@/lib/openaiProxy";
+import { ideogramProxyService } from "@/lib/ideogramProxy";
 
 interface ConnectivityPanelProps {
   onSettingsClick: () => void;
@@ -21,75 +20,77 @@ interface ApiStatus {
 
 export function ConnectivityPanel({ onSettingsClick }: ConnectivityPanelProps) {
   const [openaiStatus, setOpenaiStatus] = useState<ApiStatus>({
-    hasKey: hasOpenAIKey(),
+    hasKey: false,
     isWorking: false,
     testing: false
   });
   
   const [ideogramStatus, setIdeogramStatus] = useState<ApiStatus>({
-    hasKey: hasIdeogramKey(),
+    hasKey: false,
     isWorking: false,
     testing: false
   });
 
   const [expanded, setExpanded] = useState(false);
 
+  // Initialize status on mount
   useEffect(() => {
-    setOpenaiStatus(prev => ({ ...prev, hasKey: hasOpenAIKey() }));
-    setIdeogramStatus(prev => ({ ...prev, hasKey: hasIdeogramKey() }));
+    const checkKeys = async () => {
+      const hasOpenAI = await openAIProxyService.hasApiKey();
+      const hasIdeogram = await ideogramProxyService.hasApiKey();
+      setOpenaiStatus(prev => ({ ...prev, hasKey: hasOpenAI }));
+      setIdeogramStatus(prev => ({ ...prev, hasKey: hasIdeogram }));
+    };
+    checkKeys();
   }, []);
 
   const testOpenAI = async () => {
-    if (!hasOpenAIKey()) return;
-    
     setOpenaiStatus(prev => ({ ...prev, testing: true, lastError: undefined }));
     
     try {
-      if (!checkRateLimit('openai')) {
-        throw new Error('Rate limited - wait 3 seconds');
-      }
-      
-      const result = await openAIService.chatJSON([
-        { role: 'user', content: 'Reply with exactly: {"test": "success"}' }
-      ]);
-      
-      if (result?.test === 'success') {
-        setOpenaiStatus(prev => ({ ...prev, isWorking: true, testing: false }));
-      } else {
-        throw new Error('Invalid response format');
-      }
-    } catch (error: any) {
+      // Test with a simple chat completion
+      const result = await openAIProxyService.chatJSON([
+        { role: 'user', content: 'Respond with a simple JSON object containing just {"test": "success"}' }
+      ], { max_tokens: 50 });
+
+      const isWorking = result && typeof result === 'object' && !result.error;
+      setOpenaiStatus(prev => ({ 
+        ...prev, 
+        isWorking, 
+        testing: false,
+        lastError: isWorking ? undefined : 'Unexpected response format'
+      }));
+    } catch (error) {
+      console.error('OpenAI test failed:', error);
       setOpenaiStatus(prev => ({ 
         ...prev, 
         isWorking: false, 
         testing: false,
-        lastError: error.message || 'Test failed'
+        lastError: error instanceof Error ? error.message : 'Connection test failed'
       }));
     }
   };
 
   const testIdeogram = async () => {
-    if (!hasIdeogramKey()) return;
-    
     setIdeogramStatus(prev => ({ ...prev, testing: true, lastError: undefined }));
     
     try {
-      if (!checkRateLimit('ideogram')) {
-        throw new Error('Rate limited - wait 3 seconds');
-      }
+      // Test with a simple generation request
+      await ideogramProxyService.generateImage("test", "ASPECT_1_1");
       
-      const result = await testProxyConnection('direct');
-      if (result) {
-        setIdeogramStatus(prev => ({ ...prev, isWorking: true, testing: false }));
-      } else {
-        throw new Error('Connection test failed');
-      }
-    } catch (error: any) {
+      setIdeogramStatus(prev => ({ 
+        ...prev, 
+        isWorking: true, 
+        testing: false,
+        lastError: undefined
+      }));
+    } catch (error) {
+      console.error('Ideogram test failed:', error);
       setIdeogramStatus(prev => ({ 
         ...prev, 
         isWorking: false, 
         testing: false,
-        lastError: error.message || 'Test failed'
+        lastError: error instanceof Error ? error.message : 'Connection test failed'
       }));
     }
   };
@@ -104,7 +105,7 @@ export function ConnectivityPanel({ onSettingsClick }: ConnectivityPanelProps) {
 
   const getStatusText = (status: ApiStatus) => {
     if (status.testing) return "Testing...";
-    if (!status.hasKey) return "No API key";
+    if (!status.hasKey) return "Not configured";
     if (status.isWorking) return "Working";
     if (status.lastError) return "Error";
     return "Untested";
@@ -128,8 +129,8 @@ export function ConnectivityPanel({ onSettingsClick }: ConnectivityPanelProps) {
         onClick={() => setExpanded(true)}
         className="mb-4"
       >
-        <Settings className="h-4 w-4 mr-2" />
-        API Status
+        <Server className="h-4 w-4 mr-2" />
+        API Status (Server)
       </Button>
     );
   }
@@ -139,9 +140,12 @@ export function ConnectivityPanel({ onSettingsClick }: ConnectivityPanelProps) {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-lg">API Connectivity</CardTitle>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Server className="h-5 w-5" />
+              API Connectivity (Server)
+            </CardTitle>
             <CardDescription>
-              Check your API key status and connectivity
+              APIs are configured on the server - ready for all users
             </CardDescription>
           </div>
           {expanded && (
@@ -161,9 +165,9 @@ export function ConnectivityPanel({ onSettingsClick }: ConnectivityPanelProps) {
             <div className="flex items-center gap-3">
               {getStatusIcon(openaiStatus)}
               <div>
-                <div className="font-medium">OpenAI</div>
+                <div className="font-medium">OpenAI (Server)</div>
                 <div className="text-sm text-muted-foreground">
-                  Text generation
+                  Text generation via proxy
                 </div>
               </div>
             </div>
@@ -171,16 +175,14 @@ export function ConnectivityPanel({ onSettingsClick }: ConnectivityPanelProps) {
               <Badge variant={getStatusVariant(openaiStatus)}>
                 {getStatusText(openaiStatus)}
               </Badge>
-              {openaiStatus.hasKey && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={testOpenAI}
-                  disabled={openaiStatus.testing}
-                >
-                  Test
-                </Button>
-              )}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={testOpenAI}
+                disabled={openaiStatus.testing}
+              >
+                Test
+              </Button>
             </div>
           </div>
 
@@ -188,9 +190,9 @@ export function ConnectivityPanel({ onSettingsClick }: ConnectivityPanelProps) {
             <div className="flex items-center gap-3">
               {getStatusIcon(ideogramStatus)}
               <div>
-                <div className="font-medium">Ideogram</div>
+                <div className="font-medium">Ideogram (Server)</div>
                 <div className="text-sm text-muted-foreground">
-                  Image generation
+                  Image generation via proxy
                 </div>
               </div>
             </div>
@@ -198,16 +200,14 @@ export function ConnectivityPanel({ onSettingsClick }: ConnectivityPanelProps) {
               <Badge variant={getStatusVariant(ideogramStatus)}>
                 {getStatusText(ideogramStatus)}
               </Badge>
-              {ideogramStatus.hasKey && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={testIdeogram}
-                  disabled={ideogramStatus.testing}
-                >
-                  Test
-                </Button>
-              )}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={testIdeogram}
+                disabled={ideogramStatus.testing}
+              >
+                Test
+              </Button>
             </div>
           </div>
         </div>
@@ -231,7 +231,7 @@ export function ConnectivityPanel({ onSettingsClick }: ConnectivityPanelProps) {
         <div className="flex gap-2">
           <Button variant="outline" onClick={onSettingsClick} className="flex-1">
             <Settings className="h-4 w-4 mr-2" />
-            Configure Keys
+            Legacy Settings
           </Button>
         </div>
       </CardContent>

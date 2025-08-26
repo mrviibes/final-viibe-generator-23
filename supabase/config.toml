@@ -1,1 +1,7 @@
 project_id = "qdigssobxfgoeuvkejpo"
+
+[functions.openai-proxy]
+verify_jwt = false
+
+[functions.ideogram-proxy]
+verify_jwt = false
