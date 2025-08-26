@@ -350,15 +350,6 @@ async function generateIdeogramImageFrontend(request: IdeogramGenerateRequest): 
       lastError = error instanceof Error ? error : new Error('Unknown error');
       console.log(`${proxyType} failed with model ${currentModel}:`, lastError.message);
       
-      // If V3 failed and we haven't tried V2A_TURBO yet, try downgrading
-      if (currentModel === 'V_3' && (error as any).status !== 403) {
-        try {
-          console.log('Retrying with V_2A_TURBO model...');
-          return await tryRequest(proxyType, 'V_2A_TURBO');
-        } catch (downgradeError) {
-          console.log(`${proxyType} also failed with V_2A_TURBO:`, downgradeError);
-        }
-      }
     }
   }
   // If all methods failed, throw the last error

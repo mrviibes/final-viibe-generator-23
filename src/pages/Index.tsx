@@ -14,7 +14,7 @@ import { ProxySettingsDialog } from "@/components/ProxySettingsDialog";
 import { CorsRetryDialog } from "@/components/CorsRetryDialog";
 import { StepProgress } from "@/components/StepProgress";
 import { StackedSelectionCard } from "@/components/StackedSelectionCard";
-import { SmartOverlayToggle } from "@/components/SmartOverlayToggle";
+
 import { TextOverlay } from "@/components/TextOverlay";
 import { useNavigate } from "react-router-dom";
 import { generateCandidates, VibeResult } from "@/lib/vibeModel";
@@ -4053,11 +4053,6 @@ const Index = () => {
   const [proxySettings, setLocalProxySettings] = useState(() => getProxySettings());
   const [proxyApiKey, setProxyApiKey] = useState('');
   
-  // Ideogram model selection state - default to Turbo (recommended)
-  const [ideogramModel, setIdeogramModel] = useState<'V_2A_TURBO' | 'V_3'>(() => {
-    const stored = localStorage.getItem('ideogram_selected_model');
-    return (stored === 'V_3') ? 'V_3' : 'V_2A_TURBO';
-  });
 
   // Spelling guarantee mode states - default to ON when text is present
   const [spellingGuaranteeMode, setSpellingGuaranteeMode] = useState<boolean>(false);
@@ -4066,7 +4061,7 @@ const Index = () => {
   const [finalImageWithText, setFinalImageWithText] = useState<string | null>(null);
   const [textMisspellingDetected, setTextMisspellingDetected] = useState<boolean>(false);
   const [cleanBackgroundMode, setCleanBackgroundMode] = useState<boolean>(true);
-  const [smartOverlayEnabled, setSmartOverlayEnabled] = useState<boolean>(true);
+  
   const [overlayPosition, setOverlayPosition] = useState<'bottom' | 'top' | 'left' | 'right' | 'center'>('bottom');
   const [overlayStyle, setOverlayStyle] = useState<'translucent' | 'ribbon' | 'minimal'>('translucent');
 
@@ -4742,8 +4737,8 @@ const Index = () => {
       const aspectForIdeogram = getAspectRatioForIdeogram(finalPayload.aspect_ratio || aspectRatio);
       const styleForIdeogram = getStyleTypeForIdeogram(finalPayload.visual_style || visualStyle);
       
-      // Use user-selected model instead of automatic selection
-      const chosenModel = ideogramModel;
+      // Always use V3 model
+      const chosenModel = 'V_3';
       
       // Determine magic_prompt_option based on content
       let magicPromptOption: 'AUTO' | 'OFF' = 'AUTO';
@@ -6411,46 +6406,6 @@ const Index = () => {
                   </div>
                 </div>}
 
-              {/* Image Model Settings */}
-              <div className="bg-muted/30 rounded-lg p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-md font-medium text-foreground">Image Model</h4>
-                </div>
-                
-                <p className="text-sm text-muted-foreground">
-                  Choose which Ideogram model to use for image generation. Turbo is recommended for speed and cost.
-                </p>
-                
-                <div className="space-y-3">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Model Selection</label>
-                    <Select value={ideogramModel} onValueChange={(value: 'V_2A_TURBO' | 'V_3') => {
-                      setIdeogramModel(value);
-                      localStorage.setItem('ideogram_selected_model', value);
-                      toast({
-                        title: "Model Updated",
-                        description: `Switched to ${value === 'V_2A_TURBO' ? 'Turbo (recommended)' : 'V3 (beta)'}`
-                      });
-                    }}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="V_2A_TURBO">Turbo (V_2A_TURBO) - Recommended</SelectItem>
-                        <SelectItem value="V_3">V3 (Beta) - Higher quality, experimental</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
-                    <p className="text-sm text-blue-800 dark:text-blue-200">
-                      <strong>Cost:</strong> Turbo ≈ $0.03/image • V3 ≈ $0.08/image
-                      <br />
-                      <strong>Note:</strong> Higher counts multiply the cost. V3 may fallback to Turbo if connection issues occur.
-                    </p>
-                  </div>
-                </div>
-              </div>
 
               {/* Design Summary */}
               <div className="space-y-4">
@@ -6584,19 +6539,6 @@ const Index = () => {
         {/* Bottom Navigation */}
         <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t border-border p-4">
           <div className="max-w-6xl mx-auto">
-            {/* Smart Overlay Toggle for Step 3 */}
-            {currentStep === 3 && isStep3Complete() && selectedDimension && (selectedGeneratedOption || stepTwoText) && (
-              <div className="mb-4 max-w-md mx-auto">
-                <SmartOverlayToggle
-                  enabled={smartOverlayEnabled}
-                  onChange={setSmartOverlayEnabled}
-                  shouldRecommend={
-                    Boolean(selectedGeneratedOption || stepTwoText) && 
-                    (selectedGeneratedOption?.length || stepTwoText.length || 0) > 30
-                  }
-                />
-              </div>
-            )}
             <div className="flex justify-between items-center">
             <Button variant="outline" onClick={() => setCurrentStep(prev => Math.max(1, prev - 1))} className={currentStep === 1 ? "invisible" : ""} disabled={currentStep === 1}>
               <ArrowLeft className="h-4 w-4 mr-2" />
@@ -6721,12 +6663,11 @@ const Index = () => {
                 let styleType = getStyleTypeForIdeogram(visualStyle);
                 let model: 'V_1' | 'V_1_TURBO' | 'V_2' | 'V_2_TURBO' | 'V_2A' | 'V_2A_TURBO' | 'V_3' = 'V_2_TURBO';
 
-                // Choose model based on style type
-                const chosenModel = styleType === 'REALISTIC' ? 'V_3' : 'V_2A_TURBO';
-                model = chosenModel;
+                // Always use V3 model
+                model = 'V_3';
 
-                // Handle smart overlay or spelling guarantee mode
-                const shouldUseSmartOverlay = smartOverlayEnabled && finalText && finalText.trim() && (
+                // Smart overlay is now always enabled for complex scenarios
+                const shouldUseSmartOverlay = finalText && finalText.trim() && (
                   peopleCountHint === 'multiple' || // Complex scenes with people
                   spellingGuaranteeMode || // Spelling guarantee mode
                   finalText.length > 30 // Longer text
