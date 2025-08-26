@@ -5616,7 +5616,7 @@ const Index = () => {
                       {generatedOptions.length > 0 && generationAudit && (
                         <p className="text-xs text-muted-foreground">
                           Using {generationAudit.model} • Generated in {((Date.now() - textGenerationStartTime) / 1000).toFixed(1)}s
-                          {generationAudit.usedFallback && " • Used fallback"}
+                          {generationAudit.usedFallback && generationAudit.auditReason !== 'Missing API key. Add your OpenAI key in src/config/secrets.ts' && " • Used fallback"}
                         </p>
                       )}
                     </div>
@@ -5793,10 +5793,10 @@ const Index = () => {
                                </Button>
                              </div>
                              {visualOptions.length > 0 && visualModel && (
-                               <p className="text-xs text-muted-foreground mb-2">
-                                 Using {visualModel.includes('gpt-5-mini') ? 'gpt-5-mini' : visualModel} • Generated in {((Date.now() - visualGenerationStartTime) / 1000).toFixed(1)}s
-                                 {visualModel === 'fallback' && " • Used fallback"}
-                               </p>
+                                <p className="text-xs text-muted-foreground mb-2">
+                                  Using {visualModel.includes('gpt-5-mini') ? 'gpt-5-mini' : visualModel} • Generated in {((Date.now() - visualGenerationStartTime) / 1000).toFixed(1)}s
+                                  {visualModel === 'fallback' && visualRecommendations?.errorCode !== 'unauthorized' && " • Used fallback"}
+                                </p>
                              )}
                             {visualModel === 'fallback' && <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 text-xs p-2 rounded-lg mb-3 max-w-md mx-auto">
                                 {getErrorMessage(visualRecommendations?.errorCode)}

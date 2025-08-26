@@ -1,6 +1,5 @@
 import { getOpenAIKey } from "@/config/secrets";
 import { hasOpenAIKey, checkRateLimit } from "@/lib/keyManager";
-import { toast } from "@/hooks/use-toast";
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -51,7 +50,6 @@ export class OpenAIService {
     model?: string;
   } = {}): Promise<any> {
     if (!checkRateLimit('openai')) {
-      console.warn("Rate limit - please wait 3 seconds between requests");
       throw new Error("Rate limited - please wait");
     }
 

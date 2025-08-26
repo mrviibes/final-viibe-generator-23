@@ -1,6 +1,5 @@
 import { getIdeogramKey } from "@/config/secrets";
 import { hasIdeogramKey, checkRateLimit } from "@/lib/keyManager";
-import { toast } from "@/hooks/use-toast";
 
 const IDEOGRAM_API_BASE = 'https://api.ideogram.ai/generate';
 
@@ -111,11 +110,6 @@ export async function findBestProxy(): Promise<ProxySettings['type']> {
 
 async function callIdeogramAPI(request: IdeogramGenerateRequest, proxyType: ProxySettings['type']): Promise<IdeogramGenerateResponse> {
   if (!checkRateLimit('ideogram')) {
-    toast({
-      title: "Rate limit",
-      description: "Please wait 3 seconds between requests",
-      variant: "destructive"
-    });
     throw new IdeogramAPIError("Rate limited - please wait", 429);
   }
 
