@@ -1,4 +1,6 @@
-import { getOpenAIKey, hasOpenAIKey } from "@/lib/keyManager";
+import { getOpenAIKey } from "@/config/secrets";
+import { hasOpenAIKey, checkRateLimit } from "@/lib/keyManager";
+import { toast } from "@/hooks/use-toast";
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -48,8 +50,24 @@ export class OpenAIService {
     max_completion_tokens?: number;
     model?: string;
   } = {}): Promise<any> {
-    if (!hasOpenAIKey()) {
-      throw new Error("OpenAI API key not configured. Please configure your API keys.");
+    if (!checkRateLimit('openai')) {
+      toast({
+        title: "Rate limit",
+        description: "Please wait 3 seconds between requests",
+        variant: "destructive"
+      });
+      throw new Error("Rate limited - please wait");
+    }
+
+    const apiKey = getOpenAIKey();
+    
+    if (!apiKey || apiKey.includes("YOUR_REAL_OPENAI_KEY_HERE")) {
+      toast({
+        title: "API Key needed",
+        description: "Please paste your OpenAI API key in src/config/secrets.ts",
+        variant: "destructive"
+      });
+      throw new Error("OpenAI API key not configured");
     }
     const requestBody = {
       model: options.model || 'gpt-4o-mini',

@@ -1,4 +1,6 @@
-import { getIdeogramKey, hasIdeogramKey } from "@/lib/keyManager";
+import { getIdeogramKey } from "@/config/secrets";
+import { hasIdeogramKey, checkRateLimit } from "@/lib/keyManager";
+import { toast } from "@/hooks/use-toast";
 
 const IDEOGRAM_API_BASE = 'https://api.ideogram.ai/generate';
 
@@ -108,8 +110,24 @@ export async function findBestProxy(): Promise<ProxySettings['type']> {
 }
 
 async function callIdeogramAPI(request: IdeogramGenerateRequest, proxyType: ProxySettings['type']): Promise<IdeogramGenerateResponse> {
-  if (!hasIdeogramKey()) {
-    throw new IdeogramAPIError("Ideogram API key not configured. Please configure your API keys.");
+  if (!checkRateLimit('ideogram')) {
+    toast({
+      title: "Rate limit",
+      description: "Please wait 3 seconds between requests",
+      variant: "destructive"
+    });
+    throw new IdeogramAPIError("Rate limited - please wait", 429);
+  }
+
+  const apiKey = getIdeogramKey();
+  
+  if (!apiKey || apiKey.includes("YOUR_REAL_IDEOGRAM_KEY_HERE")) {
+    toast({
+      title: "API Key needed", 
+      description: "Please paste your Ideogram API key in src/config/secrets.ts",
+      variant: "destructive"
+    });
+    throw new IdeogramAPIError("Ideogram API key not configured", 401);
   }
   const proxyPrefix = PROXY_CONFIGS[proxyType];
   const url = proxyPrefix ? `${proxyPrefix}${encodeURIComponent(IDEOGRAM_API_BASE)}` : IDEOGRAM_API_BASE;

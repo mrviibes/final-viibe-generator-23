@@ -19,8 +19,8 @@ import { buildIdeogramPrompt, getAspectRatioForIdeogram, getStyleTypeForIdeogram
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
 import { normalizeTypography, suggestContractions, isTextMisspelled } from "@/lib/textUtils";
-import { hasOpenAIKey, hasIdeogramKey, getOpenAIKeyPreview, getIdeogramKeyPreview, getKeySource } from "@/lib/keyManager";
-import { KeyManagerDialog } from "@/components/KeyManagerDialog";
+import { hasOpenAIKey, hasIdeogramKey } from "@/lib/keyManager";
+
 const styleOptions = [{
   id: "celebrations",
   name: "Celebrations",
@@ -4057,9 +4057,6 @@ const Index = () => {
   const [selectedRecommendation, setSelectedRecommendation] = useState<number | null>(null);
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
   
-  // Key Manager state
-  const [showKeyManager, setShowKeyManager] = useState(false);
-  const [keyRefreshTrigger, setKeyRefreshTrigger] = useState(0);
 
   // Auto-generate 5 images when Step 4 loads
   useEffect(() => {
@@ -4829,47 +4826,6 @@ const Index = () => {
   };
   return <div className="min-h-screen bg-background py-12 px-4 pb-32">
       <div className="max-w-6xl mx-auto">
-        {/* API Key Warning Banner */}
-        {(!hasOpenAIKey() || !hasIdeogramKey()) && (
-          <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg text-orange-800 text-sm">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="h-4 w-4" />
-                <span className="font-medium">API Keys Not Configured</span>
-              </div>
-              <Button 
-                onClick={() => setShowKeyManager(true)}
-                size="sm"
-                className="bg-orange-600 hover:bg-orange-700 text-white"
-              >
-                Configure Keys
-              </Button>
-            </div>
-            <p className="mb-2">
-              Configure your API keys to enable text and image generation:
-            </p>
-            <ul className="mt-2 ml-4 space-y-1">
-              {!hasOpenAIKey() && (
-                <li>
-                  • OpenAI API key required for text generation
-                  <div className="text-xs text-orange-600 ml-2">
-                    Current: {getOpenAIKeyPreview()} 
-                    {getKeySource('openai') === 'localStorage' && <span className="ml-1">(from browser storage)</span>}
-                  </div>
-                </li>
-              )}
-              {!hasIdeogramKey() && (
-                <li>
-                  • Ideogram API key required for image generation
-                  <div className="text-xs text-orange-600 ml-2">
-                    Current: {getIdeogramKeyPreview()}
-                    {getKeySource('ideogram') === 'localStorage' && <span className="ml-1">(from browser storage)</span>}
-                  </div>
-                </li>
-              )}
-            </ul>
-          </div>
-        )}
         
         {/* Main Title */}
         <div className="text-center mb-8">
@@ -6509,18 +6465,6 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Key Manager Dialog */}
-        <KeyManagerDialog 
-          open={showKeyManager}
-          onOpenChange={setShowKeyManager}
-          onKeysUpdated={() => {
-            setKeyRefreshTrigger(prev => prev + 1);
-            // Force re-render to update the banner
-            setTimeout(() => {
-              // This will trigger a re-render to show updated key status
-            }, 100);
-          }}
-        />
 
       </div>
     </div>;
