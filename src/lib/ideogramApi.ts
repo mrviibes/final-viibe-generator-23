@@ -1,7 +1,7 @@
-// Export direct service as main service
-export { ideogramDirectService } from './ideogramDirect';
-export { IdeogramAPIError } from './ideogramDirect';
-export type { IdeogramGenerateRequest, IdeogramGenerateResponse } from './ideogramDirect';
+// Export secure client service as main service
+export { ideogramClientService as ideogramDirectService } from './ideogramClient';
+export { IdeogramAPIError } from './ideogramClient';
+export type { IdeogramGenerateRequest, IdeogramGenerateResponse } from './ideogramClient';
 
 // Legacy types and interfaces for backward compatibility
 export interface ProxySettings {
@@ -14,7 +14,7 @@ let currentProxySettings: ProxySettings = { type: 'direct' };
 
 // Legacy functions for backward compatibility
 export const generateIdeogramImage = async (params: any, aspectRatio?: string) => {
-  const { ideogramDirectService } = await import('./ideogramDirect');
+  const { ideogramClientService } = await import('./ideogramClient');
   
   console.log("🔍 generateIdeogramImage called with:", { params, aspectRatio });
   
@@ -24,23 +24,23 @@ export const generateIdeogramImage = async (params: any, aspectRatio?: string) =
     const prompt = params;
     const ratio = aspectRatio || "ASPECT_1_1";
     console.log("🔍 Using old signature:", { prompt, ratio });
-    return ideogramDirectService.generateImage(prompt, ratio);
+    return ideogramClientService.generateImage(prompt, ratio);
   } else {
     // New signature: generateIdeogramImage(fullParamsObject)
     console.log("🔍 Using new signature:", params);
-    return ideogramDirectService.generateImage(params.prompt, params.aspect_ratio || "ASPECT_1_1");
+    return ideogramClientService.generateImage(params.prompt, params.aspect_ratio || "ASPECT_1_1");
   }
 };
 
 export const hasIdeogramApiKey = async () => {
-  const { ideogramDirectService } = await import('./ideogramDirect');
-  return ideogramDirectService.hasApiKey();
+  const { ideogramClientService } = await import('./ideogramClient');
+  return ideogramClientService.hasApiKey();
 };
 
 export const testProxyConnection = async (proxyType?: string) => {
   try {
-    const { ideogramDirectService } = await import('./ideogramDirect');
-    await ideogramDirectService.generateImage("test", "ASPECT_1_1");
+    const { ideogramClientService } = await import('./ideogramClient');
+    await ideogramClientService.generateImage("test", "ASPECT_1_1");
     return { success: true };
   } catch (error) {
     return { 
