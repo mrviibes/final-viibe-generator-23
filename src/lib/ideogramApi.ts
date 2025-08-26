@@ -42,340 +42,65 @@ export class IdeogramAPIError extends Error {
   }
 }
 
-let apiKey: string | null = null;
-let proxySettings: ProxySettings = { type: 'direct' };
-let useBackendAPI: boolean = true; // Use Supabase backend by default
-
-export function setIdeogramApiKey(key: string) {
-  apiKey = key;
-  localStorage.setItem('ideogram_api_key', key);
-  useBackendAPI = false; // Switch to frontend mode when key is set
-}
-
-export function getIdeogramApiKey(): string | null {
-  if (apiKey) return apiKey;
-  
-  const stored = localStorage.getItem('ideogram_api_key');
-  if (stored) {
-    apiKey = stored;
-    return stored;
-  }
-  
-  return null;
-}
-
-export function clearIdeogramApiKey() {
-  apiKey = null;
-  localStorage.removeItem('ideogram_api_key');
-  useBackendAPI = true; // Go back to backend mode
-}
+// Backend-only mode: No API key or proxy handling needed
+console.info("Ideogram Service: Using Supabase backend for all API calls");
 
 export function hasIdeogramApiKey(): boolean {
-  return useBackendAPI || !!getIdeogramApiKey();
+  return true; // Always available via Supabase backend
 }
 
 export function isUsingBackend(): boolean {
-  return useBackendAPI;
+  return true; // Always using backend
 }
 
-export function setProxySettings(settings: ProxySettings) {
-  proxySettings = settings;
-  localStorage.setItem('ideogram_proxy_settings', JSON.stringify(settings));
+// Deprecated functions for backward compatibility (no-op)
+export function setIdeogramApiKey(_key: string) {
+  console.warn("setIdeogramApiKey is deprecated - using Supabase backend");
 }
 
 export function getProxySettings(): ProxySettings {
-  const stored = localStorage.getItem('ideogram_proxy_settings');
-  if (stored) {
-    try {
-      const parsed = JSON.parse(stored);
-      proxySettings = parsed;
-      return parsed;
-    } catch {
-      // Invalid JSON, fallback to default
-    }
-  }
-  return proxySettings;
+  return { type: 'direct' }; // Default for compatibility
 }
 
-export async function testProxyConnection(proxyType: ProxySettings['type']): Promise<boolean> {
-  try {
-    const testUrls: Record<ProxySettings['type'], string> = {
-      'direct': 'https://httpbin.org/status/200',
-      'cors-anywhere': 'https://cors-anywhere.herokuapp.com/https://httpbin.org/status/200',
-      'proxy-cors-sh': 'https://proxy.cors.sh/https://httpbin.org/status/200',
-      'allorigins': 'https://api.allorigins.win/raw?url=https://httpbin.org/status/200',
-      'thingproxy': 'https://thingproxy.freeboard.io/fetch/https://httpbin.org/status/200'
-    };
-
-    const headers: Record<string, string> = {};
-    if (proxyType === 'cors-anywhere') {
-      headers['X-Requested-With'] = 'XMLHttpRequest';
-    }
-    
-    const response = await fetch(testUrls[proxyType], { 
-      method: 'GET',
-      headers,
-      signal: AbortSignal.timeout(5000) // 5 second timeout
-    });
-    return response.ok;
-  } catch {
-    return false;
-  }
+export function setProxySettings(_settings: ProxySettings) {
+  console.warn("setProxySettings is deprecated - using Supabase backend");
 }
 
-// Auto-select the best working proxy
+// Deprecated proxy functions for backward compatibility
+export async function testProxyConnection(_proxyType: ProxySettings['type']): Promise<boolean> {
+  console.warn("testProxyConnection is deprecated - using Supabase backend");
+  return true;
+}
+
 export async function findBestProxy(): Promise<ProxySettings['type']> {
-  const proxyTypes: ProxySettings['type'][] = ['direct', 'proxy-cors-sh', 'allorigins', 'thingproxy', 'cors-anywhere'];
-  
-  for (const proxyType of proxyTypes) {
-    try {
-      const works = await testProxyConnection(proxyType);
-      if (works) {
-        console.log(`Auto-selected proxy: ${proxyType}`);
-        return proxyType;
-      }
-    } catch (error) {
-      console.log(`Failed to test ${proxyType}:`, error);
-    }
-  }
-  
-  // Fallback to direct if nothing works
+  console.warn("findBestProxy is deprecated - using Supabase backend");
   return 'direct';
 }
 
 export async function generateIdeogramImage(request: IdeogramGenerateRequest): Promise<IdeogramGenerateResponse> {
-  // Try backend API first if enabled
-  if (useBackendAPI) {
-    console.log(`Calling Ideogram backend API - Model: ${request.model}, Prompt: ${request.prompt.substring(0, 50)}...`);
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('ideogram-generate', {
-        body: request
-      });
-
-      if (error) {
-        console.error('Backend Ideogram API error:', error);
-        throw new IdeogramAPIError(`Backend API error: ${error.message}`);
-      }
-
-      if (!data) {
-        throw new IdeogramAPIError('No data received from backend API');
-      }
-
-      console.log(`Backend Ideogram API success - Generated ${data.data?.length || 0} image(s)`);
-      return data as IdeogramGenerateResponse;
-
-    } catch (error) {
-      console.error('Backend Ideogram API call failed:', error);
-      
-      // Fallback to frontend if backend fails and we have a key
-      const key = getIdeogramApiKey();
-      if (key) {
-        console.log('Falling back to frontend Ideogram API...');
-        useBackendAPI = false;
-        const result = await generateIdeogramImageFrontend(request);
-        useBackendAPI = true; // Reset for next call
-        return result;
-      }
-      
-      throw error instanceof IdeogramAPIError ? error : new IdeogramAPIError(
-        error instanceof Error ? error.message : 'Backend API call failed'
-      );
-    }
-  }
-
-  // Frontend mode
-  return generateIdeogramImageFrontend(request);
-}
-
-async function generateIdeogramImageFrontend(request: IdeogramGenerateRequest): Promise<IdeogramGenerateResponse> {
-  const key = getIdeogramApiKey();
-  if (!key) {
-    throw new IdeogramAPIError('No API key provided');
-  }
-
-  const settings = getProxySettings();
+  console.log(`Calling Ideogram backend API - Model: ${request.model}, Prompt: ${request.prompt.substring(0, 50)}...`);
   
-  const makeRequest = async (proxyType: ProxySettings['type'], currentModel: string): Promise<Response> => {
-    let url = IDEOGRAM_API_BASE;
-    const headers: Record<string, string> = {
-      'Api-Key': key,
-      'Content-Type': 'application/json',
-    };
-
-    // Configure URL and headers based on proxy type
-    switch (proxyType) {
-      case 'cors-anywhere':
-        url = PROXY_CONFIGS['cors-anywhere'] + IDEOGRAM_API_BASE;
-        headers['X-Requested-With'] = 'XMLHttpRequest';
-        break;
-      case 'proxy-cors-sh':
-        url = PROXY_CONFIGS['proxy-cors-sh'] + IDEOGRAM_API_BASE;
-        if (settings.apiKey) {
-          headers['x-cors-api-key'] = settings.apiKey;
-        }
-        break;
-      case 'allorigins':
-        url = PROXY_CONFIGS['allorigins'] + encodeURIComponent(IDEOGRAM_API_BASE);
-        break;
-      case 'thingproxy':
-        url = PROXY_CONFIGS['thingproxy'] + IDEOGRAM_API_BASE;
-        break;
-      case 'direct':
-      default:
-        // Use direct URL
-        break;
-    }
-
-    // Always use JSON format wrapped in image_request
-    const payload: any = {
-      prompt: request.prompt,
-      aspect_ratio: request.aspect_ratio,
-      model: currentModel,
-      magic_prompt_option: request.magic_prompt_option,
-    };
-    
-    if (request.seed !== undefined) {
-      payload.seed = request.seed;
-    }
-    
-    if (request.style_type) {
-      payload.style_type = request.style_type;
-    }
-
-    const requestBody = JSON.stringify({ image_request: payload });
-
-    // Debug log the request structure (without sensitive headers)
-    console.log('Ideogram API request:', { 
-      url: url.replace(key, '[REDACTED]'), 
-      model: currentModel,
-      payload: { ...payload, prompt: payload.prompt.substring(0, 50) + '...' }
+  try {
+    const { data, error } = await supabase.functions.invoke('ideogram-generate', {
+      body: request
     });
 
-    return fetch(url, {
-      method: 'POST',
-      headers,
-      body: requestBody,
-    });
-  };
-
-  let currentModel = request.model;
-  let lastError: Error | null = null;
-
-  // Auto-retry logic with model downgrade
-  const tryRequest = async (proxyType: ProxySettings['type'], model: string): Promise<IdeogramGenerateResponse> => {
-    try {
-      const response = await makeRequest(proxyType, model);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.log(`Request failed with ${response.status}:`, errorText);
-        
-        let errorMessage = `HTTP ${response.status}`;
-        
-        // Check for specific CORS demo error
-        if (response.status === 403 && errorText.includes('corsdemo')) {
-          throw new IdeogramAPIError(
-            'CORS_DEMO_REQUIRED',
-            403
-          );
-        }
-        
-        // Check for 415 errors (common with proxy issues)
-        if (response.status === 415) {
-          throw new IdeogramAPIError(
-            'Media type error (415). This may be a proxy configuration issue.',
-            415
-          );
-        }
-        
-        try {
-          const errorData = JSON.parse(errorText);
-          errorMessage = errorData.error?.message || errorMessage;
-        } catch {
-          errorMessage = errorText || errorMessage;
-        }
-        
-        throw new IdeogramAPIError(errorMessage, response.status);
-      }
-
-      const data = await response.json();
-      return data as IdeogramGenerateResponse;
-    } catch (error) {
-      if (error instanceof IdeogramAPIError) {
-        throw error;
-      }
-      throw new Error(`Network error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    if (error) {
+      console.error('Backend Ideogram API error:', error);
+      throw new IdeogramAPIError(`Backend API error: ${error.message}`);
     }
-  };
 
-  // Auto-select best proxy if user hasn't manually configured one
-  let proxyMethods: ProxySettings['type'][];
-  
-  if (settings.type === 'direct') {
-    // If user selected direct, try auto-selection first, then fallbacks
-    const bestProxy = await findBestProxy();
-    proxyMethods = [bestProxy];
-    if (bestProxy !== 'proxy-cors-sh') proxyMethods.push('proxy-cors-sh');
-    if (bestProxy !== 'allorigins') proxyMethods.push('allorigins');
-    if (bestProxy !== 'thingproxy') proxyMethods.push('thingproxy');
-    if (bestProxy !== 'cors-anywhere') proxyMethods.push('cors-anywhere');
-  } else {
-    // User has specific preference, try it first then fallbacks
-    proxyMethods = [settings.type];
-    const fallbacks: ProxySettings['type'][] = ['proxy-cors-sh', 'allorigins', 'thingproxy', 'cors-anywhere', 'direct'];
-    for (const fallback of fallbacks) {
-      if (fallback !== settings.type) {
-        proxyMethods.push(fallback);
-      }
+    if (!data) {
+      throw new IdeogramAPIError('No data received from backend API');
     }
-  }
 
-  for (const proxyType of proxyMethods) {
-    try {
-      return await tryRequest(proxyType, currentModel);
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error('Unknown error');
-      console.log(`${proxyType} failed with model ${currentModel}:`, lastError.message);
-      
-      // If V3 failed and we haven't tried V2A_TURBO yet, try downgrading
-      if (currentModel === 'V_3' && (error as any).status !== 403) {
-        try {
-          console.log('Retrying with V_2A_TURBO model...');
-          return await tryRequest(proxyType, 'V_2A_TURBO');
-        } catch (downgradeError) {
-          console.log(`${proxyType} also failed with V_2A_TURBO:`, downgradeError);
-        }
-      }
-    }
-  }
-  // If all methods failed, throw the last error
-  if (lastError instanceof IdeogramAPIError) {
-    throw lastError;
-  }
-  
-  // Check if it's a CORS error
-  if (lastError instanceof TypeError && lastError.message.includes('Failed to fetch')) {
-    throw new IdeogramAPIError(
-      'CORS error: Unable to connect to Ideogram API directly. Try enabling a CORS proxy in settings.',
-      0
+    console.log(`Backend Ideogram API success - Generated ${data.data?.length || 0} image(s)`);
+    return data as IdeogramGenerateResponse;
+
+  } catch (error) {
+    console.error('Backend Ideogram API call failed:', error);
+    throw error instanceof IdeogramAPIError ? error : new IdeogramAPIError(
+      error instanceof Error ? error.message : 'Backend API call failed'
     );
   }
-  
-  // Check for common content filtering keywords that might cause issues
-  const contentFilteringKeywords = ['marijuana', 'cannabis', 'weed', 'joint', 'drug', 'smoking'];
-  const hasFilteredContent = contentFilteringKeywords.some(keyword => 
-    request.prompt.toLowerCase().includes(keyword)
-  );
-  
-  if (hasFilteredContent) {
-    throw new IdeogramAPIError(
-      'Content may have been flagged by content filters. Try using different words or themes to test if the API is working.',
-      400
-    );
-  }
-  
-  throw new IdeogramAPIError(
-    `All connection methods failed. Last error: ${lastError?.message || 'Unknown error'}`
-  );
 }

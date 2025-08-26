@@ -14,7 +14,7 @@ import { useNavigate } from "react-router-dom";
 import { generateCandidates, VibeResult } from "@/lib/vibeModel";
 import { buildIdeogramHandoff } from "@/lib/ideogram";
 import { generateVisualRecommendations, VisualOption } from "@/lib/visualModel";
-import { generateIdeogramImage, setIdeogramApiKey, getIdeogramApiKey, hasIdeogramApiKey, isUsingBackend as ideogramIsUsingBackend, IdeogramAPIError, getProxySettings, setProxySettings, testProxyConnection, ProxySettings } from "@/lib/ideogramApi";
+import { generateIdeogramImage, hasIdeogramApiKey, isUsingBackend as ideogramIsUsingBackend, IdeogramAPIError, ProxySettings, getProxySettings, setProxySettings, testProxyConnection } from "@/lib/ideogramApi";
 import { buildIdeogramPrompt, getAspectRatioForIdeogram, getStyleTypeForIdeogram } from "@/lib/ideogramPrompt";
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
@@ -4040,9 +4040,7 @@ const Index = () => {
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
   const [imageGenerationError, setImageGenerationError] = useState<string>("");
   const [directPrompt, setDirectPrompt] = useState<string>("");
-  const [showProxySettings, setShowProxySettings] = useState(false);
-  const [proxySettings, setLocalProxySettings] = useState(() => getProxySettings());
-  const [proxyApiKey, setProxyApiKey] = useState('');
+  // Removed proxy settings - using Supabase backend only
 
   // Spelling guarantee mode states - default to ON when text is present
   const [spellingGuaranteeMode, setSpellingGuaranteeMode] = useState<boolean>(false);
@@ -4065,7 +4063,6 @@ const Index = () => {
   }, [currentStep]);
 
   // Visual AI recommendations state
-  const [isTestingProxy, setIsTestingProxy] = useState(false);
   const navigate = useNavigate();
   const {
     toast
@@ -4096,7 +4093,7 @@ const Index = () => {
 
   // Test connection function
   const testAIConnection = async () => {
-    setIsTestingProxy(true);
+    // Backend-only mode - no proxy testing needed
     try {
       const testResult = await openAIService.chatJSON([{
         role: 'user',
@@ -4120,7 +4117,7 @@ const Index = () => {
         variant: "destructive"
       });
     }
-    setIsTestingProxy(false);
+    // Backend-only mode - no proxy testing needed
   };
 
   // Helper function to build selections for StackedSelectionCard
@@ -4596,16 +4593,7 @@ const Index = () => {
       setIsGenerating(false);
     }
   };
-  const handleApiKeySet = (apiKey: string) => {
-    openAIService.setApiKey(apiKey);
-  };
-  const handleIdeogramApiKeySet = (apiKey: string) => {
-    setIdeogramApiKey(apiKey);
-    toast({
-      title: "API Key Saved",
-      description: "Your Ideogram API key has been saved securely."
-    });
-  };
+  // Removed unused API key handlers - using Supabase backend only
   const handleGenerateImage = async (numImages = 1) => {
     if (!hasIdeogramApiKey()) {
     }
@@ -6146,96 +6134,7 @@ const Index = () => {
                   </div>}
               </div>
               
-              {/* Proxy Settings Dialog */}
-              {showProxySettings && <div className="bg-muted/30 rounded-lg p-6 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-md font-medium text-foreground">Proxy Settings</h4>
-                    <Button variant="ghost" size="sm" onClick={() => setShowProxySettings(false)} className="h-8 w-8 p-0">
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  
-                  <p className="text-sm text-muted-foreground">
-                    Configure how to connect to the Ideogram API. Use a proxy if you encounter CORS errors.
-                  </p>
-                  
-                  <div className="space-y-3">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-foreground">Connection Method</label>
-                      <Select value={proxySettings.type} onValueChange={(value: ProxySettings['type']) => {
-                  const newSettings = {
-                    ...proxySettings,
-                    type: value
-                  };
-                  setLocalProxySettings(newSettings);
-                  setProxySettings(newSettings);
-                }}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="direct">Direct Connection</SelectItem>
-                          <SelectItem value="cors-anywhere">CORS Anywhere (Free)</SelectItem>
-                          <SelectItem value="proxy-cors-sh">Proxy.cors.sh (Paid)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    {proxySettings.type === 'proxy-cors-sh' && <div className="space-y-2">
-                        <label className="text-sm font-medium text-foreground">Proxy API Key</label>
-                        <Input type="password" placeholder="Enter your proxy.cors.sh API key" value={proxyApiKey} onChange={e => setProxyApiKey(e.target.value)} />
-                        <Button variant="outline" size="sm" onClick={() => {
-                  const newSettings = {
-                    ...proxySettings,
-                    apiKey: proxyApiKey
-                  };
-                  setLocalProxySettings(newSettings);
-                  setProxySettings(newSettings);
-                  toast({
-                    title: "API Key Saved",
-                    description: "Your proxy API key has been saved."
-                  });
-                }}>
-                          Save API Key
-                        </Button>
-                      </div>}
-                    
-                    {proxySettings.type === 'cors-anywhere' && <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg">
-                        <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                          <strong>Note:</strong> CORS Anywhere requires manual activation. 
-                          <Button variant="link" className="h-auto p-0 ml-1 text-yellow-800 dark:text-yellow-200 underline" onClick={() => window.open('https://cors-anywhere.herokuapp.com/corsdemo', '_blank')}>
-                            Click here to enable it
-                          </Button>
-                          , then test the connection below.
-                        </p>
-                      </div>}
-                    
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={async () => {
-                  setIsTestingProxy(true);
-                  try {
-                    const success = await testProxyConnection(proxySettings.type);
-                    toast({
-                      title: success ? "Connection Successful" : "Connection Failed",
-                      description: success ? "The proxy connection is working correctly." : "Unable to connect through this proxy method.",
-                      variant: success ? "default" : "destructive"
-                    });
-                  } catch (error) {
-                    toast({
-                      title: "Test Failed",
-                      description: "An error occurred while testing the connection.",
-                      variant: "destructive"
-                    });
-                  } finally {
-                    setIsTestingProxy(false);
-                  }
-                }} disabled={isTestingProxy}>
-                        {isTestingProxy ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                        Test Connection
-                      </Button>
-                    </div>
-                  </div>
-                </div>}
+              {/* Removed proxy settings - using Supabase backend only */}
 
               {/* Design Summary */}
               <div className="space-y-4">
