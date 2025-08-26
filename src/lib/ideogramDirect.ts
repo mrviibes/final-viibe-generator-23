@@ -48,8 +48,13 @@ class IdeogramDirectService {
       "Content-Type": "application/json",
     };
     
-    // Add API key to headers (proxy will forward it)
-    headers["Api-Key"] = key;
+    // Only send API key if not using proxy (proxy handles auth)
+    if (!proxyUrl) {
+      headers["Api-Key"] = key;
+    } else {
+      // Send key in custom header for proxy to forward
+      headers["X-API-Key"] = key;
+    }
 
     const resp = await fetch(apiUrl, {
       method: "POST",
