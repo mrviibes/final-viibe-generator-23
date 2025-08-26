@@ -8,7 +8,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const IDEOGRAM_API_BASE = 'https://api.ideogram.ai/v3/generate';
+const IDEOGRAM_API_BASE = 'https://api.ideogram.ai/generate';
 
 interface IdeogramGenerateRequest {
   prompt: string;
@@ -51,31 +51,27 @@ serve(async (req) => {
     console.log(`Ideogram API call - Model: ${modelToUse}, Count: ${count}, Prompt: ${request.prompt.substring(0, 50)}...`);
 
     if (count === 1) {
-      // Single image generation (existing logic)
-      const payload: any = {
-        prompt: request.prompt,
-        aspect_ratio: request.aspect_ratio,
-        model: modelToUse,
-        magic_prompt_option: request.magic_prompt_option,
-      };
+      // Single image generation with FormData for V3 API
+      const formData = new FormData();
+      formData.append('prompt', request.prompt);
+      formData.append('aspect_ratio', request.aspect_ratio);
+      formData.append('model', modelToUse);
+      formData.append('magic_prompt', request.magic_prompt_option);
       
       if (request.seed !== undefined) {
-        payload.seed = request.seed;
+        formData.append('seed', request.seed.toString());
       }
       
       if (request.style_type) {
-        payload.style_type = request.style_type;
+        formData.append('style_type', request.style_type);
       }
-
-      const requestBody = JSON.stringify({ image_request: payload });
 
       const response = await fetch(IDEOGRAM_API_BASE, {
         method: 'POST',
         headers: {
           'Api-Key': ideogramApiKey,
-          'Content-Type': 'application/json',
         },
-        body: requestBody,
+        body: formData,
       });
 
       if (!response.ok) {
@@ -117,35 +113,31 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     } else {
-      // Multiple image generation
+      // Multiple image generation with FormData for V3 API
       const promises: Promise<any>[] = [];
       
       for (let i = 0; i < count; i++) {
-        const payload: any = {
-          prompt: request.prompt,
-          aspect_ratio: request.aspect_ratio,
-          model: modelToUse,
-          magic_prompt_option: request.magic_prompt_option,
-        };
+        const formData = new FormData();
+        formData.append('prompt', request.prompt);
+        formData.append('aspect_ratio', request.aspect_ratio);
+        formData.append('model', modelToUse);
+        formData.append('magic_prompt', request.magic_prompt_option);
         
         if (request.seed !== undefined) {
-          payload.seed = request.seed + i; // Vary seed for different results
+          formData.append('seed', (request.seed + i).toString()); // Vary seed for different results
         }
         
         if (request.style_type) {
-          payload.style_type = request.style_type;
+          formData.append('style_type', request.style_type);
         }
-
-        const requestBody = JSON.stringify({ image_request: payload });
 
         promises.push(
           fetch(IDEOGRAM_API_BASE, {
             method: 'POST',
             headers: {
               'Api-Key': ideogramApiKey,
-              'Content-Type': 'application/json',
             },
-            body: requestBody,
+            body: formData,
           }).then(async (response) => {
             if (!response.ok) {
               const errorText = await response.text();
