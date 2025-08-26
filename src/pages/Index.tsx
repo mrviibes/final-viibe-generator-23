@@ -4834,10 +4834,8 @@ const Index = () => {
   return <div className="min-h-screen bg-background py-12 px-4 pb-32">
       <div className="max-w-6xl mx-auto">
         
-        {/* API Key Status Banner */}
-        <ApiKeyBanner 
-          hasOpenAI={apiKeysStatus.openai}
-          hasIdeogram={apiKeysStatus.ideogram}
+        {/* API Connectivity Panel */}
+        <ConnectivityPanel 
           onSettingsClick={() => setShowSettingsDialog(true)}
         />
         
