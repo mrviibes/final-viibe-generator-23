@@ -1,10 +1,10 @@
-import { supabase } from "@/integrations/supabase/client";
+import { IDEOGRAM_API_KEY } from "@/config/secrets";
 
 const IDEOGRAM_API_BASE = 'https://api.ideogram.ai/generate';
 
 export interface ProxySettings {
   type: 'direct' | 'cors-anywhere' | 'proxy-cors-sh' | 'allorigins' | 'thingproxy';
-  apiKey?: string; // For proxy.cors.sh
+  apiKey?: string;
 }
 
 const PROXY_CONFIGS = {
@@ -42,65 +42,127 @@ export class IdeogramAPIError extends Error {
   }
 }
 
-// Backend-only mode: No API key or proxy handling needed
-console.info("Ideogram Service: Using Supabase backend for all API calls");
+// Current proxy settings
+let currentProxySettings: ProxySettings = { type: 'direct' };
+
+console.info("Ideogram Service: Using direct API calls with hardcoded key and proxy fallbacks");
 
 export function hasIdeogramApiKey(): boolean {
-  return true; // Always available via Supabase backend
-}
-
-export function isUsingBackend(): boolean {
-  return true; // Always using backend
-}
-
-// Deprecated functions for backward compatibility (no-op)
-export function setIdeogramApiKey(_key: string) {
-  console.warn("setIdeogramApiKey is deprecated - using Supabase backend");
-}
-
-export function getProxySettings(): ProxySettings {
-  return { type: 'direct' }; // Default for compatibility
-}
-
-export function setProxySettings(_settings: ProxySettings) {
-  console.warn("setProxySettings is deprecated - using Supabase backend");
-}
-
-// Deprecated proxy functions for backward compatibility
-export async function testProxyConnection(_proxyType: ProxySettings['type']): Promise<boolean> {
-  console.warn("testProxyConnection is deprecated - using Supabase backend");
   return true;
 }
 
+export function isUsingBackend(): boolean {
+  return false;
+}
+
+export function setIdeogramApiKey(_key: string) {
+  console.warn("setIdeogramApiKey is deprecated - using hardcoded key");
+}
+
+export function getProxySettings(): ProxySettings {
+  return currentProxySettings;
+}
+
+export function setProxySettings(settings: ProxySettings) {
+  currentProxySettings = settings;
+  console.log(`Proxy settings updated to: ${settings.type}`);
+}
+
+export async function testProxyConnection(proxyType: ProxySettings['type']): Promise<boolean> {
+  const testUrl = 'https://httpbin.org/get';
+  const proxyPrefix = PROXY_CONFIGS[proxyType];
+  
+  try {
+    const url = proxyPrefix ? `${proxyPrefix}${encodeURIComponent(testUrl)}` : testUrl;
+    const headers: Record<string, string> = {};
+    
+    if (proxyType === 'proxy-cors-sh' && currentProxySettings.apiKey) {
+      headers['x-cors-api-key'] = currentProxySettings.apiKey;
+    }
+    
+    const response = await fetch(url, { 
+      method: 'GET',
+      headers,
+      signal: AbortSignal.timeout(5000)
+    });
+    
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function findBestProxy(): Promise<ProxySettings['type']> {
-  console.warn("findBestProxy is deprecated - using Supabase backend");
+  const proxies: ProxySettings['type'][] = ['direct', 'cors-anywhere', 'proxy-cors-sh', 'allorigins', 'thingproxy'];
+  
+  for (const proxy of proxies) {
+    console.log(`Testing proxy: ${proxy}`);
+    if (await testProxyConnection(proxy)) {
+      console.log(`Best proxy found: ${proxy}`);
+      return proxy;
+    }
+  }
+  
+  console.warn('No working proxy found, defaulting to direct');
   return 'direct';
 }
 
-export async function generateIdeogramImage(request: IdeogramGenerateRequest): Promise<IdeogramGenerateResponse> {
-  console.log(`Calling Ideogram backend API - Model: ${request.model}, Prompt: ${request.prompt.substring(0, 50)}...`);
+async function callIdeogramAPI(request: IdeogramGenerateRequest, proxyType: ProxySettings['type']): Promise<IdeogramGenerateResponse> {
+  const proxyPrefix = PROXY_CONFIGS[proxyType];
+  const url = proxyPrefix ? `${proxyPrefix}${encodeURIComponent(IDEOGRAM_API_BASE)}` : IDEOGRAM_API_BASE;
   
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Api-Key': IDEOGRAM_API_KEY,
+  };
+  
+  if (proxyType === 'proxy-cors-sh' && currentProxySettings.apiKey) {
+    headers['x-cors-api-key'] = currentProxySettings.apiKey;
+  }
+  
+  console.log(`Calling Ideogram API via ${proxyType} - Model: ${request.model}, Prompt: ${request.prompt.substring(0, 50)}...`);
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(request),
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.text();
+    throw new IdeogramAPIError(`API error: ${response.status} ${errorData}`, response.status);
+  }
+  
+  const data = await response.json();
+  console.log(`Ideogram API success via ${proxyType} - Generated ${data.data?.length || 0} image(s)`);
+  return data;
+}
+
+export async function generateIdeogramImage(request: IdeogramGenerateRequest): Promise<IdeogramGenerateResponse> {
+  // Try current proxy first
   try {
-    const { data, error } = await supabase.functions.invoke('ideogram-generate', {
-      body: request
-    });
-
-    if (error) {
-      console.error('Backend Ideogram API error:', error);
-      throw new IdeogramAPIError(`Backend API error: ${error.message}`);
-    }
-
-    if (!data) {
-      throw new IdeogramAPIError('No data received from backend API');
-    }
-
-    console.log(`Backend Ideogram API success - Generated ${data.data?.length || 0} image(s)`);
-    return data as IdeogramGenerateResponse;
-
+    return await callIdeogramAPI(request, currentProxySettings.type);
   } catch (error) {
-    console.error('Backend Ideogram API call failed:', error);
+    console.warn(`Failed with ${currentProxySettings.type} proxy:`, error);
+    
+    // If direct call failed, try finding a working proxy
+    if (currentProxySettings.type === 'direct') {
+      console.log('Direct call failed, searching for working proxy...');
+      const bestProxy = await findBestProxy();
+      
+      if (bestProxy !== 'direct') {
+        setProxySettings({ type: bestProxy });
+        try {
+          return await callIdeogramAPI(request, bestProxy);
+        } catch (proxyError) {
+          console.error('Proxy call also failed:', proxyError);
+        }
+      }
+    }
+    
+    // Re-throw the original error if all attempts failed
     throw error instanceof IdeogramAPIError ? error : new IdeogramAPIError(
-      error instanceof Error ? error.message : 'Backend API call failed'
+      error instanceof Error ? error.message : 'API call failed'
     );
   }
 }
