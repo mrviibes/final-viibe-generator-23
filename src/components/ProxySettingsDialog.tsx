@@ -16,7 +16,7 @@ interface ProxySettingsDialogProps {
 }
 
 export function ProxySettingsDialog({ open, onOpenChange }: ProxySettingsDialogProps) {
-  const [settings, setSettingsLocal] = useState<ProxySettings>({ type: 'direct' });
+  const [settings, setSettingsLocal] = useState<ProxySettings>({ type: 'none' });
   const [proxyApiKey, setProxyApiKey] = useState('');
   const [testResults, setTestResults] = useState<Record<string, 'testing' | 'success' | 'failed' | null>>({});
   const { toast } = useToast();
@@ -41,7 +41,7 @@ export function ProxySettingsDialog({ open, onOpenChange }: ProxySettingsDialogP
   };
 
   const testAllConnections = async () => {
-    const types: ProxySettings['type'][] = ['direct', 'proxy-cors-sh', 'allorigins', 'thingproxy', 'cors-anywhere'];
+    const types: ProxySettings['type'][] = ['none', 'proxy-cors-sh', 'allorigins', 'thingproxy', 'cors-anywhere'];
     await Promise.all(types.map(type => testConnection(type)));
   };
 
@@ -97,15 +97,15 @@ export function ProxySettingsDialog({ open, onOpenChange }: ProxySettingsDialogP
             <div className="space-y-4">
               <div className="flex items-center justify-between p-3 border rounded-lg">
                 <div className="flex items-center space-x-3">
-                  <RadioGroupItem value="direct" id="direct" />
+                  <RadioGroupItem value="none" id="none" />
                   <div>
-                    <Label htmlFor="direct" className="font-medium">Direct Connection</Label>
+                    <Label htmlFor="none" className="font-medium">Direct Connection</Label>
                     <p className="text-sm text-muted-foreground">Connect directly to Ideogram API</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
-                  {getStatusIcon(testResults.direct)}
-                  {testResults.direct === 'success' && <Badge variant="secondary">Recommended</Badge>}
+                  {getStatusIcon(testResults.none)}
+                  {testResults.none === 'success' && <Badge variant="secondary">Recommended</Badge>}
                 </div>
               </div>
 

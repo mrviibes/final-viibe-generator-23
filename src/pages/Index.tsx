@@ -4374,11 +4374,8 @@ const Index = () => {
   // Generate subject using AI
   const handleGenerateSubject = async () => {
     if (!openAIService.hasApiKey()) {
-      // Only show dialog if not using backend API
-      if (!openAIService.isUsingBackend()) {
-        setShowApiKeyDialog(true);
-        return;
-      }
+      setShowApiKeyDialog(true);
+      return;
     }
 
     // Auto-commit pending tag input before generating
@@ -4491,11 +4488,8 @@ const Index = () => {
   // Generate text using Vibe Model
   const handleGenerateText = async () => {
     if (!openAIService.hasApiKey()) {
-      // Only show dialog if not using backend API
-      if (!openAIService.isUsingBackend()) {
-        setShowApiKeyDialog(true);
-        return;
-      }
+      setShowApiKeyDialog(true);
+      return;
     }
     setIsGenerating(true);
     setTextGenerationStartTime(Date.now());
@@ -4781,8 +4775,8 @@ const Index = () => {
       const responses = await Promise.all(imagePromises);
       // Collect all image URLs from all responses
       const allImageUrls = responses.flatMap(response => 
-        response.data && response.data.length > 0 
-          ? response.data.map(img => img.url)
+        response.images && response.images.length > 0 
+          ? response.images.map(img => img.url)
           : []
       );
       
@@ -4842,11 +4836,8 @@ const Index = () => {
   const handleSearch = async (searchTerm: string) => {
     if (!searchTerm.trim() || !selectedSubOption) return;
     if (!openAIService.hasApiKey()) {
-      // Only show dialog if not using backend API
-      if (!openAIService.isUsingBackend()) {
-        setShowApiKeyDialog(true);
-        return;
-      }
+      setShowApiKeyDialog(true);
+      return;
     }
     setIsSearching(true);
     setSearchError("");
@@ -4869,10 +4860,8 @@ const Index = () => {
   const handlePopSearch = async (searchTerm: string) => {
     if (!searchTerm.trim() || !selectedSubOption) return;
     if (!openAIService.hasApiKey()) {
-      if (!openAIService.isUsingBackend()) {
-        setShowApiKeyDialog(true);
-        return;
-      }
+      setShowApiKeyDialog(true);
+      return;
     }
     setIsPopSearching(true);
     setPopSearchError("");
@@ -6687,8 +6676,8 @@ const Index = () => {
                     magic_prompt_option: 'OFF' // Disable magic prompt for background-only
                   });
                   
-                  if (backgroundResult.data?.[0]?.url) {
-                    setBackgroundOnlyImageUrl(backgroundResult.data[0].url);
+                  if (backgroundResult.images?.[0]?.url) {
+                    setBackgroundOnlyImageUrl(backgroundResult.images[0].url);
                     setShowTextOverlay(true);
                     setIsGeneratingImage(false);
                     console.log('✅ Smart overlay background generated successfully');
@@ -6728,8 +6717,8 @@ const Index = () => {
                   ]);
                   
                   const allImages = [];
-                  if (groupResult.data?.[0]?.url) allImages.push(groupResult.data[0].url);
-                  if (soloResult.data?.[0]?.url) allImages.push(soloResult.data[0].url);
+                  if (groupResult.images?.[0]?.url) allImages.push(groupResult.images[0].url);
+                  if (soloResult.images?.[0]?.url) allImages.push(soloResult.images[0].url);
                   
                   if (allImages.length > 0) {
                     setGeneratedImages(allImages);
@@ -6750,8 +6739,8 @@ const Index = () => {
                     count: 1
                   });
                   
-                  if (result.data && result.data.length > 0) {
-                    const imageUrls = result.data.map(img => img.url);
+                  if (result.images && result.images.length > 0) {
+                    const imageUrls = result.images.map(img => img.url);
                     setGeneratedImages(imageUrls);
                     setSelectedImageIndex(0);
                     const modelDescription = model === 'V_3' ? 'Ideogram V3 (Realistic)' : 'Ideogram Turbo';
