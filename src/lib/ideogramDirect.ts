@@ -1,4 +1,4 @@
-import { getIdeogramKey } from "@/config/secrets";
+import { getIdeogramKey, getIdeogramProxyUrl } from "@/config/secrets";
 
 export interface IdeogramGenerateRequest {
   image_request: {
@@ -40,17 +40,29 @@ class IdeogramDirectService {
       },
     };
 
-    const resp = await fetch("https://api.ideogram.ai/generate", {
+    // Use proxy if configured, otherwise direct API
+    const proxyUrl = getIdeogramProxyUrl();
+    const apiUrl = proxyUrl || "https://api.ideogram.ai/generate";
+    
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    
+    // Add API key to headers (proxy will forward it)
+    headers["Api-Key"] = key;
+
+    const resp = await fetch(apiUrl, {
       method: "POST",
-      headers: {
-        "Api-Key": key,
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify(body),
     });
 
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) {
+      // Enhanced error messaging for CORS issues
+      if (resp.status === 0 || resp.type === 'opaque') {
+        throw new IdeogramAPIError("CORS error: Configure a proxy URL in secrets.ts or use a backend service", resp.status);
+      }
       throw new IdeogramAPIError(data?.error?.message || `Ideogram error ${resp.status}`, resp.status);
     }
     return data as IdeogramGenerateResponse;

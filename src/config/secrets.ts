@@ -73,8 +73,16 @@ export function getIdeogramKey(): string {
   return decoded;
 }
 
+// Optional proxy URL for Ideogram (to bypass CORS)
+const IDEOGRAM_PROXY_URL = ""; // e.g., "https://your-proxy.workers.dev"
+
+export function getIdeogramProxyUrl(): string {
+  return IDEOGRAM_PROXY_URL.trim();
+}
+
 // Health check for development (no key logging)
 console.log("🔑 Keys configured:", {
   openai: getOpenAIKey().length > 0,
-  ideogram: getIdeogramKey().length > 0
+  ideogram: getIdeogramKey().length > 0,
+  ideogramProxy: getIdeogramProxyUrl().length > 0
 });

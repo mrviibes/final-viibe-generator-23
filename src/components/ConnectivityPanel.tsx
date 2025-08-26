@@ -221,7 +221,14 @@ export function ConnectivityPanel({ onSettingsClick }: ConnectivityPanelProps) {
                   <div><strong>OpenAI:</strong> {openaiStatus.lastError}</div>
                 )}
                 {ideogramStatus.lastError && (
-                  <div><strong>Ideogram:</strong> {ideogramStatus.lastError}</div>
+                  <div>
+                    <strong>Ideogram:</strong> {ideogramStatus.lastError}
+                    {ideogramStatus.lastError.includes('CORS') && (
+                      <div className="text-xs mt-1 text-muted-foreground">
+                        💡 Tip: Add IDEOGRAM_PROXY_URL in src/config/secrets.ts to bypass CORS
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </AlertDescription>
