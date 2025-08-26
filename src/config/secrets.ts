@@ -4,9 +4,9 @@
 // For production, consider using a backend proxy or server-side API calls
 
 export const HARDCODED_API_KEYS = {
-  // Uncomment and add your API keys if you want to hardcode them
-  // OPENAI_API_KEY: "your-openai-api-key-here",
-  // IDEOGRAM_API_KEY: "your-ideogram-api-key-here",
+  // Add your API keys here to hardcode them
+  OPENAI_API_KEY: "your-openai-api-key-here",
+  IDEOGRAM_API_KEY: "your-ideogram-api-key-here",
 } as {
   OPENAI_API_KEY?: string;
   IDEOGRAM_API_KEY?: string;

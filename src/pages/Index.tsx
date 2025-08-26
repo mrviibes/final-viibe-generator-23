@@ -12,6 +12,7 @@ import { StepProgress } from "@/components/StepProgress";
 import { StackedSelectionCard } from "@/components/StackedSelectionCard";
 import { ApiKeyManager } from "@/components/ApiKeyManager";
 import { hasIdeogramApiKey } from "@/lib/ideogramApi";
+import { hasHardcodedOpenAIKey, hasHardcodedIdeogramKey } from "@/config/secrets";
 
 import { TextOverlay } from "@/components/TextOverlay";
 import { useNavigate } from "react-router-dom";
@@ -4075,6 +4076,9 @@ const Index = () => {
   // Visual AI recommendations state
   const [isTestingProxy, setIsTestingProxy] = useState(false);
   const [showApiKeyDialog, setShowApiKeyDialog] = useState<boolean>(false);
+  
+  // Hide API key UI if hardcoded keys are present
+  const hideApiKeyUI = hasHardcodedOpenAIKey() || hasHardcodedIdeogramKey();
   const navigate = useNavigate();
   const {
     toast
@@ -4926,14 +4930,16 @@ const Index = () => {
         <div className="flex justify-between items-center mb-4">
           <div></div>
           <StepProgress currentStep={currentStep} />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowApiKeyDialog(true)}
-            className="text-xs"
-          >
-            API Keys
-          </Button>
+          {!hideApiKeyUI && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowApiKeyDialog(true)}
+              className="text-xs"
+            >
+              API Keys
+            </Button>
+          )}
         </div>
         
         {currentStep === 1 && <>
@@ -6735,13 +6741,15 @@ const Index = () => {
 
       </div>
 
-      <ApiKeyManager
-        open={showApiKeyDialog}
-        onOpenChange={setShowApiKeyDialog}
-        onKeysSet={() => {
-          // Refresh any UI state that depends on API keys
-        }}
-      />
+      {!hideApiKeyUI && (
+        <ApiKeyManager
+          open={showApiKeyDialog}
+          onOpenChange={setShowApiKeyDialog}
+          onKeysSet={() => {
+            // Refresh any UI state that depends on API keys
+          }}
+        />
+      )}
     </div>;
 };
 export default Index;

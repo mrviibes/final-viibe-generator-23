@@ -1,3 +1,5 @@
+import { HARDCODED_API_KEYS } from "@/config/secrets";
+
 export interface IdeogramGenerateRequest {
   prompt: string;
   aspect_ratio: 'ASPECT_10_16' | 'ASPECT_16_10' | 'ASPECT_9_16' | 'ASPECT_16_9' | 'ASPECT_3_2' | 'ASPECT_2_3' | 'ASPECT_4_3' | 'ASPECT_3_4' | 'ASPECT_1_1' | 'ASPECT_1_3' | 'ASPECT_3_1';
@@ -29,7 +31,7 @@ export class IdeogramAPIError extends Error {
 const IDEOGRAM_API_BASE = 'https://api.ideogram.ai/generate';
 
 export function hasIdeogramApiKey(): boolean {
-  return Boolean(localStorage.getItem('ideogram_api_key'));
+  return Boolean(HARDCODED_API_KEYS.IDEOGRAM_API_KEY || localStorage.getItem('ideogram_api_key'));
 }
 
 export function isUsingBackend(): boolean {
@@ -37,7 +39,7 @@ export function isUsingBackend(): boolean {
 }
 
 export function getIdeogramApiKey(): string | null {
-  return localStorage.getItem('ideogram_api_key');
+  return HARDCODED_API_KEYS.IDEOGRAM_API_KEY || localStorage.getItem('ideogram_api_key');
 }
 
 export function setIdeogramApiKey(key: string): void {
