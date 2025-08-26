@@ -1,8 +1,5 @@
 // Secure OpenAI client that calls server proxy instead of direct API
-
-// Hardcoded production URL with local development fallback
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 
-  (window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://your-api-server.com');
+import { getServerUrl } from '../config/runtime';
 
 export interface OpenAISearchResult {
   title: string;
@@ -20,7 +17,7 @@ export interface GenerateTextParams {
 
 class OpenAIClientService {
   async chatJSON(messages: Array<{role: string; content: string}>, options: any = {}): Promise<any> {
-    const response = await fetch(`${SERVER_URL}/api/openai/chat`, {
+    const response = await fetch(`${getServerUrl()}/api/openai/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

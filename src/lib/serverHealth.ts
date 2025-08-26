@@ -1,6 +1,5 @@
 // Server health check service for API validation
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 
-  (window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://your-api-server.com');
+import { getServerUrl } from '../config/runtime';
 
 export interface ServerHealth {
   openaiAvailable: boolean;
@@ -23,7 +22,7 @@ class ServerHealthService {
     }
 
     try {
-      const response = await fetch(`${SERVER_URL}/health`, {
+      const response = await fetch(`${getServerUrl()}/health`, {
         method: 'GET',
       });
 

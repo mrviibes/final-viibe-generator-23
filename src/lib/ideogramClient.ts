@@ -1,8 +1,5 @@
 // Secure Ideogram client that calls server proxy instead of direct API
-
-// Hardcoded production URL with local development fallback
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 
-  (window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://your-api-server.com');
+import { getServerUrl } from '../config/runtime';
 
 export interface IdeogramGenerateRequest {
   prompt: string;
@@ -30,7 +27,7 @@ export class IdeogramAPIError extends Error {
 class IdeogramClientService {
   async generateImage(prompt: string, aspectRatio: string = "ASPECT_1_1"): Promise<IdeogramGenerateResponse> {
     try {
-      const response = await fetch(`${SERVER_URL}/api/ideogram/generate`, {
+      const response = await fetch(`${getServerUrl()}/api/ideogram/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
