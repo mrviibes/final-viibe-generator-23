@@ -1,4 +1,4 @@
-import { OPENAI_API_KEY, HAS_OPENAI_KEY } from "@/config/secrets";
+import { getOpenAIKey, hasOpenAIKey } from "@/lib/keyManager";
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -35,7 +35,7 @@ export class OpenAIService {
   }
 
   hasApiKey(): boolean {
-    return HAS_OPENAI_KEY;
+    return hasOpenAIKey();
   }
 
   isUsingBackend(): boolean {
@@ -48,8 +48,8 @@ export class OpenAIService {
     max_completion_tokens?: number;
     model?: string;
   } = {}): Promise<any> {
-    if (!HAS_OPENAI_KEY) {
-      throw new Error("OpenAI API key not configured. Please update src/config/secrets.ts");
+    if (!hasOpenAIKey()) {
+      throw new Error("OpenAI API key not configured. Please configure your API keys.");
     }
     const requestBody = {
       model: options.model || 'gpt-4o-mini',
@@ -64,7 +64,7 @@ export class OpenAIService {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Authorization': `Bearer ${getOpenAIKey()}`,
       },
       body: JSON.stringify(requestBody),
     });

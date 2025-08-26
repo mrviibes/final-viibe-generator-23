@@ -1,4 +1,4 @@
-import { IDEOGRAM_API_KEY, HAS_IDEOGRAM_KEY } from "@/config/secrets";
+import { getIdeogramKey, hasIdeogramKey } from "@/lib/keyManager";
 
 const IDEOGRAM_API_BASE = 'https://api.ideogram.ai/generate';
 
@@ -48,7 +48,7 @@ let currentProxySettings: ProxySettings = { type: 'direct' };
 console.info("Ideogram Service: Using direct API calls with hardcoded key and proxy fallbacks");
 
 export function hasIdeogramApiKey(): boolean {
-  return HAS_IDEOGRAM_KEY;
+  return hasIdeogramKey();
 }
 
 export function isUsingBackend(): boolean {
@@ -108,15 +108,15 @@ export async function findBestProxy(): Promise<ProxySettings['type']> {
 }
 
 async function callIdeogramAPI(request: IdeogramGenerateRequest, proxyType: ProxySettings['type']): Promise<IdeogramGenerateResponse> {
-  if (!HAS_IDEOGRAM_KEY) {
-    throw new IdeogramAPIError("Ideogram API key not configured. Please update src/config/secrets.ts");
+  if (!hasIdeogramKey()) {
+    throw new IdeogramAPIError("Ideogram API key not configured. Please configure your API keys.");
   }
   const proxyPrefix = PROXY_CONFIGS[proxyType];
   const url = proxyPrefix ? `${proxyPrefix}${encodeURIComponent(IDEOGRAM_API_BASE)}` : IDEOGRAM_API_BASE;
   
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'Api-Key': IDEOGRAM_API_KEY,
+    'Api-Key': getIdeogramKey(),
   };
   
   if (proxyType === 'proxy-cors-sh' && currentProxySettings.apiKey) {
