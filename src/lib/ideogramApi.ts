@@ -16,14 +16,18 @@ let currentProxySettings: ProxySettings = { type: 'direct' };
 export const generateIdeogramImage = async (params: any, aspectRatio?: string) => {
   const { ideogramDirectService } = await import('./ideogramDirect');
   
+  console.log("🔍 generateIdeogramImage called with:", { params, aspectRatio });
+  
   // Handle both old (prompt, aspectRatio) and new (full params object) signatures
   if (typeof params === 'string') {
     // Old signature: generateIdeogramImage(prompt, aspectRatio)
     const prompt = params;
     const ratio = aspectRatio || "ASPECT_1_1";
+    console.log("🔍 Using old signature:", { prompt, ratio });
     return ideogramDirectService.generateImage(prompt, ratio);
   } else {
     // New signature: generateIdeogramImage(fullParamsObject)
+    console.log("🔍 Using new signature:", params);
     return ideogramDirectService.generateImage(params.prompt, params.aspect_ratio || "ASPECT_1_1");
   }
 };

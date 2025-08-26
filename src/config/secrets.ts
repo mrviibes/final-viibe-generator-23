@@ -73,8 +73,8 @@ export function getIdeogramKey(): string {
   return decoded;
 }
 
-// Optional proxy URL for Ideogram (to bypass CORS)
-const IDEOGRAM_PROXY_URL = ""; // e.g., "https://your-proxy.workers.dev"
+// TEMPORARY DEMO PROXY - Deploy your own for production!
+const IDEOGRAM_PROXY_URL = "https://cors-anywhere.herokuapp.com/https://api.ideogram.ai/generate";
 
 export function getIdeogramProxyUrl(): string {
   // First check localStorage (runtime setting)
