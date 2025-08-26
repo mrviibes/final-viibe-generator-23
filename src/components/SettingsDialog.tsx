@@ -19,18 +19,42 @@ export function SettingsDialog({ open, onOpenChange, onKeysUpdated }: SettingsDi
   const [showIdeogramKey, setShowIdeogramKey] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const validateOpenAIKey = (key: string): boolean => {
+    return key.trim().startsWith('sk-') && key.trim().length > 20;
+  };
+
+  const validateIdeogramKey = (key: string): boolean => {
+    return key.trim().length > 10; // Basic length check
+  };
+
   const handleSave = async () => {
     setSaving(true);
     
+    // Validate keys before saving
+    const trimmedOpenAIKey = openaiKey.trim();
+    const trimmedIdeogramKey = ideogramKey.trim();
+    
+    if (trimmedOpenAIKey && !validateOpenAIKey(trimmedOpenAIKey)) {
+      setSaving(false);
+      alert('OpenAI API key should start with "sk-" and be at least 20 characters long');
+      return;
+    }
+    
+    if (trimmedIdeogramKey && !validateIdeogramKey(trimmedIdeogramKey)) {
+      setSaving(false);
+      alert('Ideogram API key should be at least 10 characters long');
+      return;
+    }
+    
     // Save to localStorage
-    if (openaiKey.trim()) {
-      localStorage.setItem('openai_api_key', openaiKey.trim());
+    if (trimmedOpenAIKey) {
+      localStorage.setItem('openai_api_key', trimmedOpenAIKey);
     } else {
       localStorage.removeItem('openai_api_key');
     }
     
-    if (ideogramKey.trim()) {
-      localStorage.setItem('ideogram_api_key', ideogramKey.trim());
+    if (trimmedIdeogramKey) {
+      localStorage.setItem('ideogram_api_key', trimmedIdeogramKey);
     } else {
       localStorage.removeItem('ideogram_api_key');
     }

@@ -20,6 +20,7 @@ import { normalizeTypography, suggestContractions, isTextMisspelled } from "@/li
 import { hasOpenAIKey, hasIdeogramKey } from "@/lib/keyManager";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { ApiKeyBanner } from "@/components/ApiKeyBanner";
+import { ConnectivityPanel } from "@/components/ConnectivityPanel";
 
 const styleOptions = [{
   id: "celebrations",
