@@ -19,7 +19,7 @@ import { buildIdeogramPrompt, getAspectRatioForIdeogram, getStyleTypeForIdeogram
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
 import { normalizeTypography, suggestContractions, isTextMisspelled } from "@/lib/textUtils";
-import { HAS_OPENAI_KEY, HAS_IDEOGRAM_KEY } from "@/config/secrets";
+import { HAS_OPENAI_KEY, HAS_IDEOGRAM_KEY, OPENAI_KEY_PREVIEW, IDEOGRAM_KEY_PREVIEW } from "@/config/secrets";
 const styleOptions = [{
   id: "celebrations",
   name: "Celebrations",
@@ -4835,8 +4835,18 @@ const Index = () => {
               Please configure your API keys in <code className="bg-orange-100 px-1 rounded">src/config/secrets.ts</code>:
             </p>
             <ul className="mt-2 ml-4 space-y-1">
-              {!HAS_OPENAI_KEY && <li>• OpenAI API key required for text generation</li>}
-              {!HAS_IDEOGRAM_KEY && <li>• Ideogram API key required for image generation</li>}
+              {!HAS_OPENAI_KEY && (
+                <li>
+                  • OpenAI API key required for text generation
+                  <div className="text-xs text-orange-600 ml-2">Current: {OPENAI_KEY_PREVIEW}</div>
+                </li>
+              )}
+              {!HAS_IDEOGRAM_KEY && (
+                <li>
+                  • Ideogram API key required for image generation
+                  <div className="text-xs text-orange-600 ml-2">Current: {IDEOGRAM_KEY_PREVIEW}</div>
+                </li>
+              )}
             </ul>
           </div>
         )}
