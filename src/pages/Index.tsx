@@ -8,8 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Search, Loader2, AlertCircle, ArrowLeft, ArrowRight, X, Download } from "lucide-react";
 import { openAIService, OpenAISearchResult } from "@/lib/openai";
-import { ProxySettingsDialog } from "@/components/ProxySettingsDialog";
-import { CorsRetryDialog } from "@/components/CorsRetryDialog";
 import { StepProgress } from "@/components/StepProgress";
 import { StackedSelectionCard } from "@/components/StackedSelectionCard";
 
@@ -18,7 +16,7 @@ import { useNavigate } from "react-router-dom";
 import { generateCandidates, VibeResult } from "@/lib/vibeModel";
 import { buildIdeogramHandoff } from "@/lib/ideogram";
 import { generateVisualRecommendations, VisualOption } from "@/lib/visualModel";
-import { generateIdeogramImage, setIdeogramApiKey, getIdeogramApiKey, hasIdeogramApiKey, isUsingBackend as ideogramIsUsingBackend, IdeogramAPIError, getProxySettings, setProxySettings, testProxyConnection, ProxySettings } from "@/lib/ideogramApi";
+import { generateIdeogramImage, hasIdeogramApiKey, isUsingBackend as ideogramIsUsingBackend, IdeogramAPIError } from "@/lib/ideogramApi";
 import { buildIdeogramPrompt, getAspectRatioForIdeogram, getStyleTypeForIdeogram, parseDirectPrompt } from "@/lib/ideogramPrompt";
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
@@ -4040,16 +4038,11 @@ const Index = () => {
   const [stepTwoText, setStepTwoText] = useState<string>("");
   const [isCustomTextConfirmed, setIsCustomTextConfirmed] = useState<boolean>(false);
   
-  const [showProxySettingsDialog, setShowProxySettingsDialog] = useState<boolean>(false);
-  const [showCorsRetryDialog, setShowCorsRetryDialog] = useState<boolean>(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState<boolean>(false);
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
   const [imageGenerationError, setImageGenerationError] = useState<string>("");
   const [directPrompt, setDirectPrompt] = useState<string>("");
-  const [showProxySettings, setShowProxySettings] = useState(false);
-  const [proxySettings, setLocalProxySettings] = useState(() => getProxySettings());
-  const [proxyApiKey, setProxyApiKey] = useState('');
   
 
   // Spelling guarantee mode states - default to ON when text is present
@@ -4778,18 +4771,7 @@ const Index = () => {
       console.error('Image generation failed:', error);
       if (error instanceof IdeogramAPIError) {
         // Handle specific CORS demo activation error
-        if (error.message === 'CORS_DEMO_REQUIRED') {
-          setShowCorsRetryDialog(true);
-          setImageGenerationError('CORS proxy needs activation. Click "Enable CORS Proxy" button below, then try again.');
-        } else if (error.message.includes('proxy.cors.sh') && !getProxySettings().apiKey) {
-          setImageGenerationError('Proxy.cors.sh selected but no API key provided. Add an API key in Proxy Settings for better reliability.');
-          setTimeout(() => setShowProxySettingsDialog(true), 2000);
-        } else if (error.message.includes('CORS') || error.message.includes('Failed to fetch')) {
-          setImageGenerationError('Connection failed. Trying alternative proxy methods automatically...');
-          setTimeout(() => setShowProxySettingsDialog(true), 2000);
-        } else {
-          setImageGenerationError(error.message);
-        }
+        setImageGenerationError(error.message);
       } else {
         setImageGenerationError('An unexpected error occurred while generating the image.');
       }
@@ -6245,9 +6227,6 @@ const Index = () => {
                         <Button onClick={() => handleGenerateImage(1)} variant="outline" size="sm">
                           Try Again
                         </Button>
-                        {imageGenerationError.includes('CORS proxy needs activation') && <Button variant="brand" size="sm" onClick={() => setShowCorsRetryDialog(true)}>
-                            Enable CORS Proxy
-                          </Button>}
                       </div>
                     </div> : <p className="text-muted-foreground text-lg">Preparing your VIIBE...</p>}
                 </div>
@@ -6287,96 +6266,6 @@ const Index = () => {
                   </div>}
               </div>
               
-              {/* Proxy Settings Dialog */}
-              {showProxySettings && <div className="bg-muted/30 rounded-lg p-6 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-md font-medium text-foreground">Proxy Settings</h4>
-                    <Button variant="ghost" size="sm" onClick={() => setShowProxySettings(false)} className="h-8 w-8 p-0">
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  
-                  <p className="text-sm text-muted-foreground">
-                    Configure how to connect to the Ideogram API. Use a proxy if you encounter CORS errors.
-                  </p>
-                  
-                  <div className="space-y-3">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-foreground">Connection Method</label>
-                      <Select value={proxySettings.type} onValueChange={(value: ProxySettings['type']) => {
-                  const newSettings = {
-                    ...proxySettings,
-                    type: value
-                  };
-                  setLocalProxySettings(newSettings);
-                  setProxySettings(newSettings);
-                }}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="direct">Direct Connection</SelectItem>
-                          <SelectItem value="cors-anywhere">CORS Anywhere (Free)</SelectItem>
-                          <SelectItem value="proxy-cors-sh">Proxy.cors.sh (Paid)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    {proxySettings.type === 'proxy-cors-sh' && <div className="space-y-2">
-                        <label className="text-sm font-medium text-foreground">Proxy API Key</label>
-                        <Input type="password" placeholder="Enter your proxy.cors.sh API key" value={proxyApiKey} onChange={e => setProxyApiKey(e.target.value)} />
-                        <Button variant="outline" size="sm" onClick={() => {
-                  const newSettings = {
-                    ...proxySettings,
-                    apiKey: proxyApiKey
-                  };
-                  setLocalProxySettings(newSettings);
-                  setProxySettings(newSettings);
-                  toast({
-                    title: "API Key Saved",
-                    description: "Your proxy API key has been saved."
-                  });
-                }}>
-                          Save API Key
-                        </Button>
-                      </div>}
-                    
-                    {proxySettings.type === 'cors-anywhere' && <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg">
-                        <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                          <strong>Note:</strong> CORS Anywhere requires manual activation. 
-                          <Button variant="link" className="h-auto p-0 ml-1 text-yellow-800 dark:text-yellow-200 underline" onClick={() => window.open('https://cors-anywhere.herokuapp.com/corsdemo', '_blank')}>
-                            Click here to enable it
-                          </Button>
-                          , then test the connection below.
-                        </p>
-                      </div>}
-                    
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={async () => {
-                  setIsTestingProxy(true);
-                  try {
-                    const success = await testProxyConnection(proxySettings.type);
-                    toast({
-                      title: success ? "Connection Successful" : "Connection Failed",
-                      description: success ? "The proxy connection is working correctly." : "Unable to connect through this proxy method.",
-                      variant: success ? "default" : "destructive"
-                    });
-                  } catch (error) {
-                    toast({
-                      title: "Test Failed",
-                      description: "An error occurred while testing the connection.",
-                      variant: "destructive"
-                    });
-                  } finally {
-                    setIsTestingProxy(false);
-                  }
-                }} disabled={isTestingProxy}>
-                        {isTestingProxy ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                        Test Connection
-                      </Button>
-                    </div>
-                  </div>
-                </div>}
 
 
               {/* Design Summary */}
@@ -6832,11 +6721,6 @@ const Index = () => {
         </div>
 
 
-        {/* Proxy Settings Dialog */}
-        <ProxySettingsDialog open={showProxySettingsDialog} onOpenChange={setShowProxySettingsDialog} />
-
-        {/* CORS Retry Dialog */}
-        <CorsRetryDialog open={showCorsRetryDialog} onOpenChange={setShowCorsRetryDialog} onRetry={handleGenerateImage} />
 
       </div>
     </div>;

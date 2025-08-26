@@ -1,6 +1,4 @@
-import { HARDCODED_API_KEYS, hasHardcodedOpenAIKey } from "@/config/secrets";
-
-const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
+import { supabase } from "@/integrations/supabase/client";
 
 export interface OpenAISearchResult {
   title: string;
@@ -17,105 +15,59 @@ export interface GenerateTextParams {
 }
 
 export class OpenAIService {
-  private apiKey: string | null = null;
-
-  constructor() {
-    this.apiKey = localStorage.getItem('openai_api_key');
-  }
-
-  setApiKey(key: string) {
-    this.apiKey = key;
-    localStorage.setItem('openai_api_key', key);
-  }
-
   hasApiKey(): boolean {
-    return Boolean(this.apiKey || localStorage.getItem('openai_api_key') || hasHardcodedOpenAIKey());
-  }
-
-  private getApiKey(): string | null {
-    return this.apiKey || localStorage.getItem('openai_api_key') || HARDCODED_API_KEYS.OPENAI_API_KEY || null;
+    return true; // Always true since keys are stored server-side
   }
 
   async chatJSON(messages: Array<{role: string; content: string}>, options: any = {}): Promise<any> {
-    const apiKey = this.getApiKey();
-    
-    if (!apiKey) {
-      throw new Error('OpenAI API key is required. Please set your API key.');
-    }
+    try {
+      const requestOptions = {
+        ...options,
+        response_format: { type: "json_object" }
+      };
 
-    // Direct OpenAI API call with multiple model fallbacks
-    const models = ['gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo'];
-    let lastError: Error | null = null;
+      const { data, error } = await supabase.functions.invoke('openai-chat', {
+        body: { messages, options: requestOptions }
+      });
 
-    for (const model of models) {
+      if (error) {
+        console.error('Supabase edge function error:', error);
+        throw new Error(error.message || 'Failed to call OpenAI via edge function');
+      }
+
+      if (!data) {
+        throw new Error('No data received from edge function');
+      }
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      const content = data.choices?.[0]?.message?.content;
+      
+      if (!content) {
+        throw new Error('No content received from OpenAI');
+      }
+
       try {
-        const result = await this.attemptChatJSON(messages, { ...options, model });
-        return result;
-      } catch (error) {
-        console.warn(`Model ${model} failed:`, error);
-        lastError = error as Error;
+        return JSON.parse(content);
+      } catch (parseError) {
+        // Try to clean and parse again
+        const cleanedContent = content
+          .replace(/```json\s*|\s*```/g, '')
+          .replace(/^[^{]*/, '')
+          .replace(/[^}]*$/, '')
+          .trim();
         
-        // Don't retry if it's an auth error
-        if (error instanceof Error && error.message.includes('401')) {
-          throw error;
+        try {
+          return JSON.parse(cleanedContent);
+        } catch {
+          throw new Error(`Invalid JSON response from OpenAI`);
         }
       }
-    }
-
-    throw lastError || new Error('All model attempts failed');
-  }
-
-  private async attemptChatJSON(messages: Array<{role: string; content: string}>, options: any): Promise<any> {
-    const {
-      temperature = 0.8,
-      max_tokens = 2500,
-      model = 'gpt-4o-mini'
-    } = options;
-
-    const requestBody = {
-      model,
-      messages,
-      max_tokens,
-      temperature,
-      response_format: { type: "json_object" }
-    };
-
-    const response = await fetch(OPENAI_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.getApiKey()}`,
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error?.message || 'OpenAI API request failed');
-    }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-    
-    if (!content) {
-      throw new Error('No content received from OpenAI');
-    }
-
-    try {
-      return JSON.parse(content);
-    } catch (parseError) {
-      // Try to clean and parse again
-      const cleanedContent = content
-        .replace(/```json\s*|\s*```/g, '')
-        .replace(/^[^{]*/, '')
-        .replace(/[^}]*$/, '')
-        .trim();
-      
-      try {
-        return JSON.parse(cleanedContent);
-      } catch {
-        throw new Error(`Invalid JSON response from OpenAI`);
-      }
+    } catch (error) {
+      console.error('OpenAI chatJSON error:', error);
+      throw error instanceof Error ? error : new Error('Unknown error occurred');
     }
   }
 
