@@ -51,27 +51,25 @@ serve(async (req) => {
     console.log(`Ideogram API call - Model: ${modelToUse}, Count: ${count}, Prompt: ${request.prompt.substring(0, 50)}...`);
 
     if (count === 1) {
-      // Single image generation with FormData for V3 API
-      const formData = new FormData();
-      formData.append('prompt', request.prompt);
-      formData.append('aspect_ratio', request.aspect_ratio);
-      formData.append('model', modelToUse);
-      formData.append('magic_prompt', request.magic_prompt_option);
-      
-      if (request.seed !== undefined) {
-        formData.append('seed', request.seed.toString());
-      }
-      
-      if (request.style_type) {
-        formData.append('style_type', request.style_type);
-      }
+      // Single image generation with JSON for V3 API
+      const requestBody = {
+        image_request: {
+          prompt: request.prompt,
+          aspect_ratio: request.aspect_ratio,
+          model: modelToUse,
+          magic_prompt: request.magic_prompt_option,
+          ...(request.seed !== undefined && { seed: request.seed }),
+          ...(request.style_type && { style_type: request.style_type }),
+        }
+      };
 
       const response = await fetch(IDEOGRAM_API_BASE, {
         method: 'POST',
         headers: {
           'Api-Key': ideogramApiKey,
+          'Content-Type': 'application/json',
         },
-        body: formData,
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -109,35 +107,44 @@ serve(async (req) => {
       const data = await response.json();
       console.log(`Ideogram API success - Generated ${data.data?.length || 0} image(s) with model ${modelToUse}`);
       
-      return new Response(JSON.stringify(data), {
+      // Normalize response for frontend
+      const normalizedResponse = {
+        success: true,
+        images: data.data?.map((item: any) => ({
+          prompt: request.prompt,
+          resolution: item.resolution || 'unknown',
+          url: item.url || item.image_url || item.image_url_png,
+          is_image_safe: item.is_image_safe !== false
+        })) || []
+      };
+      
+      return new Response(JSON.stringify(normalizedResponse), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     } else {
-      // Multiple image generation with FormData for V3 API
+      // Multiple image generation with JSON for V3 API
       const promises: Promise<any>[] = [];
       
       for (let i = 0; i < count; i++) {
-        const formData = new FormData();
-        formData.append('prompt', request.prompt);
-        formData.append('aspect_ratio', request.aspect_ratio);
-        formData.append('model', modelToUse);
-        formData.append('magic_prompt', request.magic_prompt_option);
-        
-        if (request.seed !== undefined) {
-          formData.append('seed', (request.seed + i).toString()); // Vary seed for different results
-        }
-        
-        if (request.style_type) {
-          formData.append('style_type', request.style_type);
-        }
+        const requestBody = {
+          image_request: {
+            prompt: request.prompt,
+            aspect_ratio: request.aspect_ratio,
+            model: modelToUse,
+            magic_prompt: request.magic_prompt_option,
+            ...(request.seed !== undefined && { seed: request.seed + i }),
+            ...(request.style_type && { style_type: request.style_type }),
+          }
+        };
 
         promises.push(
           fetch(IDEOGRAM_API_BASE, {
             method: 'POST',
             headers: {
               'Api-Key': ideogramApiKey,
+              'Content-Type': 'application/json',
             },
-            body: formData,
+            body: JSON.stringify(requestBody),
           }).then(async (response) => {
             if (!response.ok) {
               const errorText = await response.text();
@@ -165,19 +172,26 @@ serve(async (req) => {
         });
       }
 
-      // Combine all successful results
-      const combinedData: any[] = [];
+      // Combine all successful results and normalize
+      const combinedImages: any[] = [];
       successfulResults.forEach(result => {
         if (result.data && Array.isArray(result.data)) {
-          combinedData.push(...result.data);
+          result.data.forEach((item: any) => {
+            combinedImages.push({
+              prompt: request.prompt,
+              resolution: item.resolution || 'unknown',
+              url: item.url || item.image_url || item.image_url_png,
+              is_image_safe: item.is_image_safe !== false
+            });
+          });
         }
       });
 
-      console.log(`Ideogram API batch success - Generated ${combinedData.length}/${count} images`);
+      console.log(`Ideogram API batch success - Generated ${combinedImages.length}/${count} images`);
       
       return new Response(JSON.stringify({
-        created: successfulResults[0]?.created || new Date().toISOString(),
-        data: combinedData
+        success: true,
+        images: combinedImages
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
