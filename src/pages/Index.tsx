@@ -6459,14 +6459,14 @@ const Index = () => {
                   }
                 }
 
-                // Generate 5 images with Ideogram Turbo
+                // Generate 1 image with Ideogram Turbo
                 const result = await generateIdeogramImage({
                   prompt: promptText,
                   aspect_ratio: aspectRatioKey,
                   style_type: styleType,
                   model: 'V_2A_TURBO', // Use Turbo for speed
                   magic_prompt_option: 'AUTO',
-                  count: 5
+                  count: 1
                 });
                 if (result.data && result.data.length > 0) {
                   const imageUrls = result.data.map(img => img.url);
