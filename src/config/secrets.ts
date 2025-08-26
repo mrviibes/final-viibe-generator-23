@@ -44,13 +44,7 @@ function isPlaceholderKey(key: string): boolean {
 }
 
 export function getOpenAIKey(): string {
-  // First check localStorage
-  const localKey = localStorage.getItem('openai_api_key');
-  if (localKey && !isPlaceholderKey(localKey)) {
-    return localKey;
-  }
-  
-  // Fall back to config file
+  // Use hardcoded key only
   const decoded = decodeKey(OPENAI_KEY_ENCODED);
   if (isPlaceholderKey(decoded)) {
     return "";
@@ -59,13 +53,7 @@ export function getOpenAIKey(): string {
 }
 
 export function getIdeogramKey(): string {
-  // First check localStorage
-  const localKey = localStorage.getItem('ideogram_api_key');
-  if (localKey && !isPlaceholderKey(localKey)) {
-    return localKey;
-  }
-  
-  // Fall back to config file
+  // Use hardcoded key only
   const decoded = decodeKey(IDEOGRAM_KEY_ENCODED);
   if (isPlaceholderKey(decoded)) {
     return "";
@@ -73,17 +61,11 @@ export function getIdeogramKey(): string {
   return decoded;
 }
 
-// TEMPORARY DEMO PROXY - Deploy your own for production!
-const IDEOGRAM_PROXY_URL = "";
+// HARDCODED PROXY URL - Replace with your Cloudflare Worker URL
+const IDEOGRAM_PROXY_URL = "https://your-worker.your-subdomain.workers.dev";
 
 export function getIdeogramProxyUrl(): string {
-  // First check localStorage (runtime setting)
-  const localProxyUrl = localStorage.getItem('ideogram_proxy_url');
-  if (localProxyUrl && localProxyUrl.trim()) {
-    return localProxyUrl.trim();
-  }
-  
-  // Fall back to hardcoded value
+  // Use hardcoded proxy URL only
   return IDEOGRAM_PROXY_URL.trim();
 }
 

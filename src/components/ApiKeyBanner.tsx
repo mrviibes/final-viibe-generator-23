@@ -5,10 +5,9 @@ import { Button } from "@/components/ui/button";
 interface ApiKeyBannerProps {
   hasOpenAI: boolean;
   hasIdeogram: boolean;
-  onSettingsClick: () => void;
 }
 
-export function ApiKeyBanner({ hasOpenAI, hasIdeogram, onSettingsClick }: ApiKeyBannerProps) {
+export function ApiKeyBanner({ hasOpenAI, hasIdeogram }: ApiKeyBannerProps) {
   if (hasOpenAI && hasIdeogram) {
     return null;
   }
@@ -20,19 +19,13 @@ export function ApiKeyBanner({ hasOpenAI, hasIdeogram, onSettingsClick }: ApiKey
   return (
     <Alert className="mb-6">
       <AlertCircle className="h-4 w-4" />
-      <AlertDescription className="flex items-center justify-between">
-        <span>
-          Missing API keys: {missingKeys.join(" and ")}. Set them up to unlock full functionality.
+      <AlertDescription>
+        Missing API keys: {missingKeys.join(" and ")}. 
+        Edit <code className="px-1 py-0.5 bg-muted rounded text-sm">src/config/secrets.ts</code> to configure your keys.
+        <br />
+        <span className="text-sm text-muted-foreground mt-1 block">
+          See <code>docs/cloudflare-worker-setup.md</code> for complete setup instructions.
         </span>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={onSettingsClick}
-          className="ml-4"
-        >
-          <Settings className="h-4 w-4 mr-2" />
-          Settings
-        </Button>
       </AlertDescription>
     </Alert>
   );
