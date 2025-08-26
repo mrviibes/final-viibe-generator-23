@@ -1,14 +1,14 @@
-import { getOpenAIKey, getIdeogramKey } from "@/config/secrets";
+// Legacy file - API keys are now managed server-side
+// These functions are kept for backward compatibility but always return false
 
-// Helper function to check if we have valid API keys (config-only)
 export function hasOpenAIKey(): boolean {
-  const key = getOpenAIKey();
-  return key && key.length > 0 && key.startsWith('sk-');
+  console.warn('hasOpenAIKey() is deprecated - use server health checks instead');
+  return false;
 }
 
 export function hasIdeogramKey(): boolean {
-  const key = getIdeogramKey();
-  return key && key.length > 0;
+  console.warn('hasIdeogramKey() is deprecated - use server health checks instead');  
+  return false;
 }
 
 // Simple rate limiting (1 request per 3 seconds per tab)

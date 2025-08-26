@@ -17,7 +17,8 @@ import { generateVisualRecommendations, VisualOption } from "@/lib/visualModel";
 import { generateIdeogramImage, hasIdeogramApiKey, isUsingBackend as ideogramIsUsingBackend, IdeogramAPIError, ProxySettings, getProxySettings, setProxySettings, testProxyConnection } from "@/lib/ideogramApi";
 import { buildIdeogramPrompt, getAspectRatioForIdeogram, getStyleTypeForIdeogram } from "@/lib/ideogramPrompt";
 import { normalizeTypography, suggestContractions, isTextMisspelled } from "@/lib/textUtils";
-import { hasOpenAIKey, hasIdeogramKey } from "@/lib/keyManager";
+import { serverHealthService } from "@/lib/serverHealth";
+import { ServerStatusBanner } from "@/components/ServerStatusBanner";
 
 
 const styleOptions = [{
@@ -4056,27 +4057,21 @@ const Index = () => {
   const [selectedRecommendation, setSelectedRecommendation] = useState<number | null>(null);
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
   
-  const [apiKeysStatus, setApiKeysStatus] = useState({ openai: false, ideogram: false });
+  const [serverHealth, setServerHealth] = useState<any>(null);
   
 
-  // Check API keys status on mount
+  // Check server health status on mount
   useEffect(() => {
-    const checkApiKeys = () => {
-      setApiKeysStatus({
-        openai: hasOpenAIKey(),
-        ideogram: hasIdeogramKey()
-      });
+    const checkServerHealth = async () => {
+      try {
+        const health = await serverHealthService.checkHealth();
+        setServerHealth(health);
+      } catch (error) {
+        console.error('Health check failed:', error);
+      }
     };
     
-    checkApiKeys();
-    
-    // Listen for localStorage changes
-    const handleStorageChange = () => {
-      checkApiKeys();
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    checkServerHealth();
   }, []);
 
   // Auto-generate 5 images when Step 4 loads
@@ -4824,6 +4819,8 @@ const Index = () => {
   return <div className="min-h-screen bg-background py-12 px-4 pb-32">
       <div className="max-w-6xl mx-auto">
         
+        {/* Server Status Banner */}
+        <ServerStatusBanner />
         
         {/* Main Title */}
         <div className="text-center mb-8">

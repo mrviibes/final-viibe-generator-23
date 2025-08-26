@@ -1,77 +1,29 @@
 /*
- * PASTE YOUR REAL API KEYS HERE (one-time setup):
+ * DEPRECATED: API keys are now managed server-side for security
  * 
- * 1. Replace BOTH keys below with your actual keys:
- *    - OpenAI: Get from https://platform.openai.com/api-keys
- *    - Ideogram: Get from https://ideogram.ai/api
+ * This file is kept for backward compatibility but keys are no longer used.
+ * All API calls now go through the secure server proxy.
  * 
- * 2. Keys will be visible to anyone who inspects the code
+ * To configure API keys:
+ * 1. Deploy the server from server/ folder  
+ * 2. Set OPENAI_API_KEY and IDEOGRAM_API_KEY environment variables on server
+ * 3. Set VITE_SERVER_URL to your deployed server URL in frontend
  * 
- * Optional obfuscation (copy/paste in browser console to encode):
- *   btoa("your-actual-openai-key-here")
- *   btoa("your-actual-ideogram-key-here")
+ * See server/DEPLOYMENT.md for detailed instructions.
  */
 
-// PASTE YOUR ACTUAL KEYS HERE (or base64 encoded versions):
-const OPENAI_KEY_ENCODED = "sk-proj-YOUR_REAL_OPENAI_KEY_HERE";
-const IDEOGRAM_KEY_ENCODED = "YOUR_REAL_IDEOGRAM_KEY_HERE";
-
-// List of placeholder patterns to detect
-const PLACEHOLDER_PATTERNS = [
-  "YOUR_REAL_OPENAI_KEY_HERE",
-  "YOUR_REAL_IDEOGRAM_KEY_HERE", 
-  "sk-proj-YOUR_REAL_OPENAI_KEY_HERE",
-  "PASTE_YOUR_KEY_HERE",
-  "YOUR_KEY_HERE"
-];
-
-// Decode function (handles both plain and base64)
-function decodeKey(key: string): string {
-  try {
-    // If it looks like base64, decode it
-    if (!key.startsWith('sk-') && !key.includes('-')) {
-      return atob(key);
-    }
-  } catch (e) {
-    // Not base64, return as-is
-  }
-  return key.trim();
-}
-
-// Check if a key is a placeholder
-function isPlaceholderKey(key: string): boolean {
-  return PLACEHOLDER_PATTERNS.some(pattern => key.includes(pattern));
-}
-
+// Legacy functions kept for compatibility (return empty strings)
 export function getOpenAIKey(): string {
-  // Use hardcoded key only
-  const decoded = decodeKey(OPENAI_KEY_ENCODED);
-  if (isPlaceholderKey(decoded)) {
-    return "";
-  }
-  return decoded;
+  console.warn('getOpenAIKey() is deprecated - API keys are now server-side');
+  return "";
 }
 
 export function getIdeogramKey(): string {
-  // Use hardcoded key only
-  const decoded = decodeKey(IDEOGRAM_KEY_ENCODED);
-  if (isPlaceholderKey(decoded)) {
-    return "";
-  }
-  return decoded;
+  console.warn('getIdeogramKey() is deprecated - API keys are now server-side');
+  return "";
 }
-
-// HARDCODED PROXY URL - Replace with your Cloudflare Worker URL
-const IDEOGRAM_PROXY_URL = "https://your-worker.your-subdomain.workers.dev";
 
 export function getIdeogramProxyUrl(): string {
-  // Use hardcoded proxy URL only
-  return IDEOGRAM_PROXY_URL.trim();
+  console.warn('getIdeogramProxyUrl() is deprecated - all requests use server proxy');
+  return "";
 }
-
-// Health check for development (no key logging)
-console.log("🔑 Keys configured:", {
-  openai: getOpenAIKey().length > 0,
-  ideogram: getIdeogramKey().length > 0,
-  ideogramProxy: getIdeogramProxyUrl().length > 0
-});
