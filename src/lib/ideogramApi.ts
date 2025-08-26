@@ -29,10 +29,12 @@ export class IdeogramAPIError extends Error {
 const IDEOGRAM_API_V3_ENDPOINT = 'https://api.ideogram.ai/generate';
 const IDEOGRAM_API_LEGACY_ENDPOINT = 'https://api.ideogram.ai/generate';
 
+import { HARDCODED_API_KEYS, hasHardcodedIdeogramKey } from '@/config/secrets';
+
 const IDEOGRAM_API_KEY_STORAGE = 'ideogram_api_key';
 
 export function hasIdeogramApiKey(): boolean {
-  return !!localStorage.getItem(IDEOGRAM_API_KEY_STORAGE);
+  return hasHardcodedIdeogramKey() || !!localStorage.getItem(IDEOGRAM_API_KEY_STORAGE);
 }
 
 export function isUsingBackend(): boolean {
@@ -40,6 +42,10 @@ export function isUsingBackend(): boolean {
 }
 
 export function getIdeogramApiKey(): string | null {
+  // Use hardcoded key first, fallback to localStorage
+  if (hasHardcodedIdeogramKey()) {
+    return HARDCODED_API_KEYS.IDEOGRAM_API_KEY!;
+  }
   return localStorage.getItem(IDEOGRAM_API_KEY_STORAGE);
 }
 
@@ -126,7 +132,7 @@ export async function generateIdeogramImage(request: IdeogramGenerateRequest): P
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Ideogram API error:', response.status, errorText);
-      throw new IdeogramAPIError(`API error (${response.status}): ${errorText}`);
+      throw new IdeogramAPIError(`Ideogram API error (${response.status}): ${errorText || 'Unknown error'}`);
     }
 
     const data = await response.json();
