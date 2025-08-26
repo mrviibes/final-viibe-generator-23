@@ -1,17 +1,16 @@
-// Hardcoded API keys for direct frontend usage
-// TODO: Replace "your-ideogram-api-key-here" with your actual Ideogram API key
+// ⚠️ DEPRECATED ⚠️
+// API keys are now managed server-side through Supabase Edge Functions
+// This file is kept for backward compatibility but is no longer used
+
 export const HARDCODED_API_KEYS = {
+  // These are no longer used - API keys are managed in Supabase Secrets
   OPENAI_API_KEY: "your-openai-api-key-here",
-  IDEOGRAM_API_KEY: "your-ideogram-api-key-here", // Replace this with your actual key
+  IDEOGRAM_API_KEY: "your-ideogram-api-key-here",
 } as {
   OPENAI_API_KEY?: string;
   IDEOGRAM_API_KEY?: string;
 };
 
-export const hasHardcodedOpenAIKey = (): boolean => {
-  return !!HARDCODED_API_KEYS.OPENAI_API_KEY && HARDCODED_API_KEYS.OPENAI_API_KEY !== "your-openai-api-key-here";
-};
-
-export const hasHardcodedIdeogramKey = (): boolean => {
-  return !!HARDCODED_API_KEYS.IDEOGRAM_API_KEY && HARDCODED_API_KEYS.IDEOGRAM_API_KEY !== "your-ideogram-api-key-here";
-};
+// Deprecated functions - kept for backward compatibility
+export const hasHardcodedOpenAIKey = (): boolean => false;
+export const hasHardcodedIdeogramKey = (): boolean => false;

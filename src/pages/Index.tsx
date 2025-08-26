@@ -13,7 +13,6 @@ import { StackedSelectionCard } from "@/components/StackedSelectionCard";
 import { ApiKeyManager } from "@/components/ApiKeyManager";
 import { hasIdeogramApiKey } from "@/lib/ideogramApi";
 import { hasHardcodedOpenAIKey, hasHardcodedIdeogramKey } from "@/config/secrets";
-import { TestIdeogram } from "@/components/TestIdeogram";
 
 import { TextOverlay } from "@/components/TextOverlay";
 import { useNavigate } from "react-router-dom";
@@ -4078,8 +4077,8 @@ const Index = () => {
   const [isTestingProxy, setIsTestingProxy] = useState(false);
   const [showApiKeyDialog, setShowApiKeyDialog] = useState<boolean>(false);
   
-  // Show API key UI since we're using direct frontend calls
-  const hideApiKeyUI = false;
+  // API keys are now managed server-side, so hide the UI
+  const hideApiKeyUI = true;
   const navigate = useNavigate();
   const {
     toast
@@ -4372,7 +4371,7 @@ const Index = () => {
 
   // Generate subject using AI
   const handleGenerateSubject = async () => {
-    if (!openAIService.hasApiKey() && !hasHardcodedOpenAIKey()) {
+    if (!openAIService.hasApiKey()) {
       setShowApiKeyDialog(true);
       return;
     }
@@ -4486,7 +4485,7 @@ const Index = () => {
 
   // Generate text using Vibe Model
   const handleGenerateText = async () => {
-    if (!openAIService.hasApiKey() && !hasHardcodedOpenAIKey()) {
+    if (!openAIService.hasApiKey()) {
       setShowApiKeyDialog(true);
       return;
     }
@@ -4809,7 +4808,7 @@ const Index = () => {
   };
   const handleSearch = async (searchTerm: string) => {
     if (!searchTerm.trim() || !selectedSubOption) return;
-    if (!openAIService.hasApiKey() && !hasHardcodedOpenAIKey()) {
+    if (!openAIService.hasApiKey()) {
       setShowApiKeyDialog(true);
       return;
     }
@@ -4833,7 +4832,7 @@ const Index = () => {
   // Independent pop culture search handler
   const handlePopSearch = async (searchTerm: string) => {
     if (!searchTerm.trim() || !selectedSubOption) return;
-    if (!openAIService.hasApiKey() && !hasHardcodedOpenAIKey()) {
+    if (!openAIService.hasApiKey()) {
       setShowApiKeyDialog(true);
       return;
     }
@@ -4931,19 +4930,16 @@ const Index = () => {
         <div className="flex justify-between items-center mb-4">
           <div></div>
           <StepProgress currentStep={currentStep} />
-          <div className="flex items-center gap-2">
-            {(!hasHardcodedOpenAIKey() || !hasHardcodedIdeogramKey()) && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowApiKeyDialog(true)}
-                className="text-xs"
-              >
-                API Keys
-              </Button>
-            )}
-            <TestIdeogram />
-          </div>
+          {!hideApiKeyUI && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowApiKeyDialog(true)}
+              className="text-xs"
+            >
+              API Keys
+            </Button>
+          )}
         </div>
         
         {currentStep === 1 && <>
@@ -6745,13 +6741,15 @@ const Index = () => {
 
       </div>
 
-      <ApiKeyManager
-        open={showApiKeyDialog}
-        onOpenChange={setShowApiKeyDialog}
-        onKeysSet={() => {
-          // Refresh any UI state that depends on API keys
-        }}
-      />
+      {!hideApiKeyUI && (
+        <ApiKeyManager
+          open={showApiKeyDialog}
+          onOpenChange={setShowApiKeyDialog}
+          onKeysSet={() => {
+            // Refresh any UI state that depends on API keys
+          }}
+        />
+      )}
     </div>;
 };
 export default Index;
