@@ -74,7 +74,7 @@ export function getIdeogramKey(): string {
 }
 
 // TEMPORARY DEMO PROXY - Deploy your own for production!
-const IDEOGRAM_PROXY_URL = "https://cors-anywhere.herokuapp.com/https://api.ideogram.ai/generate";
+const IDEOGRAM_PROXY_URL = "";
 
 export function getIdeogramProxyUrl(): string {
   // First check localStorage (runtime setting)
