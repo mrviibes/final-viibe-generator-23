@@ -44,6 +44,12 @@ class IdeogramDirectService {
     const proxyUrl = getIdeogramProxyUrl();
     const apiUrl = proxyUrl || "https://api.ideogram.ai/generate";
     
+    console.log("🔍 Ideogram API Debug:", { 
+      proxyUrl, 
+      apiUrl, 
+      usingProxy: !!proxyUrl 
+    });
+    
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
