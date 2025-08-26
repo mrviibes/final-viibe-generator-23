@@ -225,7 +225,7 @@ export function ConnectivityPanel({ onSettingsClick }: ConnectivityPanelProps) {
                     <strong>Ideogram:</strong> {ideogramStatus.lastError}
                     {ideogramStatus.lastError.includes('CORS') && (
                       <div className="text-xs mt-1 text-muted-foreground">
-                        💡 Tip: Add IDEOGRAM_PROXY_URL in src/config/secrets.ts to bypass CORS
+                        💡 Tip: Set proxy URL in Settings → Ideogram Proxy URL to bypass CORS
                       </div>
                     )}
                   </div>
@@ -238,8 +238,14 @@ export function ConnectivityPanel({ onSettingsClick }: ConnectivityPanelProps) {
         <div className="flex gap-2">
           <Button variant="outline" onClick={onSettingsClick} className="flex-1">
             <Settings className="h-4 w-4 mr-2" />
-            Legacy Settings
+            Settings
           </Button>
+          {ideogramStatus.lastError?.includes('CORS') && (
+            <Button variant="secondary" onClick={onSettingsClick} className="flex-1">
+              <AlertCircle className="h-4 w-4 mr-2" />
+              Fix CORS
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>

@@ -15,6 +15,7 @@ interface SettingsDialogProps {
 export function SettingsDialog({ open, onOpenChange, onKeysUpdated }: SettingsDialogProps) {
   const [openaiKey, setOpenaiKey] = useState(localStorage.getItem('openai_api_key') || '');
   const [ideogramKey, setIdeogramKey] = useState(localStorage.getItem('ideogram_api_key') || '');
+  const [ideogramProxyUrl, setIdeogramProxyUrl] = useState(localStorage.getItem('ideogram_proxy_url') || '');
   const [showOpenaiKey, setShowOpenaiKey] = useState(false);
   const [showIdeogramKey, setShowIdeogramKey] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -33,6 +34,7 @@ export function SettingsDialog({ open, onOpenChange, onKeysUpdated }: SettingsDi
     // Validate keys before saving
     const trimmedOpenAIKey = openaiKey.trim();
     const trimmedIdeogramKey = ideogramKey.trim();
+    const trimmedProxyUrl = ideogramProxyUrl.trim();
     
     if (trimmedOpenAIKey && !validateOpenAIKey(trimmedOpenAIKey)) {
       setSaving(false);
@@ -59,6 +61,12 @@ export function SettingsDialog({ open, onOpenChange, onKeysUpdated }: SettingsDi
       localStorage.removeItem('ideogram_api_key');
     }
     
+    if (trimmedProxyUrl) {
+      localStorage.setItem('ideogram_proxy_url', trimmedProxyUrl);
+    } else {
+      localStorage.removeItem('ideogram_proxy_url');
+    }
+    
     setSaving(false);
     onKeysUpdated();
     onOpenChange(false);
@@ -67,6 +75,7 @@ export function SettingsDialog({ open, onOpenChange, onKeysUpdated }: SettingsDi
   const handleCancel = () => {
     setOpenaiKey(localStorage.getItem('openai_api_key') || '');
     setIdeogramKey(localStorage.getItem('ideogram_api_key') || '');
+    setIdeogramProxyUrl(localStorage.getItem('ideogram_proxy_url') || '');
     onOpenChange(false);
   };
 
@@ -135,6 +144,20 @@ export function SettingsDialog({ open, onOpenChange, onKeysUpdated }: SettingsDi
             </div>
           </div>
           
+          <div className="grid gap-2">
+            <Label htmlFor="ideogram-proxy">Ideogram Proxy URL (Optional)</Label>
+            <Input
+              id="ideogram-proxy"
+              type="text"
+              placeholder="https://your-proxy.workers.dev"
+              value={ideogramProxyUrl}
+              onChange={(e) => setIdeogramProxyUrl(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Deploy a CORS proxy to bypass browser restrictions. Leave empty for direct API calls.
+            </p>
+          </div>
+          
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
@@ -145,6 +168,9 @@ export function SettingsDialog({ open, onOpenChange, onKeysUpdated }: SettingsDi
               and{" "}
               <a href="https://ideogram.ai/api" target="_blank" rel="noopener noreferrer" className="underline">
                 Ideogram
+              </a>. If Ideogram fails with CORS errors, deploy a proxy using{" "}
+              <a href="https://workers.cloudflare.com" target="_blank" rel="noopener noreferrer" className="underline">
+                Cloudflare Workers
               </a>.
             </AlertDescription>
           </Alert>

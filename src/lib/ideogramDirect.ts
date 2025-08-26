@@ -66,7 +66,7 @@ class IdeogramDirectService {
     if (!resp.ok) {
       // Enhanced error messaging for CORS issues
       if (resp.status === 0 || resp.type === 'opaque') {
-        throw new IdeogramAPIError("CORS error: Configure a proxy URL in secrets.ts or use a backend service", resp.status);
+        throw new IdeogramAPIError("CORS error: Set proxy URL in Settings → Ideogram Proxy URL", resp.status);
       }
       throw new IdeogramAPIError(data?.error?.message || `Ideogram error ${resp.status}`, resp.status);
     }

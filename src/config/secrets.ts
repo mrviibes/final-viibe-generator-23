@@ -77,6 +77,13 @@ export function getIdeogramKey(): string {
 const IDEOGRAM_PROXY_URL = ""; // e.g., "https://your-proxy.workers.dev"
 
 export function getIdeogramProxyUrl(): string {
+  // First check localStorage (runtime setting)
+  const localProxyUrl = localStorage.getItem('ideogram_proxy_url');
+  if (localProxyUrl && localProxyUrl.trim()) {
+    return localProxyUrl.trim();
+  }
+  
+  // Fall back to hardcoded value
   return IDEOGRAM_PROXY_URL.trim();
 }
 
