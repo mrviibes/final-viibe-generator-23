@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle, XCircle, AlertCircle, RefreshCw, Settings, Server } from "lucide-react";
-import { openAIProxyService } from "@/lib/openaiProxy";
-import { ideogramProxyService } from "@/lib/ideogramProxy";
+import { openAIService } from "@/lib/openai";
+import { ideogramDirectService } from "@/lib/ideogramDirect";
 
 interface ConnectivityPanelProps {
   onSettingsClick: () => void;
@@ -35,9 +35,9 @@ export function ConnectivityPanel({ onSettingsClick }: ConnectivityPanelProps) {
 
   // Initialize status on mount
   useEffect(() => {
-    const checkKeys = async () => {
-      const hasOpenAI = await openAIProxyService.hasApiKey();
-      const hasIdeogram = await ideogramProxyService.hasApiKey();
+    const checkKeys = () => {
+      const hasOpenAI = openAIService.hasApiKey();
+      const hasIdeogram = ideogramDirectService.hasApiKey();
       setOpenaiStatus(prev => ({ ...prev, hasKey: hasOpenAI }));
       setIdeogramStatus(prev => ({ ...prev, hasKey: hasIdeogram }));
     };
@@ -49,7 +49,7 @@ export function ConnectivityPanel({ onSettingsClick }: ConnectivityPanelProps) {
     
     try {
       // Test with a simple chat completion
-      const result = await openAIProxyService.chatJSON([
+      const result = await openAIService.chatJSON([
         { role: 'user', content: 'Respond with a simple JSON object containing just {"test": "success"}' }
       ], { max_tokens: 50 });
 
@@ -76,7 +76,7 @@ export function ConnectivityPanel({ onSettingsClick }: ConnectivityPanelProps) {
     
     try {
       // Test with a simple generation request
-      await ideogramProxyService.generateImage("test", "ASPECT_1_1");
+      await ideogramDirectService.generateImage("test", "ASPECT_1_1");
       
       setIdeogramStatus(prev => ({ 
         ...prev, 
@@ -130,7 +130,7 @@ export function ConnectivityPanel({ onSettingsClick }: ConnectivityPanelProps) {
         className="mb-4"
       >
         <Server className="h-4 w-4 mr-2" />
-        API Status (Server)
+        API Status (Direct)
       </Button>
     );
   }
@@ -142,10 +142,10 @@ export function ConnectivityPanel({ onSettingsClick }: ConnectivityPanelProps) {
           <div>
             <CardTitle className="text-lg flex items-center gap-2">
               <Server className="h-5 w-5" />
-              API Connectivity (Server)
+              API Connectivity (Direct)
             </CardTitle>
             <CardDescription>
-              APIs are configured on the server - ready for all users
+              APIs configured locally with hardcoded keys
             </CardDescription>
           </div>
           {expanded && (
@@ -165,9 +165,9 @@ export function ConnectivityPanel({ onSettingsClick }: ConnectivityPanelProps) {
             <div className="flex items-center gap-3">
               {getStatusIcon(openaiStatus)}
               <div>
-                <div className="font-medium">OpenAI (Server)</div>
+                <div className="font-medium">OpenAI (Direct)</div>
                 <div className="text-sm text-muted-foreground">
-                  Text generation via proxy
+                  Text generation directly from browser
                 </div>
               </div>
             </div>
@@ -190,9 +190,9 @@ export function ConnectivityPanel({ onSettingsClick }: ConnectivityPanelProps) {
             <div className="flex items-center gap-3">
               {getStatusIcon(ideogramStatus)}
               <div>
-                <div className="font-medium">Ideogram (Server)</div>
+                <div className="font-medium">Ideogram (Direct)</div>
                 <div className="text-sm text-muted-foreground">
-                  Image generation via proxy
+                  Image generation directly from browser
                 </div>
               </div>
             </div>
