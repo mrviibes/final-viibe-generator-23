@@ -18,6 +18,8 @@ import { generateIdeogramImage, hasIdeogramApiKey, isUsingBackend as ideogramIsU
 import { buildIdeogramPrompt, getAspectRatioForIdeogram, getStyleTypeForIdeogram } from "@/lib/ideogramPrompt";
 import { normalizeTypography, suggestContractions, isTextMisspelled } from "@/lib/textUtils";
 import { hasOpenAIKey, hasIdeogramKey } from "@/lib/keyManager";
+import { SettingsDialog } from "@/components/SettingsDialog";
+import { ApiKeyBanner } from "@/components/ApiKeyBanner";
 
 const styleOptions = [{
   id: "celebrations",
@@ -4055,6 +4057,30 @@ const Index = () => {
   const [selectedRecommendation, setSelectedRecommendation] = useState<number | null>(null);
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
   
+  // Settings dialog state
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  const [apiKeysStatus, setApiKeysStatus] = useState({ openai: false, ideogram: false });
+  
+
+  // Check API keys status on mount
+  useEffect(() => {
+    const checkApiKeys = () => {
+      setApiKeysStatus({
+        openai: hasOpenAIKey(),
+        ideogram: hasIdeogramKey()
+      });
+    };
+    
+    checkApiKeys();
+    
+    // Listen for localStorage changes
+    const handleStorageChange = () => {
+      checkApiKeys();
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   // Auto-generate 5 images when Step 4 loads
   useEffect(() => {
@@ -4796,8 +4822,30 @@ const Index = () => {
       }
     }, 250);
   };
+  
+  const handleKeysUpdated = () => {
+    setApiKeysStatus({
+      openai: hasOpenAIKey(),
+      ideogram: hasIdeogramKey()
+    });
+  };
+
   return <div className="min-h-screen bg-background py-12 px-4 pb-32">
       <div className="max-w-6xl mx-auto">
+        
+        {/* API Key Status Banner */}
+        <ApiKeyBanner 
+          hasOpenAI={apiKeysStatus.openai}
+          hasIdeogram={apiKeysStatus.ideogram}
+          onSettingsClick={() => setShowSettingsDialog(true)}
+        />
+        
+        {/* Settings Dialog */}
+        <SettingsDialog
+          open={showSettingsDialog}
+          onOpenChange={setShowSettingsDialog}
+          onKeysUpdated={handleKeysUpdated}
+        />
         
         {/* Main Title */}
         <div className="text-center mb-8">

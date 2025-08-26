@@ -44,18 +44,30 @@ function isPlaceholderKey(key: string): boolean {
 }
 
 export function getOpenAIKey(): string {
+  // First check localStorage
+  const localKey = localStorage.getItem('openai_api_key');
+  if (localKey && !isPlaceholderKey(localKey)) {
+    return localKey;
+  }
+  
+  // Fall back to config file
   const decoded = decodeKey(OPENAI_KEY_ENCODED);
   if (isPlaceholderKey(decoded)) {
-    console.warn("⚠️ OpenAI key is still a placeholder. Replace it in src/config/secrets.ts with your real key from https://platform.openai.com/api-keys");
     return "";
   }
   return decoded;
 }
 
 export function getIdeogramKey(): string {
+  // First check localStorage
+  const localKey = localStorage.getItem('ideogram_api_key');
+  if (localKey && !isPlaceholderKey(localKey)) {
+    return localKey;
+  }
+  
+  // Fall back to config file
   const decoded = decodeKey(IDEOGRAM_KEY_ENCODED);
   if (isPlaceholderKey(decoded)) {
-    console.warn("⚠️ Ideogram key is still a placeholder. Replace it in src/config/secrets.ts with your real key from https://ideogram.ai/api");
     return "";
   }
   return decoded;
