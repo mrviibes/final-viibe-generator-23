@@ -1,4 +1,4 @@
-import { OPENAI_API_KEY } from "@/config/secrets";
+import { OPENAI_API_KEY, HAS_OPENAI_KEY } from "@/config/secrets";
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -35,7 +35,7 @@ export class OpenAIService {
   }
 
   hasApiKey(): boolean {
-    return true;
+    return HAS_OPENAI_KEY;
   }
 
   isUsingBackend(): boolean {
@@ -48,8 +48,11 @@ export class OpenAIService {
     max_completion_tokens?: number;
     model?: string;
   } = {}): Promise<any> {
+    if (!HAS_OPENAI_KEY) {
+      throw new Error("OpenAI API key not configured. Please update src/config/secrets.ts");
+    }
     const requestBody = {
-      model: options.model || 'gpt-5-2025-08-07',
+      model: options.model || 'gpt-4o-mini',
       messages,
       temperature: options.temperature ?? 0.7,
       max_completion_tokens: options.max_completion_tokens || options.max_tokens || 4000,
@@ -123,7 +126,7 @@ Example format:
       const data = await this.callDirectAPI(messages, {
         temperature: 0.8,
         max_completion_tokens: 1500,
-        model: 'gpt-5-2025-08-07'
+        model: 'gpt-4o-mini'
       });
 
       const content = data.choices?.[0]?.message?.content;
@@ -164,7 +167,7 @@ Example format:
       const data = await this.callDirectAPI(messages, {
         temperature: 0.9,
         max_completion_tokens: 2000,
-        model: 'gpt-5-2025-08-07'
+        model: 'gpt-4o-mini'
       });
 
       const content = data.choices?.[0]?.message?.content;

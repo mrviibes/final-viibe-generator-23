@@ -2,15 +2,19 @@
 export const OPENAI_API_KEY = "REPLACE_WITH_YOUR_OPENAI_API_KEY";
 export const IDEOGRAM_API_KEY = "REPLACE_WITH_YOUR_IDEOGRAM_API_KEY";
 
-// Validate that keys have been replaced
-if (OPENAI_API_KEY === "REPLACE_WITH_YOUR_OPENAI_API_KEY") {
-  console.error("❌ OpenAI API key not set! Please update src/config/secrets.ts");
-  throw new Error("OpenAI API key not configured");
+// Check if keys have been replaced
+export const HAS_OPENAI_KEY = OPENAI_API_KEY !== "REPLACE_WITH_YOUR_OPENAI_API_KEY";
+export const HAS_IDEOGRAM_KEY = IDEOGRAM_API_KEY !== "REPLACE_WITH_YOUR_IDEOGRAM_API_KEY";
+
+// Log warnings for missing keys
+if (!HAS_OPENAI_KEY) {
+  console.warn("⚠️ OpenAI API key not set! Please update src/config/secrets.ts");
 }
 
-if (IDEOGRAM_API_KEY === "REPLACE_WITH_YOUR_IDEOGRAM_API_KEY") {
-  console.error("❌ Ideogram API key not set! Please update src/config/secrets.ts");
-  throw new Error("Ideogram API key not configured");
+if (!HAS_IDEOGRAM_KEY) {
+  console.warn("⚠️ Ideogram API key not set! Please update src/config/secrets.ts");
 }
 
-console.log("✅ API keys loaded successfully");
+if (HAS_OPENAI_KEY && HAS_IDEOGRAM_KEY) {
+  console.log("✅ API keys loaded successfully");
+}

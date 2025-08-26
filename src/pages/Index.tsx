@@ -19,6 +19,7 @@ import { buildIdeogramPrompt, getAspectRatioForIdeogram, getStyleTypeForIdeogram
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
 import { normalizeTypography, suggestContractions, isTextMisspelled } from "@/lib/textUtils";
+import { HAS_OPENAI_KEY, HAS_IDEOGRAM_KEY } from "@/config/secrets";
 const styleOptions = [{
   id: "celebrations",
   name: "Celebrations",
@@ -4823,6 +4824,23 @@ const Index = () => {
   };
   return <div className="min-h-screen bg-background py-12 px-4 pb-32">
       <div className="max-w-6xl mx-auto">
+        {/* API Key Warning Banner */}
+        {(!HAS_OPENAI_KEY || !HAS_IDEOGRAM_KEY) && (
+          <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg text-orange-800 text-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertCircle className="h-4 w-4" />
+              <span className="font-medium">API Keys Not Configured</span>
+            </div>
+            <p>
+              Please configure your API keys in <code className="bg-orange-100 px-1 rounded">src/config/secrets.ts</code>:
+            </p>
+            <ul className="mt-2 ml-4 space-y-1">
+              {!HAS_OPENAI_KEY && <li>• OpenAI API key required for text generation</li>}
+              {!HAS_IDEOGRAM_KEY && <li>• Ideogram API key required for image generation</li>}
+            </ul>
+          </div>
+        )}
+        
         {/* Main Title */}
         <div className="text-center mb-8">
           
