@@ -188,7 +188,7 @@ Return only: {"lines":["option1","option2","option3","option4"]}`;
     ];
     
     const result = await openAIService.chatJSON(messages, {
-      max_completion_tokens: 220,
+      max_tokens: 220,
       model: 'gpt-4o-mini'
     });
     
