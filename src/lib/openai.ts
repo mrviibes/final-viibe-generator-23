@@ -1,3 +1,3 @@
-// Export proxy service as main service
-export { openAIProxyService as openAIService } from "./openaiProxy";
-export type { OpenAISearchResult, GenerateTextParams } from "./openaiProxy";
+// Export direct service as main service
+export { openAIDirectService as openAIService } from "./openaiDirect";
+export type { OpenAISearchResult, GenerateTextParams } from "./openaiDirect";
