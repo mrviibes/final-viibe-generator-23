@@ -1,6 +1,7 @@
 // Secure Ideogram client that calls server proxy instead of direct API
 
-const SERVER_URL = 'http://localhost:3001';
+// Use environment variable for server URL with fallback
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
 
 export interface IdeogramGenerateRequest {
   prompt: string;
