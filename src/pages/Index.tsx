@@ -8,10 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Search, Loader2, AlertCircle, ArrowLeft, ArrowRight, X, Download } from "lucide-react";
 import { openAIService, OpenAISearchResult } from "@/lib/openai";
-import { ApiKeyDialog } from "@/components/ApiKeyDialog";
-import { IdeogramKeyDialog } from "@/components/IdeogramKeyDialog";
-import { ProxySettingsDialog } from "@/components/ProxySettingsDialog";
-import { CorsRetryDialog } from "@/components/CorsRetryDialog";
 import { StepProgress } from "@/components/StepProgress";
 import { StackedSelectionCard } from "@/components/StackedSelectionCard";
 import { useNavigate } from "react-router-dom";
@@ -4026,7 +4022,7 @@ const Index = () => {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [finalSearchTerm, setFinalSearchTerm] = useState<string>("");
   const [isFinalSearchFocused, setIsFinalSearchFocused] = useState<boolean>(false);
-  const [showApiKeyDialog, setShowApiKeyDialog] = useState<boolean>(false);
+  
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [searchResults, setSearchResults] = useState<OpenAISearchResult[]>([]);
   const [searchError, setSearchError] = useState<string>("");
@@ -4039,9 +4035,6 @@ const Index = () => {
   const popSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [stepTwoText, setStepTwoText] = useState<string>("");
   const [isCustomTextConfirmed, setIsCustomTextConfirmed] = useState<boolean>(false);
-  const [showIdeogramKeyDialog, setShowIdeogramKeyDialog] = useState<boolean>(false);
-  const [showProxySettingsDialog, setShowProxySettingsDialog] = useState<boolean>(false);
-  const [showCorsRetryDialog, setShowCorsRetryDialog] = useState<boolean>(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState<boolean>(false);
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
@@ -4366,11 +4359,6 @@ const Index = () => {
   // Generate subject using AI
   const handleGenerateSubject = async () => {
     if (!openAIService.hasApiKey()) {
-      // Only show dialog if not using backend API
-      if (!openAIService.isUsingBackend()) {
-        setShowApiKeyDialog(true);
-        return;
-      }
     }
 
     // Auto-commit pending tag input before generating
@@ -4483,11 +4471,6 @@ const Index = () => {
   // Generate text using Vibe Model
   const handleGenerateText = async () => {
     if (!openAIService.hasApiKey()) {
-      // Only show dialog if not using backend API
-      if (!openAIService.isUsingBackend()) {
-        setShowApiKeyDialog(true);
-        return;
-      }
     }
     setIsGenerating(true);
     setTextGenerationStartTime(Date.now());
@@ -4625,11 +4608,6 @@ const Index = () => {
   };
   const handleGenerateImage = async (numImages = 1) => {
     if (!hasIdeogramApiKey()) {
-      // Only show dialog if not using backend API
-      if (!ideogramIsUsingBackend()) {
-        setShowIdeogramKeyDialog(true);
-        return;
-      }
     }
     setIsGeneratingImage(true);
     setImageGenerationError("");
@@ -4727,19 +4705,7 @@ const Index = () => {
     } catch (error) {
       console.error('Image generation failed:', error);
       if (error instanceof IdeogramAPIError) {
-        // Handle specific CORS demo activation error
-        if (error.message === 'CORS_DEMO_REQUIRED') {
-          setShowCorsRetryDialog(true);
-          setImageGenerationError('CORS proxy needs activation. Click "Enable CORS Proxy" button below, then try again.');
-        } else if (error.message.includes('proxy.cors.sh') && !getProxySettings().apiKey) {
-          setImageGenerationError('Proxy.cors.sh selected but no API key provided. Add an API key in Proxy Settings for better reliability.');
-          setTimeout(() => setShowProxySettingsDialog(true), 2000);
-        } else if (error.message.includes('CORS') || error.message.includes('Failed to fetch')) {
-          setImageGenerationError('Connection failed. Trying alternative proxy methods automatically...');
-          setTimeout(() => setShowProxySettingsDialog(true), 2000);
-        } else {
-          setImageGenerationError(error.message);
-        }
+        setImageGenerationError(error.message);
       } else {
         setImageGenerationError('An unexpected error occurred while generating the image.');
       }
@@ -4769,11 +4735,6 @@ const Index = () => {
   const handleSearch = async (searchTerm: string) => {
     if (!searchTerm.trim() || !selectedSubOption) return;
     if (!openAIService.hasApiKey()) {
-      // Only show dialog if not using backend API
-      if (!openAIService.isUsingBackend()) {
-        setShowApiKeyDialog(true);
-        return;
-      }
     }
     setIsSearching(true);
     setSearchError("");
@@ -4784,9 +4745,6 @@ const Index = () => {
     } catch (error) {
       console.error('Search error:', error);
       setSearchError(error instanceof Error ? error.message : 'Search failed');
-      if (error instanceof Error && error.message.includes('API key')) {
-        setShowApiKeyDialog(true);
-      }
     } finally {
       setIsSearching(false);
     }
@@ -4795,12 +4753,6 @@ const Index = () => {
   // Independent pop culture search handler
   const handlePopSearch = async (searchTerm: string) => {
     if (!searchTerm.trim() || !selectedSubOption) return;
-    if (!openAIService.hasApiKey()) {
-      if (!openAIService.isUsingBackend()) {
-        setShowApiKeyDialog(true);
-        return;
-      }
-    }
     setIsPopSearching(true);
     setPopSearchError("");
     setPopSearchResults([]);
@@ -4810,9 +4762,6 @@ const Index = () => {
     } catch (error) {
       console.error('Pop culture search error:', error);
       setPopSearchError(error instanceof Error ? error.message : 'Search failed');
-      if (error instanceof Error && error.message.includes('API key')) {
-        setShowApiKeyDialog(true);
-      }
     } finally {
       setIsPopSearching(false);
     }
@@ -6158,9 +6107,6 @@ const Index = () => {
                         <Button onClick={() => handleGenerateImage(5)} variant="outline" size="sm">
                           Try Again
                         </Button>
-                        {imageGenerationError.includes('CORS proxy needs activation') && <Button variant="brand" size="sm" onClick={() => setShowCorsRetryDialog(true)}>
-                            Enable CORS Proxy
-                          </Button>}
                       </div>
                     </div> : <p className="text-muted-foreground text-lg">Preparing your VIIBE...</p>}
                 </div>
@@ -6616,17 +6562,6 @@ const Index = () => {
           </div>
         </div>
 
-        {/* API Key Dialog */}
-        <ApiKeyDialog open={showApiKeyDialog} onOpenChange={setShowApiKeyDialog} onApiKeySet={handleApiKeySet} />
-
-        {/* Ideogram API Key Dialog */}
-        <IdeogramKeyDialog open={showIdeogramKeyDialog} onOpenChange={setShowIdeogramKeyDialog} onApiKeySet={handleIdeogramApiKeySet} />
-
-        {/* Proxy Settings Dialog */}
-        <ProxySettingsDialog open={showProxySettingsDialog} onOpenChange={setShowProxySettingsDialog} />
-
-        {/* CORS Retry Dialog */}
-        <CorsRetryDialog open={showCorsRetryDialog} onOpenChange={setShowCorsRetryDialog} onRetry={handleGenerateImage} />
 
       </div>
     </div>;
