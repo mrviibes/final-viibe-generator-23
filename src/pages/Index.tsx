@@ -8,19 +8,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Search, Loader2, AlertCircle, ArrowLeft, ArrowRight, X, Download } from "lucide-react";
 import { openAIService, OpenAISearchResult } from "@/lib/openai";
+import { ApiKeyDialog } from "@/components/ApiKeyDialog";
+import { IdeogramKeyDialog } from "@/components/IdeogramKeyDialog";
+import { ProxySettingsDialog } from "@/components/ProxySettingsDialog";
+import { CorsRetryDialog } from "@/components/CorsRetryDialog";
 import { StepProgress } from "@/components/StepProgress";
 import { StackedSelectionCard } from "@/components/StackedSelectionCard";
+
+import { TextOverlay } from "@/components/TextOverlay";
 import { useNavigate } from "react-router-dom";
 import { generateCandidates, VibeResult } from "@/lib/vibeModel";
 import { buildIdeogramHandoff } from "@/lib/ideogram";
 import { generateVisualRecommendations, VisualOption } from "@/lib/visualModel";
-import { generateIdeogramImage, hasIdeogramApiKey, isUsingBackend as ideogramIsUsingBackend, IdeogramAPIError, ProxySettings, getProxySettings, setProxySettings, testProxyConnection } from "@/lib/ideogramApi";
-import { buildIdeogramPrompt, getAspectRatioForIdeogram, getStyleTypeForIdeogram } from "@/lib/ideogramPrompt";
+import { generateIdeogramImage, setIdeogramApiKey, getIdeogramApiKey, hasIdeogramApiKey, isUsingBackend as ideogramIsUsingBackend, IdeogramAPIError, getProxySettings, setProxySettings, testProxyConnection, ProxySettings } from "@/lib/ideogramApi";
+import { buildIdeogramPrompt, getAspectRatioForIdeogram, getStyleTypeForIdeogram, parseDirectPrompt } from "@/lib/ideogramPrompt";
+import { useToast } from "@/hooks/use-toast";
+import { toast as sonnerToast } from "sonner";
 import { normalizeTypography, suggestContractions, isTextMisspelled } from "@/lib/textUtils";
-import { serverHealthService } from "@/lib/serverHealth";
-import { ServerStatusBanner } from "@/components/ServerStatusBanner";
-
-
 const styleOptions = [{
   id: "celebrations",
   name: "Celebrations",
@@ -4024,7 +4028,7 @@ const Index = () => {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [finalSearchTerm, setFinalSearchTerm] = useState<string>("");
   const [isFinalSearchFocused, setIsFinalSearchFocused] = useState<boolean>(false);
-  
+  const [showApiKeyDialog, setShowApiKeyDialog] = useState<boolean>(false);
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [searchResults, setSearchResults] = useState<OpenAISearchResult[]>([]);
   const [searchError, setSearchError] = useState<string>("");
@@ -4037,12 +4041,18 @@ const Index = () => {
   const popSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [stepTwoText, setStepTwoText] = useState<string>("");
   const [isCustomTextConfirmed, setIsCustomTextConfirmed] = useState<boolean>(false);
+  const [showIdeogramKeyDialog, setShowIdeogramKeyDialog] = useState<boolean>(false);
+  const [showProxySettingsDialog, setShowProxySettingsDialog] = useState<boolean>(false);
+  const [showCorsRetryDialog, setShowCorsRetryDialog] = useState<boolean>(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState<boolean>(false);
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
   const [imageGenerationError, setImageGenerationError] = useState<string>("");
   const [directPrompt, setDirectPrompt] = useState<string>("");
-  // Removed proxy settings - using Supabase backend only
+  const [showProxySettings, setShowProxySettings] = useState(false);
+  const [proxySettings, setLocalProxySettings] = useState(() => getProxySettings());
+  const [proxyApiKey, setProxyApiKey] = useState('');
+  
 
   // Spelling guarantee mode states - default to ON when text is present
   const [spellingGuaranteeMode, setSpellingGuaranteeMode] = useState<boolean>(false);
@@ -4051,38 +4061,30 @@ const Index = () => {
   const [finalImageWithText, setFinalImageWithText] = useState<string | null>(null);
   const [textMisspellingDetected, setTextMisspellingDetected] = useState<boolean>(false);
   const [cleanBackgroundMode, setCleanBackgroundMode] = useState<boolean>(true);
+  
+  const [overlayPosition, setOverlayPosition] = useState<'bottom' | 'top' | 'left' | 'right' | 'center'>('bottom');
+  const [overlayStyle, setOverlayStyle] = useState<'translucent' | 'ribbon' | 'minimal'>('translucent');
 
   // Visual AI recommendations state
   const [visualRecommendations, setVisualRecommendations] = useState<any>(null);
   const [selectedRecommendation, setSelectedRecommendation] = useState<number | null>(null);
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
-  
-  const [serverHealth, setServerHealth] = useState<any>(null);
-  
 
-  // Check server health status on mount
-  useEffect(() => {
-    const checkServerHealth = async () => {
-      try {
-        const health = await serverHealthService.checkHealth();
-        setServerHealth(health);
-      } catch (error) {
-        console.error('Health check failed:', error);
-      }
-    };
-    
-    checkServerHealth();
-  }, []);
+  // Text speed locked to fast (removed state)
 
-  // Auto-generate 5 images when Step 4 loads
+  // Auto-generate 1 image when Step 4 loads AND visual recommendations are ready
   useEffect(() => {
-    if (currentStep === 4 && !isGeneratingImage && generatedImages.length === 0 && !imageGenerationError) {
-      handleGenerateImage(5); // Generate 5 images automatically
+    if (currentStep === 4 && !isGeneratingImage && generatedImages.length === 0 && !imageGenerationError && visualRecommendations) {
+      handleGenerateImage(1); // Generate 1 image automatically
     }
-  }, [currentStep]);
+  }, [currentStep, visualRecommendations]);
 
   // Visual AI recommendations state
+  const [isTestingProxy, setIsTestingProxy] = useState(false);
   const navigate = useNavigate();
+  const {
+    toast
+  } = useToast();
 
   // Helper function to truncate text to max words
   const truncateWords = (text: string, maxWords: number): string => {
@@ -4109,24 +4111,31 @@ const Index = () => {
 
   // Test connection function
   const testAIConnection = async () => {
-    // Backend-only mode - no proxy testing needed
+    setIsTestingProxy(true);
     try {
       const testResult = await openAIService.chatJSON([{
         role: 'user',
         content: 'Test connection. Return JSON response: {"status": "ok"}'
       }], {
-        model: 'gpt-4o-mini',
-        max_tokens: 50
+        model: 'gpt-5-mini-2025-08-07',
+        max_completion_tokens: 50
       });
       if (testResult?.status === 'ok') {
-        console.log("✅ AI connection is working properly");
+        toast({
+          title: "Connection Success",
+          description: "AI connection is working properly"
+        });
       } else {
         throw new Error('Invalid response');
       }
     } catch (error) {
-      console.error("❌ AI connection failed:", error);
+      toast({
+        title: "Connection Failed",
+        description: "Check your API key and network connection",
+        variant: "destructive"
+      });
     }
-    // Backend-only mode - no proxy testing needed
+    setIsTestingProxy(false);
   };
 
   // Helper function to build selections for StackedSelectionCard
@@ -4365,6 +4374,11 @@ const Index = () => {
   // Generate subject using AI
   const handleGenerateSubject = async () => {
     if (!openAIService.hasApiKey()) {
+      // Only show dialog if not using backend API
+      if (!openAIService.isUsingBackend()) {
+        setShowApiKeyDialog(true);
+        return;
+      }
     }
 
     // Auto-commit pending tag input before generating
@@ -4477,6 +4491,11 @@ const Index = () => {
   // Generate text using Vibe Model
   const handleGenerateText = async () => {
     if (!openAIService.hasApiKey()) {
+      // Only show dialog if not using backend API
+      if (!openAIService.isUsingBackend()) {
+        setShowApiKeyDialog(true);
+        return;
+      }
     }
     setIsGenerating(true);
     setTextGenerationStartTime(Date.now());
@@ -4563,9 +4582,11 @@ const Index = () => {
         recipient_name: selectedPick || "-"
       }, 4);
 
-      // Check for partial tag coverage and log
+      // Check for partial tag coverage and show notification
       if (vibeResult.audit.reason?.includes('tag coverage') || vibeResult.audit.reason?.includes('partial tag coverage')) {
-        console.log("ℹ️ Generated text with partial keyword match - AI created content that may not exactly match all keywords but fits the tone and context");
+        sonnerToast.info("Generated text with partial keyword match", {
+          description: "The AI created content that may not exactly match all your keywords but fits the tone and context."
+        });
       }
       console.log('Vibe generation audit:', vibeResult.audit);
       console.log('✅ Generated text options:', vibeResult.candidates);
@@ -4581,24 +4602,46 @@ const Index = () => {
       // Log audit info for debugging
       console.log('🔍 Vibe generation audit:', vibeResult.audit);
 
-      // Log success with model information if retry occurred
+      // Show success toast with model information if retry occurred
       if (vibeResult.audit.retryAttempt && vibeResult.audit.retryAttempt > 0) {
-        console.log(`✅ Generated text with model fallback - switched from ${vibeResult.audit.originalModel} to ${vibeResult.audit.model} for better results`);
+        sonnerToast.success("Generated text with model fallback", {
+          description: `Switched from ${vibeResult.audit.originalModel} to ${vibeResult.audit.model} for better results.`
+        });
       }
 
       // Warn if fallbacks were used
       if (vibeResult.audit.usedFallback) {
         console.warn('⚠️ Text generation used fallback variants. API may be unavailable or having issues.');
+        sonnerToast.warning('Text generation used fallback. Results may be less relevant to your tags.');
+      } else if (vibeResult.audit.candidateCount < 4) {
+        console.log(`✅ Generated ${vibeResult.audit.candidateCount} unique options from AI model`);
       }
     } catch (error) {
       console.error('❌ Error generating text:', error);
+      sonnerToast.error('Failed to generate text options. Please try again.');
     } finally {
       setIsGenerating(false);
     }
   };
-  // Removed unused API key handlers - using Supabase backend only
+  const handleApiKeySet = (apiKey: string) => {
+    openAIService.setApiKey(apiKey);
+  };
+
+  // Text speed handling removed - locked to fast
+  const handleIdeogramApiKeySet = (apiKey: string) => {
+    setIdeogramApiKey(apiKey);
+    toast({
+      title: "API Key Saved",
+      description: "Your Ideogram API key has been saved securely."
+    });
+  };
   const handleGenerateImage = async (numImages = 1) => {
     if (!hasIdeogramApiKey()) {
+      // Only show dialog if not using backend API
+      if (!ideogramIsUsingBackend()) {
+        setShowIdeogramKeyDialog(true);
+        return;
+      }
     }
     setIsGeneratingImage(true);
     setImageGenerationError("");
@@ -4626,6 +4669,20 @@ const Index = () => {
       const visualTagsStr = subjectTags.join(', ') || "None";
       const chosenVisual = selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].prompt : selectedSubjectOption === "design-myself" && subjectDescription ? subjectDescription : "";
       const subcategorySecondary = selectedStyle === 'pop-culture' && selectedPick ? selectedPick : undefined;
+      // Get selected visual recommendation details
+      let recSubject = undefined;
+      let recBackground = undefined;
+      if (selectedRecommendation !== null && visualRecommendations) {
+        const selectedRec = visualRecommendations.options[selectedRecommendation];
+        recSubject = selectedRec.subject;
+        recBackground = selectedRec.background;
+      } else if (visualRecommendations && visualRecommendations.options.length > 0) {
+        // Default to first option if nothing selected
+        const firstRec = visualRecommendations.options[0];
+        recSubject = firstRec.subject;
+        recBackground = firstRec.background;
+      }
+
       const ideogramPayload = buildIdeogramHandoff({
         visual_style: visualStyle,
         subcategory: subcategory,
@@ -4639,38 +4696,84 @@ const Index = () => {
         text_tags_csv: textTagsStr,
         visual_tags_csv: visualTagsStr,
         ai_text_assist_used: selectedCompletionOption === "ai-assist",
-        ai_visual_assist_used: selectedSubjectOption === "ai-assist"
+        ai_visual_assist_used: selectedSubjectOption === "ai-assist",
+        rec_subject: recSubject,
+        rec_background: recBackground
       });
 
-      // Use direct prompt if provided, otherwise use selected recommendation prompt, otherwise build from structured inputs
-      let prompt = directPrompt.trim();
-      if (!prompt && selectedRecommendation !== null && visualRecommendations) {
+      // Always use structured approach with guardrails
+      let prompt: string;
+      let finalPayload = ideogramPayload;
+      
+      if (directPrompt.trim()) {
+        // Parse direct prompt and merge with existing payload to apply guardrails
+        console.log('=== Parsing Direct Prompt ===');
+        console.log('Original direct prompt:', directPrompt);
+        
+        const { parsedHandoff, additionalNotes } = parseDirectPrompt(directPrompt);
+        console.log('Parsed handoff data:', parsedHandoff);
+        console.log('Additional style notes:', additionalNotes);
+        
+        // Merge parsed data with existing payload (parsed data takes priority)
+        finalPayload = {
+          ...ideogramPayload,
+          ...parsedHandoff
+        };
+        
+        // Add additional notes to design_notes if present
+        if (additionalNotes) {
+          finalPayload.design_notes = finalPayload.design_notes 
+            ? `${finalPayload.design_notes}. ${additionalNotes}`
+            : additionalNotes;
+        }
+        
+        prompt = buildIdeogramPrompt(finalPayload);
+        console.log('Rebuilt prompt with guardrails:', prompt);
+      } else if (selectedRecommendation !== null && visualRecommendations) {
         prompt = visualRecommendations.options[selectedRecommendation].prompt;
+      } else {
+        prompt = buildIdeogramPrompt(finalPayload);
       }
-      if (!prompt) {
-        prompt = buildIdeogramPrompt(ideogramPayload);
+      const aspectForIdeogram = getAspectRatioForIdeogram(finalPayload.aspect_ratio || aspectRatio);
+      const styleForIdeogram = getStyleTypeForIdeogram(finalPayload.visual_style || visualStyle);
+      
+      // Always use V3 model
+      const chosenModel = 'V_3';
+      
+      // Determine magic_prompt_option based on content
+      let magicPromptOption: 'AUTO' | 'OFF' = 'AUTO';
+      if (finalPayload.key_line && finalPayload.key_line.trim()) {
+        // Disable magic prompt for exact text to prevent drift
+        magicPromptOption = 'OFF';
       }
-      const aspectForIdeogram = getAspectRatioForIdeogram(aspectRatio);
-      const styleForIdeogram = getStyleTypeForIdeogram(visualStyle);
+      
       console.log('=== Ideogram Generation Debug ===');
       console.log('Direct prompt provided:', !!directPrompt.trim());
+      console.log('Final structured payload:', finalPayload);
       console.log('Final prompt:', prompt);
       console.log('Aspect ratio:', aspectForIdeogram);
       console.log('Style type:', styleForIdeogram);
-      console.log('Final payload:', {
+      console.log('Chosen model:', chosenModel);
+      console.log('Magic prompt option:', magicPromptOption);
+      console.log('Final API payload:', {
         prompt,
         aspect_ratio: aspectForIdeogram,
-        model: 'V_2A_TURBO',
-        magic_prompt_option: 'AUTO',
+        model: chosenModel,
+        magic_prompt_option: magicPromptOption,
         style_type: styleForIdeogram
       });
+      
+      // Add copy button for debugging (console helper)
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        console.log('📋 To copy prompt to clipboard, run: navigator.clipboard.writeText(`' + prompt.replace(/`/g, '\\`') + '`)');
+      }
       // Generate multiple images
       const imagePromises = Array(numImages).fill(null).map(() => 
         generateIdeogramImage({
           prompt,
           aspect_ratio: aspectForIdeogram,
-          model: 'V_2A_TURBO',
-          magic_prompt_option: 'AUTO',
+          model: chosenModel,
+          magic_prompt_option: magicPromptOption,
           style_type: styleForIdeogram
         })
       );
@@ -4686,18 +4789,38 @@ const Index = () => {
       if (allImageUrls.length > 0) {
         setGeneratedImages(allImageUrls);
         setSelectedImageIndex(0);
-        console.log(`✅ Images Generated! Your ${allImageUrls.length} VIIBE${allImageUrls.length > 1 ? 's have' : ' has'} been successfully created with Ideogram Turbo.`);
+        const modelDescription = chosenModel === 'V_3' ? 'Ideogram V3 (Realistic)' : 'Ideogram Turbo';
+        toast({
+          title: "Images Generated!",
+          description: `Your ${allImageUrls.length} VIIBE${allImageUrls.length > 1 ? 's have' : ' has'} been successfully created with ${modelDescription}.`
+        });
       } else {
         throw new Error("No image data received from Ideogram API");
       }
     } catch (error) {
       console.error('Image generation failed:', error);
       if (error instanceof IdeogramAPIError) {
-        setImageGenerationError(error.message);
+        // Handle specific CORS demo activation error
+        if (error.message === 'CORS_DEMO_REQUIRED') {
+          setShowCorsRetryDialog(true);
+          setImageGenerationError('CORS proxy needs activation. Click "Enable CORS Proxy" button below, then try again.');
+        } else if (error.message.includes('proxy.cors.sh') && !getProxySettings().apiKey) {
+          setImageGenerationError('Proxy.cors.sh selected but no API key provided. Add an API key in Proxy Settings for better reliability.');
+          setTimeout(() => setShowProxySettingsDialog(true), 2000);
+        } else if (error.message.includes('CORS') || error.message.includes('Failed to fetch')) {
+          setImageGenerationError('Connection failed. Trying alternative proxy methods automatically...');
+          setTimeout(() => setShowProxySettingsDialog(true), 2000);
+        } else {
+          setImageGenerationError(error.message);
+        }
       } else {
         setImageGenerationError('An unexpected error occurred while generating the image.');
       }
-      console.error("❌ Generation Failed:", imageGenerationError || "Failed to generate image. Please try again.");
+      toast({
+        title: "Generation Failed",
+        description: imageGenerationError || "Failed to generate image. Please try again.",
+        variant: "destructive"
+      });
     } finally {
       setIsGeneratingImage(false);
     }
@@ -4711,11 +4834,19 @@ const Index = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    console.log("📥 Download Started - Your VIIBE image is being downloaded.");
+    toast({
+      title: "Download Started",
+      description: "Your VIIBE image is being downloaded."
+    });
   };
   const handleSearch = async (searchTerm: string) => {
     if (!searchTerm.trim() || !selectedSubOption) return;
     if (!openAIService.hasApiKey()) {
+      // Only show dialog if not using backend API
+      if (!openAIService.isUsingBackend()) {
+        setShowApiKeyDialog(true);
+        return;
+      }
     }
     setIsSearching(true);
     setSearchError("");
@@ -4726,6 +4857,9 @@ const Index = () => {
     } catch (error) {
       console.error('Search error:', error);
       setSearchError(error instanceof Error ? error.message : 'Search failed');
+      if (error instanceof Error && error.message.includes('API key')) {
+        setShowApiKeyDialog(true);
+      }
     } finally {
       setIsSearching(false);
     }
@@ -4734,6 +4868,12 @@ const Index = () => {
   // Independent pop culture search handler
   const handlePopSearch = async (searchTerm: string) => {
     if (!searchTerm.trim() || !selectedSubOption) return;
+    if (!openAIService.hasApiKey()) {
+      if (!openAIService.isUsingBackend()) {
+        setShowApiKeyDialog(true);
+        return;
+      }
+    }
     setIsPopSearching(true);
     setPopSearchError("");
     setPopSearchResults([]);
@@ -4743,6 +4883,9 @@ const Index = () => {
     } catch (error) {
       console.error('Pop culture search error:', error);
       setPopSearchError(error instanceof Error ? error.message : 'Search failed');
+      if (error instanceof Error && error.message.includes('API key')) {
+        setShowApiKeyDialog(true);
+      }
     } finally {
       setIsPopSearching(false);
     }
@@ -4814,21 +4957,19 @@ const Index = () => {
       }
     }, 250);
   };
-  
-
   return <div className="min-h-screen bg-background py-12 px-4 pb-32">
       <div className="max-w-6xl mx-auto">
-        
-        {/* Server Status Banner */}
-        <ServerStatusBanner />
-        
         {/* Main Title */}
         <div className="text-center mb-8">
           
         </div>
         
         {/* Step Progress Header */}
-        <StepProgress currentStep={currentStep} />
+        <div className="flex justify-between items-center mb-4">
+          <div></div>
+          <StepProgress currentStep={currentStep} />
+          <div></div>
+        </div>
         
         {currentStep === 1 && <>
             <div className="text-center mb-12">
@@ -5636,10 +5777,10 @@ const Index = () => {
                           {isGenerating ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : "Regenerate"}
                         </Button>
                       </div>
-                      {generatedOptions.length > 0 && generationAudit && (
+                       {generatedOptions.length > 0 && generationAudit && (
                         <p className="text-xs text-muted-foreground">
-                          Using {generationAudit.model} • Generated in {((Date.now() - textGenerationStartTime) / 1000).toFixed(1)}s
-                          {generationAudit.usedFallback && generationAudit.auditReason !== 'Missing API key. Add your OpenAI key in src/config/secrets.ts' && " • Used fallback"}
+                           Using {generationAudit.model} • Generated in {((Date.now() - textGenerationStartTime) / 1000).toFixed(1)}s
+                           {generationAudit.usedFallback ? " • Used fallback" : ` • Received ${generationAudit.candidateCount} options`}
                         </p>
                       )}
                     </div>
@@ -5816,10 +5957,10 @@ const Index = () => {
                                </Button>
                              </div>
                              {visualOptions.length > 0 && visualModel && (
-                                <p className="text-xs text-muted-foreground mb-2">
-                                  Using {visualModel.includes('gpt-5-mini') ? 'gpt-5-mini' : visualModel} • Generated in {((Date.now() - visualGenerationStartTime) / 1000).toFixed(1)}s
-                                  {visualModel === 'fallback' && visualRecommendations?.errorCode !== 'unauthorized' && " • Used fallback"}
-                                </p>
+                               <p className="text-xs text-muted-foreground mb-2">
+                                 Using {visualModel.includes('gpt-5-mini') ? 'gpt-5-mini' : visualModel} • Generated in {((Date.now() - visualGenerationStartTime) / 1000).toFixed(1)}s
+                                 {visualModel === 'fallback' && " • Used fallback"}
+                               </p>
                              )}
                             {visualModel === 'fallback' && <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 text-xs p-2 rounded-lg mb-3 max-w-md mx-auto">
                                 {getErrorMessage(visualRecommendations?.errorCode)}
@@ -5833,8 +5974,9 @@ const Index = () => {
                   setShowSubjectTagEditor(false); // Keep tag editor hidden once visual is selected
                 }}>
                               <CardHeader className="pb-2">
-                                <CardTitle className="text-base font-semibold text-card-foreground">
+                                <CardTitle className="text-base font-semibold text-card-foreground flex items-center gap-2">
                                   Option {index + 1} ({option.slot?.replace('-', ' ') || 'Visual'})
+                                  {option.isSinglePerson && <Badge variant="secondary" className="text-xs">Solo</Badge>}
                                 </CardTitle>
                               </CardHeader>
                               <CardContent className="pt-0">
@@ -6059,6 +6201,43 @@ const Index = () => {
                   {isGeneratingImage ? <div className="flex flex-col items-center gap-4">
                       <Loader2 className="h-8 w-8 animate-spin text-primary" />
                       <p className="text-muted-foreground text-lg">Generating image with Ideogram Turbo...</p>
+                    </div> : showTextOverlay && backgroundOnlyImageUrl ? <div className="max-w-full max-h-full relative">
+                      <div className="mb-4 relative">
+                        <img src={backgroundOnlyImageUrl} alt="Background for text overlay" className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
+                        <TextOverlay
+                          text={selectedGeneratedOption || stepTwoText || ""}
+                          position={overlayPosition}
+                          style={overlayStyle}
+                          className="rounded-lg"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-4">
+                        <p className="text-sm text-muted-foreground text-center">Smart overlay mode - Adjust text placement and style</p>
+                        <div className="flex flex-wrap gap-2 justify-center">
+                          <Select value={overlayPosition} onValueChange={(value: 'bottom' | 'top' | 'left' | 'right' | 'center') => setOverlayPosition(value)}>
+                            <SelectTrigger className="w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="bottom">Bottom</SelectItem>
+                              <SelectItem value="top">Top</SelectItem>
+                              <SelectItem value="left">Left</SelectItem>
+                              <SelectItem value="right">Right</SelectItem>
+                              <SelectItem value="center">Center</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Select value={overlayStyle} onValueChange={(value: 'translucent' | 'ribbon' | 'minimal') => setOverlayStyle(value)}>
+                            <SelectTrigger className="w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="translucent">Translucent</SelectItem>
+                              <SelectItem value="ribbon">Ribbon</SelectItem>
+                              <SelectItem value="minimal">Minimal</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
                     </div> : generatedImages.length > 0 ? <div className="max-w-full max-h-full">
                       <div className="mb-4">
                         <img src={generatedImages[selectedImageIndex]} alt={`Generated VIIBE ${selectedImageIndex + 1}`} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
@@ -6091,9 +6270,12 @@ const Index = () => {
                         <p className="text-muted-foreground text-sm mt-1">{imageGenerationError}</p>
                       </div>
                       <div className="flex gap-2">
-                        <Button onClick={() => handleGenerateImage(5)} variant="outline" size="sm">
+                        <Button onClick={() => handleGenerateImage(1)} variant="outline" size="sm">
                           Try Again
                         </Button>
+                        {imageGenerationError.includes('CORS proxy needs activation') && <Button variant="brand" size="sm" onClick={() => setShowCorsRetryDialog(true)}>
+                            Enable CORS Proxy
+                          </Button>}
                       </div>
                     </div> : <p className="text-muted-foreground text-lg">Preparing your VIIBE...</p>}
                 </div>
@@ -6102,7 +6284,7 @@ const Index = () => {
                  {generatedImages.length > 0 && textMisspellingDetected && <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 p-4 rounded-lg mb-4 text-center">
                      <p className="text-sm font-medium mb-2">⚠️ Text may be misspelled in the generated image</p>
                      <div className="flex gap-2 justify-center">
-                        <Button variant="outline" size="sm" onClick={() => handleGenerateImage(5)}>
+                        <Button variant="outline" size="sm" onClick={() => handleGenerateImage(1)}>
                           Regenerate
                         </Button>
                        <Button variant="outline" size="sm" onClick={() => setSpellingGuaranteeMode(true)}>
@@ -6118,7 +6300,7 @@ const Index = () => {
                       <Download className="h-4 w-4" />
                       Download Image
                     </Button>
-                    <Button variant="brand" className="flex items-center gap-2" onClick={() => handleGenerateImage(5)} disabled={isGeneratingImage}>
+                    <Button variant="brand" className="flex items-center gap-2" onClick={() => handleGenerateImage(1)} disabled={isGeneratingImage}>
                       {isGeneratingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>}
@@ -6133,7 +6315,97 @@ const Index = () => {
                   </div>}
               </div>
               
-              {/* Removed proxy settings - using Supabase backend only */}
+              {/* Proxy Settings Dialog */}
+              {showProxySettings && <div className="bg-muted/30 rounded-lg p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-md font-medium text-foreground">Proxy Settings</h4>
+                    <Button variant="ghost" size="sm" onClick={() => setShowProxySettings(false)} className="h-8 w-8 p-0">
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  
+                  <p className="text-sm text-muted-foreground">
+                    Configure how to connect to the Ideogram API. Use a proxy if you encounter CORS errors.
+                  </p>
+                  
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">Connection Method</label>
+                      <Select value={proxySettings.type} onValueChange={(value: ProxySettings['type']) => {
+                  const newSettings = {
+                    ...proxySettings,
+                    type: value
+                  };
+                  setLocalProxySettings(newSettings);
+                  setProxySettings(newSettings);
+                }}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="direct">Direct Connection</SelectItem>
+                          <SelectItem value="cors-anywhere">CORS Anywhere (Free)</SelectItem>
+                          <SelectItem value="proxy-cors-sh">Proxy.cors.sh (Paid)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {proxySettings.type === 'proxy-cors-sh' && <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Proxy API Key</label>
+                        <Input type="password" placeholder="Enter your proxy.cors.sh API key" value={proxyApiKey} onChange={e => setProxyApiKey(e.target.value)} />
+                        <Button variant="outline" size="sm" onClick={() => {
+                  const newSettings = {
+                    ...proxySettings,
+                    apiKey: proxyApiKey
+                  };
+                  setLocalProxySettings(newSettings);
+                  setProxySettings(newSettings);
+                  toast({
+                    title: "API Key Saved",
+                    description: "Your proxy API key has been saved."
+                  });
+                }}>
+                          Save API Key
+                        </Button>
+                      </div>}
+                    
+                    {proxySettings.type === 'cors-anywhere' && <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg">
+                        <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                          <strong>Note:</strong> CORS Anywhere requires manual activation. 
+                          <Button variant="link" className="h-auto p-0 ml-1 text-yellow-800 dark:text-yellow-200 underline" onClick={() => window.open('https://cors-anywhere.herokuapp.com/corsdemo', '_blank')}>
+                            Click here to enable it
+                          </Button>
+                          , then test the connection below.
+                        </p>
+                      </div>}
+                    
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={async () => {
+                  setIsTestingProxy(true);
+                  try {
+                    const success = await testProxyConnection(proxySettings.type);
+                    toast({
+                      title: success ? "Connection Successful" : "Connection Failed",
+                      description: success ? "The proxy connection is working correctly." : "Unable to connect through this proxy method.",
+                      variant: success ? "default" : "destructive"
+                    });
+                  } catch (error) {
+                    toast({
+                      title: "Test Failed",
+                      description: "An error occurred while testing the connection.",
+                      variant: "destructive"
+                    });
+                  } finally {
+                    setIsTestingProxy(false);
+                  }
+                }} disabled={isTestingProxy}>
+                        {isTestingProxy ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                        Test Connection
+                      </Button>
+                    </div>
+                  </div>
+                </div>}
+
 
               {/* Design Summary */}
               <div className="space-y-4">
@@ -6266,19 +6538,68 @@ const Index = () => {
 
         {/* Bottom Navigation */}
         <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t border-border p-4">
-          <div className="max-w-6xl mx-auto flex justify-between items-center">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex justify-between items-center">
             <Button variant="outline" onClick={() => setCurrentStep(prev => Math.max(1, prev - 1))} className={currentStep === 1 ? "invisible" : ""} disabled={currentStep === 1}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
             
-            <Button variant={currentStep === 1 && !isStep1Complete() || currentStep === 2 && !isStep2Complete() || currentStep === 3 && !isStep3Complete() || currentStep === 4 && !isStep4Complete() ? "outline" : "brand"} onClick={async () => {
+            {currentStep < 4 && (
+              <Button variant={currentStep === 1 && !isStep1Complete() || currentStep === 2 && !isStep2Complete() || currentStep === 3 && !isStep3Complete() ? "outline" : "brand"} onClick={async () => {
             if (currentStep === 3 && isStep3Complete() && selectedDimension) {
-              // Move to Step 4 and automatically start generating the image
-              setCurrentStep(4);
-
-              // Start automatic image generation
-              setIsGeneratingImage(true);
+               // Immediately move to Step 4, then generate visual recommendations in background
+               setCurrentStep(4);
+               setIsLoadingRecommendations(true);
+               
+               // Generate visual recommendations in background
+               (async () => {
+                 try {
+                   const category = selectedStyle ? styleOptions.find(s => s.id === selectedStyle)?.name || "" : "";
+                   let subcategory = 'general';
+                   const finalTags = [...tags, ...subjectTags];
+                   
+                   if (selectedStyle === 'celebrations' && selectedSubOption) {
+                     const celebOption = celebrationOptions.find(c => c.id === selectedSubOption);
+                     subcategory = celebOption?.name || selectedSubOption;
+                   } else if (selectedStyle === 'pop-culture' && selectedSubOption) {
+                     const popOption = popCultureOptions.find(p => p.id === selectedSubOption);
+                     subcategory = popOption?.name || selectedSubOption;
+                     if (selectedPick) {
+                       finalTags.push(selectedPick);
+                     }
+                   } else if (selectedSubOption) {
+                     subcategory = selectedSubOption;
+                   }
+                   
+                   const selectedTextStyleObj = textStyleOptions.find(ts => ts.id === selectedTextStyle);
+                   const tone = selectedTextStyleObj?.name || 'Humorous';
+                   const finalLine = selectedGeneratedOption || (isCustomTextConfirmed ? stepTwoText : undefined);
+                   
+                   const visualResult = await generateVisualRecommendations({
+                     category,
+                     subcategory,
+                     tone: tone.toLowerCase(),
+                     tags: finalTags,
+                     visualStyle: selectedVisualStyle || undefined,
+                     finalLine,
+                     subjectOption: selectedSubjectOption || undefined,
+                     dimensions: selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || undefined
+                   }, 4);
+                   
+                   setVisualRecommendations(visualResult);
+                   setIsLoadingRecommendations(false);
+                 } catch (error) {
+                   console.error('Failed to generate visual recommendations:', error);
+                   setIsLoadingRecommendations(false);
+                 }
+               })();
+               return;
+             }
+             
+             if (currentStep === 4 && isStep4Complete()) {
+               // Start manual image generation on Step 4
+               setIsGeneratingImage(true);
               try {
                 const finalText = selectedGeneratedOption || stepTwoText || "";
                 const visualStyle = selectedVisualStyle || "";
@@ -6305,6 +6626,13 @@ const Index = () => {
 
                 // Get secondary subcategory for pop culture
                 const subcategorySecondary = selectedStyle === 'pop-culture' && selectedPick ? selectedPick : undefined;
+                // Determine people count hint and text placement preference
+                const selectedVisualOption = selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex] : undefined;
+                const peopleCountHint: 'single' | 'multiple' | undefined = selectedVisualOption?.isSinglePerson ? 'single' : 
+                  (selectedVisualOption && ['friends', 'crowd', 'people', 'group', 'party', 'audience', 'performers', 'celebrating'].some(keyword => 
+                    selectedVisualOption.subject.toLowerCase().includes(keyword) || selectedVisualOption.background.toLowerCase().includes(keyword)
+                  )) ? 'multiple' : undefined;
+                
                 const ideogramPayload = buildIdeogramHandoff({
                   // Core parameters
                   visual_style: visualStyle,
@@ -6323,7 +6651,10 @@ const Index = () => {
                   ai_visual_assist_used: selectedSubjectOption === "ai-assist",
                   // Visual AI Recommendations
                   rec_subject: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].subject : selectedSubjectOption === "design-myself" ? subjectDescription : undefined,
-                  rec_background: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined
+                  rec_background: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined,
+                  // New hints
+                  people_count_hint: peopleCountHint,
+                  text_placement_preference: 'bottom' // Default to bottom placement for better text readability
                 });
 
                 // Generate the Ideogram prompt
@@ -6332,50 +6663,106 @@ const Index = () => {
                 let styleType = getStyleTypeForIdeogram(visualStyle);
                 let model: 'V_1' | 'V_1_TURBO' | 'V_2' | 'V_2_TURBO' | 'V_2A' | 'V_2A_TURBO' | 'V_3' = 'V_2_TURBO';
 
-                // Optimize for text accuracy when text is present
-                if (finalText && finalText.trim()) {
-                  styleType = 'DESIGN'; // Better for text fidelity
-                  model = 'V_2A_TURBO'; // Better model for text
-                }
+                // Always use V3 model
+                model = 'V_3';
 
-                // Handle spelling guarantee mode
-                if (spellingGuaranteeMode && finalText && finalText.trim()) {
+                // Smart overlay is now always enabled for complex scenarios
+                const shouldUseSmartOverlay = finalText && finalText.trim() && (
+                  peopleCountHint === 'multiple' || // Complex scenes with people
+                  spellingGuaranteeMode || // Spelling guarantee mode
+                  finalText.length > 30 // Longer text
+                );
+                
+                if (shouldUseSmartOverlay) {
+                  console.log('🎯 Using smart overlay mode - generating background-only image');
                   // Generate background-only image first - remove ALL text-related instructions
-                  const backgroundPrompt = promptText.replace(/EXACT_TEXT \(VERBATIM\): ".*?"/g, '').replace(/Render this text EXACTLY.*?\./g, '').replace(/Use only standard ASCII.*?\./g, '').replace(/If you cannot render.*?\./g, '').replace(/Style and display this text.*?\./g, '').replace(/Ensure the text is.*?\./g, '').replace(/NEGATIVE PROMPTS:.*?\./g, '').replace(/\s+/g, ' ').trim() + ' No text, no typography, no words, no letters, no characters, no glyphs, no symbols, no UI elements overlaid on the image. Clean minimal background only.';
+                  const backgroundPayload = { ...ideogramPayload, key_line: '' }; // Remove text from payload
+                  const backgroundPrompt = buildIdeogramPrompt(backgroundPayload, true); // Use cleanBackground flag
+                  
                   const backgroundResult = await generateIdeogramImage({
                     prompt: backgroundPrompt,
                     aspect_ratio: aspectRatioKey,
                     style_type: styleType,
                     model: model,
-                    magic_prompt_option: 'AUTO'
+                    magic_prompt_option: 'OFF' // Disable magic prompt for background-only
                   });
+                  
                   if (backgroundResult.data?.[0]?.url) {
                     setBackgroundOnlyImageUrl(backgroundResult.data[0].url);
                     setShowTextOverlay(true);
                     setIsGeneratingImage(false);
+                    console.log('✅ Smart overlay background generated successfully');
+                    sonnerToast.success("Background generated! Text overlay ready for fine-tuning.");
                     return;
                   }
                 }
 
-                // Generate 1 image with Ideogram Turbo
-                const result = await generateIdeogramImage({
-                  prompt: promptText,
-                  aspect_ratio: aspectRatioKey,
-                  style_type: styleType,
-                  model: 'V_2A_TURBO', // Use Turbo for speed
-                  magic_prompt_option: 'AUTO',
-                  count: 1
-                });
-                if (result.data && result.data.length > 0) {
-                  const imageUrls = result.data.map(img => img.url);
-                  setGeneratedImages(imageUrls);
-                  setSelectedImageIndex(0);
-                  console.log(`✅ Generated ${imageUrls.length} VIIBE options! Choose your favorite.`);
+                // Generate images - multiple if we need both group and solo versions
+                const shouldGenerateBothVersions = peopleCountHint === 'multiple' && finalText.trim();
+                
+                if (shouldGenerateBothVersions) {
+                  // Generate two versions: one group, one solo
+                  const groupPayload = { ...ideogramPayload, people_count_hint: 'multiple' as const };
+                  const soloPayload = { ...ideogramPayload, people_count_hint: 'single' as const };
+                  
+                  const groupPrompt = buildIdeogramPrompt(groupPayload);
+                  const soloPrompt = buildIdeogramPrompt(soloPayload);
+                  
+                  const [groupResult, soloResult] = await Promise.all([
+                    generateIdeogramImage({
+                      prompt: groupPrompt,
+                      aspect_ratio: aspectRatioKey,
+                      style_type: styleType,
+                      model: model,
+                      magic_prompt_option: finalText?.trim() ? 'OFF' : 'AUTO',
+                      count: 1
+                    }),
+                    generateIdeogramImage({
+                      prompt: soloPrompt,
+                      aspect_ratio: aspectRatioKey,
+                      style_type: styleType,
+                      model: model,
+                      magic_prompt_option: finalText?.trim() ? 'OFF' : 'AUTO',
+                      count: 1
+                    })
+                  ]);
+                  
+                  const allImages = [];
+                  if (groupResult.data?.[0]?.url) allImages.push(groupResult.data[0].url);
+                  if (soloResult.data?.[0]?.url) allImages.push(soloResult.data[0].url);
+                  
+                  if (allImages.length > 0) {
+                    setGeneratedImages(allImages);
+                    setSelectedImageIndex(0);
+                    const modelDescription = model === 'V_3' ? 'Ideogram V3 (Realistic)' : 'Ideogram Turbo';
+                    sonnerToast.success(`Generated ${allImages.length} VIIBE options with ${modelDescription}! Choose your favorite.`);
+                  } else {
+                    sonnerToast.error("Failed to generate your VIIBE. Please try again.");
+                  }
                 } else {
-                  console.error("❌ Failed to generate your VIIBE. Please try again.");
+                  // Generate single image with current settings
+                  const result = await generateIdeogramImage({
+                    prompt: promptText,
+                    aspect_ratio: aspectRatioKey,
+                    style_type: styleType,
+                    model: model,
+                    magic_prompt_option: finalText?.trim() ? 'OFF' : 'AUTO',
+                    count: 1
+                  });
+                  
+                  if (result.data && result.data.length > 0) {
+                    const imageUrls = result.data.map(img => img.url);
+                    setGeneratedImages(imageUrls);
+                    setSelectedImageIndex(0);
+                    const modelDescription = model === 'V_3' ? 'Ideogram V3 (Realistic)' : 'Ideogram Turbo';
+                    sonnerToast.success(`Generated ${imageUrls.length} VIIBE options with ${modelDescription}! Choose your favorite.`);
+                  } else {
+                    sonnerToast.error("Failed to generate your VIIBE. Please try again.");
+                  }
                 }
               } catch (error) {
-                console.error("❌ Error generating image:", error);
+                console.error("Error generating image:", error);
+                sonnerToast.error("Failed to generate your VIIBE. Please try again.");
               } finally {
                 setIsGeneratingImage(false);
               }
@@ -6406,6 +6793,14 @@ const Index = () => {
 
               // Get secondary subcategory for pop culture
               const subcategorySecondary = selectedStyle === 'pop-culture' && selectedPick ? selectedPick : undefined;
+              
+              // Determine people count hint and text placement preference
+              const selectedVisualOption = selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex] : undefined;
+              const peopleCountHint: 'single' | 'multiple' | undefined = selectedVisualOption?.isSinglePerson ? 'single' : 
+                (selectedVisualOption && ['friends', 'crowd', 'people', 'group', 'party', 'audience', 'performers', 'celebrating'].some(keyword => 
+                  selectedVisualOption.subject.toLowerCase().includes(keyword) || selectedVisualOption.background.toLowerCase().includes(keyword)
+                )) ? 'multiple' : undefined;
+              
               const ideogramPayload = buildIdeogramHandoff({
                 // Core parameters
                 visual_style: visualStyle,
@@ -6424,7 +6819,10 @@ const Index = () => {
                 ai_visual_assist_used: selectedSubjectOption === "ai-assist",
                 // Visual AI Recommendations
                 rec_subject: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].subject : selectedSubjectOption === "design-myself" ? subjectDescription : undefined,
-                rec_background: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined
+                rec_background: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined,
+                // New hints
+                people_count_hint: peopleCountHint,
+                text_placement_preference: 'bottom' // Default to bottom placement for better text readability
               });
               console.log("VIIBE Generated!", {
                 category: selectedStyle || "",
@@ -6447,18 +6845,31 @@ const Index = () => {
 
               // You can add your VIIBE generation logic here
               alert("VIIBE Generated Successfully! Check console for Ideogram handoff payload.");
-            } else {
+            } else if (currentStep < 4) {
               setCurrentStep(prev => prev + 1);
             }
-          }} disabled={currentStep === 1 && !isStep1Complete() || currentStep === 2 && !isStep2Complete() || currentStep === 3 && !isStep3Complete() || currentStep === 4 && !isStep4Complete()}>
-              {currentStep === 3 && isStep3Complete() && selectedDimension ? "GENERATE YOUR VIIBE" : currentStep === 4 && isStep4Complete() ? "GENERATE VIIBE NOW" : <>
+          }} disabled={currentStep === 1 && !isStep1Complete() || currentStep === 2 && !isStep2Complete() || currentStep === 3 && !isStep3Complete()}>
+              {currentStep === 3 && isStep3Complete() && selectedDimension ? "GENERATE YOUR VIIBE" : <>
                   Continue
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </>}
             </Button>
+            )}
+            </div>
           </div>
         </div>
 
+        {/* API Key Dialog */}
+        <ApiKeyDialog open={showApiKeyDialog} onOpenChange={setShowApiKeyDialog} onApiKeySet={handleApiKeySet} />
+
+        {/* Ideogram API Key Dialog */}
+        <IdeogramKeyDialog open={showIdeogramKeyDialog} onOpenChange={setShowIdeogramKeyDialog} onApiKeySet={handleIdeogramApiKeySet} />
+
+        {/* Proxy Settings Dialog */}
+        <ProxySettingsDialog open={showProxySettingsDialog} onOpenChange={setShowProxySettingsDialog} />
+
+        {/* CORS Retry Dialog */}
+        <CorsRetryDialog open={showCorsRetryDialog} onOpenChange={setShowCorsRetryDialog} onRetry={handleGenerateImage} />
 
       </div>
     </div>;
