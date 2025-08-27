@@ -4737,7 +4737,7 @@ const Index = () => {
       const aspectForIdeogram = getAspectRatioForIdeogram(finalPayload.aspect_ratio || aspectRatio);
       const styleForIdeogram = getStyleTypeForIdeogram(finalPayload.visual_style || visualStyle);
       
-      // Always use V3 model
+      // Now using V3 model with proper V3 endpoint support
       const chosenModel = 'V_3';
       
       // Determine magic_prompt_option based on content
@@ -4789,7 +4789,7 @@ const Index = () => {
       if (allImageUrls.length > 0) {
         setGeneratedImages(allImageUrls);
         setSelectedImageIndex(0);
-        const modelDescription = chosenModel === 'V_3' ? 'Ideogram V3 (Realistic)' : 'Ideogram Turbo';
+        const modelDescription = chosenModel === 'V_3' ? 'Ideogram V3 (Realistic)' : chosenModel === 'V_2A_TURBO' ? 'Ideogram V2A Turbo' : 'Ideogram Turbo';
         toast({
           title: "Images Generated!",
           description: `Your ${allImageUrls.length} VIIBE${allImageUrls.length > 1 ? 's have' : ' has'} been successfully created with ${modelDescription}.`

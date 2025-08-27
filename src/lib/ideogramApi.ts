@@ -206,62 +206,110 @@ async function generateIdeogramImageFrontend(request: IdeogramGenerateRequest): 
   const settings = getProxySettings();
   
   const makeRequest = async (proxyType: ProxySettings['type'], currentModel: string): Promise<Response> => {
-    let url = IDEOGRAM_API_BASE;
     const headers: Record<string, string> = {
       'Api-Key': key,
-      'Content-Type': 'application/json',
     };
 
+    // Choose endpoint based on model
+    const baseUrl = currentModel === 'V_3' ? 'https://api.ideogram.ai/v3/generate' : IDEOGRAM_API_BASE;
+    let url = baseUrl;
+    
     // Configure URL and headers based on proxy type
     switch (proxyType) {
       case 'cors-anywhere':
-        url = PROXY_CONFIGS['cors-anywhere'] + IDEOGRAM_API_BASE;
+        url = PROXY_CONFIGS['cors-anywhere'] + baseUrl;
         headers['X-Requested-With'] = 'XMLHttpRequest';
         break;
       case 'proxy-cors-sh':
-        url = PROXY_CONFIGS['proxy-cors-sh'] + IDEOGRAM_API_BASE;
+        url = PROXY_CONFIGS['proxy-cors-sh'] + baseUrl;
         if (settings.apiKey) {
           headers['x-cors-api-key'] = settings.apiKey;
         }
         break;
       case 'allorigins':
-        url = PROXY_CONFIGS['allorigins'] + encodeURIComponent(IDEOGRAM_API_BASE);
+        url = PROXY_CONFIGS['allorigins'] + encodeURIComponent(baseUrl);
         break;
       case 'thingproxy':
-        url = PROXY_CONFIGS['thingproxy'] + IDEOGRAM_API_BASE;
+        url = PROXY_CONFIGS['thingproxy'] + baseUrl;
         break;
       case 'direct':
       default:
-        // Use direct URL
+        url = baseUrl;
         break;
     }
 
-    // Always use JSON format wrapped in image_request
-    // Use the model as requested (no forced downgrade)
-    let modelToUse = currentModel;
-
-    const payload: any = {
-      prompt: request.prompt,
-      aspect_ratio: request.aspect_ratio,
-      model: modelToUse,
-      magic_prompt_option: request.magic_prompt_option,
-    };
+    // Handle different request formats for V3 vs legacy models
+    let requestBody: string | FormData;
     
-    if (request.seed !== undefined) {
-      payload.seed = request.seed;
-    }
-    
-    if (request.style_type) {
-      payload.style_type = request.style_type;
-    }
+    if (currentModel === 'V_3') {
+      // V3 uses multipart/form-data
+      const formData = new FormData();
+      formData.append('prompt', request.prompt);
+      
+      // Map aspect_ratio to resolution for V3
+      const aspectToResolution: Record<string, string> = {
+        'ASPECT_1_1': '1024x1024',
+        'ASPECT_16_9': '1280x720',
+        'ASPECT_9_16': '720x1280',
+        'ASPECT_16_10': '1280x800',
+        'ASPECT_10_16': '800x1280',
+        'ASPECT_3_2': '1536x1024',
+        'ASPECT_2_3': '1024x1536',
+        'ASPECT_4_3': '1152x896',
+        'ASPECT_3_4': '896x1152',
+        'ASPECT_3_1': '1728x576',
+        'ASPECT_1_3': '576x1728'
+      };
+      
+      formData.append('resolution', aspectToResolution[request.aspect_ratio] || '1024x1024');
+      
+      if (request.seed !== undefined) {
+        formData.append('seed', request.seed.toString());
+      }
+      
+      // Map style_type to style for V3 if provided
+      if (request.style_type && request.style_type !== 'AUTO') {
+        const styleMapping: Record<string, string> = {
+          'GENERAL': 'general',
+          'REALISTIC': 'realistic',
+          'DESIGN': 'design',
+          'RENDER_3D': '3d_render',
+          'ANIME': 'anime'
+        };
+        if (styleMapping[request.style_type]) {
+          formData.append('style', styleMapping[request.style_type]);
+        }
+      }
+      
+      requestBody = formData;
+      // Don't set Content-Type for FormData - browser will set it with boundary
+    } else {
+      // Legacy models use JSON format
+      headers['Content-Type'] = 'application/json';
+      
+      const payload: any = {
+        prompt: request.prompt,
+        aspect_ratio: request.aspect_ratio,
+        model: currentModel,
+        magic_prompt_option: request.magic_prompt_option,
+      };
+      
+      if (request.seed !== undefined) {
+        payload.seed = request.seed;
+      }
+      
+      if (request.style_type) {
+        payload.style_type = request.style_type;
+      }
 
-    const requestBody = JSON.stringify({ image_request: payload });
+      requestBody = JSON.stringify({ image_request: payload });
+    }
 
     // Debug log the request structure (without sensitive headers)
     console.log('Ideogram API request:', { 
       url: url.replace(key, '[REDACTED]'), 
       model: currentModel,
-      payload: { ...payload, prompt: payload.prompt.substring(0, 50) + '...' }
+      requestType: currentModel === 'V_3' ? 'multipart/form-data' : 'application/json'
     });
 
     return fetch(url, {
