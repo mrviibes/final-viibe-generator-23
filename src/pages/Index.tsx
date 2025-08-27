@@ -4751,7 +4751,7 @@ const Index = () => {
         const modelDescription = chosenModel === 'V_3' ? 'Ideogram V3 (Realistic)' : 'Ideogram Turbo';
         toast({
           title: "Images Generated!",
-          description: `Your ${allImageUrls.length} VIIBE${allImageUrls.length > 1 ? 's have' : ' has'} been successfully created with ${modelDescription}.`
+          description: `Your ${allImageUrls.length} vibe${allImageUrls.length > 1 ? 's have' : ' has'} been successfully created with ${modelDescription}.`
         });
       } else {
         throw new Error("No image data received from Ideogram API");
@@ -4795,7 +4795,7 @@ const Index = () => {
     document.body.removeChild(link);
     toast({
       title: "Download Started",
-      description: "Your VIIBE image is being downloaded."
+      description: "Your vibe image is being downloaded."
     });
   };
   const handleSearch = async (searchTerm: string) => {
@@ -4933,7 +4933,7 @@ const Index = () => {
         {currentStep === 1 && <>
             <div className="text-center mb-12">
               <h2 className="text-2xl md:text-3xl font-semibold text-foreground mb-4">Choose Your Category</h2>
-              <p className="text-xl text-muted-foreground">Select the Category that best fits your Viibe</p>
+              <p className="text-xl text-muted-foreground">Select the Category that best fits your Vibe</p>
             </div>
             
             {/* Show all cards when no style is selected, or only the selected card */}
@@ -5816,13 +5816,13 @@ const Index = () => {
                 {(() => {
               // Show the actual text they chose, or indicate no text
               if (selectedCompletionOption === "no-text") {
-                return "Your Viibe doesn't have any text";
+                return "Your Vibe doesn't have any text";
               } else if (selectedGeneratedOption) {
                 return `"${selectedGeneratedOption}"`;
               } else if (stepTwoText && isCustomTextConfirmed) {
                 return `"${stepTwoText}"`;
               } else {
-                return "Your Viibe doesn't have any text";
+                return "Your Vibe doesn't have any text";
               }
             })()}
               </p>
@@ -6008,7 +6008,7 @@ const Index = () => {
                     {/* Subject description form for Design Myself */}
                     {selectedSubjectOption === "design-myself" && !isSubjectDescriptionConfirmed && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <div className="text-center mb-8">
-                          <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Describe the visuals of your Viibe (100 characters max)</h2>
+                          <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Describe the visuals of your Vibe (100 characters max)</h2>
                         </div>
 
                         <div className="max-w-lg mx-auto">
@@ -6144,8 +6144,8 @@ const Index = () => {
 
         {currentStep === 4 && <>
             <div className="text-center mb-8">
-              <h2 className="text-2xl md:text-3xl font-semibold text-foreground mb-4">Finished Design</h2>
-              <p className="text-xl text-muted-foreground">Your viibe is ready! Review the details and download your creation.</p>
+              <h2 className="text-2xl md:text-3xl font-semibold text-foreground mb-4">Your vibe is finished!</h2>
+              <p className="text-xl text-muted-foreground">Your vibe is ready! Review the details and download your creation.</p>
             </div>
             
             <div className="max-w-4xl mx-auto space-y-8">
@@ -6161,7 +6161,7 @@ const Index = () => {
                       <p className="text-muted-foreground text-lg">Generating image with Ideogram Turbo...</p>
                     </div> : generatedImages.length > 0 ? <div className="max-w-full max-h-full">
                       <div className="mb-4">
-                        <img src={generatedImages[selectedImageIndex]} alt={`Generated VIIBE ${selectedImageIndex + 1}`} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
+                        <img src={generatedImages[selectedImageIndex]} alt={`Generated Vibe ${selectedImageIndex + 1}`} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
                       </div>
                       {generatedImages.length > 1 && <div className="flex flex-col gap-4">
                         <p className="text-sm text-muted-foreground text-center">Choose your favorite ({selectedImageIndex + 1} of {generatedImages.length})</p>
@@ -6174,7 +6174,7 @@ const Index = () => {
                                 selectedImageIndex === index ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'
                               }`}
                             >
-                              <img src={imageUrl} alt={`VIIBE option ${index + 1}`} className="w-full h-full object-cover" />
+                              <img src={imageUrl} alt={`Vibe option ${index + 1}`} className="w-full h-full object-cover" />
                               {selectedImageIndex === index && (
                                 <div className="absolute inset-0 bg-primary/10 flex items-center justify-center">
                                   <div className="w-4 h-4 rounded-full bg-primary" />
@@ -6198,7 +6198,7 @@ const Index = () => {
                             Enable CORS Proxy
                           </Button>}
                       </div>
-                    </div> : <p className="text-muted-foreground text-lg">Preparing your VIIBE...</p>}
+                    </div> : <p className="text-muted-foreground text-lg">Preparing your vibe...</p>}
                 </div>
                 
                  {/* Text Misspelling Detection */}
@@ -6652,18 +6652,18 @@ const Index = () => {
                   setGeneratedImages(imageUrls);
                   setSelectedImageIndex(0);
                   const modelDescription = model === 'V_3' ? 'Ideogram V3 (Realistic)' : 'Ideogram Turbo';
-                  sonnerToast.success(`Generated ${imageUrls.length} VIIBE options with ${modelDescription}! Choose your favorite.`);
+                  sonnerToast.success(`Generated ${imageUrls.length} vibe options with ${modelDescription}! Choose your favorite.`);
                 } else {
-                  sonnerToast.error("Failed to generate your VIIBE. Please try again.");
+                  sonnerToast.error("Failed to generate your vibe. Please try again.");
                 }
               } catch (error) {
                 console.error("Error generating image:", error);
-                sonnerToast.error("Failed to generate your VIIBE. Please try again.");
+                sonnerToast.error("Failed to generate your vibe. Please try again.");
               } finally {
                 setIsGeneratingImage(false);
               }
             } else if (currentStep === 4 && isStep4Complete()) {
-              // Generate VIIBE with Ideogram handoff
+              // Generate vibe with Ideogram handoff
               const finalText = selectedGeneratedOption || stepTwoText || "";
               const visualStyle = selectedVisualStyle || "";
               const subcategory = (() => {
@@ -6709,7 +6709,7 @@ const Index = () => {
                 rec_subject: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].subject : selectedSubjectOption === "design-myself" ? subjectDescription : undefined,
                 rec_background: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined
               });
-              console.log("VIIBE Generated!", {
+              console.log("Vibe Generated!", {
                 category: selectedStyle || "",
                 subcategory: selectedSubOption || "",
                 pick: selectedPick || "",
@@ -6728,16 +6728,27 @@ const Index = () => {
                 ideogramHandoff: ideogramPayload
               });
 
-              // You can add your VIIBE generation logic here
-              alert("VIIBE Generated Successfully! Check console for Ideogram handoff payload.");
+              // You can add your vibe generation logic here
+              alert("Vibe Generated Successfully! Check console for Ideogram handoff payload.");
             } else if (currentStep < 4) {
               setCurrentStep(prev => prev + 1);
             }
           }} disabled={currentStep === 1 && !isStep1Complete() || currentStep === 2 && !isStep2Complete() || currentStep === 3 && !isStep3Complete()}>
-              {currentStep === 3 && isStep3Complete() && selectedDimension ? "GENERATE YOUR VIIBE" : <>
+              {currentStep === 3 && isStep3Complete() && selectedDimension ? (
+                isLoadingRecommendations ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  "Generate your vibe"
+                )
+              ) : (
+                <>
                   Continue
                   <ArrowRight className="h-4 w-4 ml-2" />
-                </>}
+                </>
+              )}
             </Button>
             )}
           </div>

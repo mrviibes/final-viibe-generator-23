@@ -8,7 +8,7 @@ const steps = [
   { id: 1, name: "Category" },
   { id: 2, name: "Text" },
   { id: 3, name: "Visuals" },
-  { id: 4, name: "YOUR VIIBE" }
+  { id: 4, name: "Your Vibe" }
 ];
 
 export const StepProgress = ({ currentStep }: StepProgressProps) => {
