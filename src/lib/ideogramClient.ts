@@ -1,5 +1,5 @@
-// Secure Ideogram client that calls server proxy instead of direct API
-import { getServerUrl } from '../config/runtime';
+// Secure Ideogram client using Supabase Edge Functions
+import { supabase } from "@/integrations/supabase/client";
 
 export interface IdeogramGenerateRequest {
   prompt: string;
@@ -27,23 +27,18 @@ export class IdeogramAPIError extends Error {
 class IdeogramClientService {
   async generateImage(prompt: string, aspectRatio: string = "ASPECT_1_1"): Promise<IdeogramGenerateResponse> {
     try {
-      const response = await fetch(`${getServerUrl()}/api/ideogram/generate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('ideogram-generate', {
+        body: {
           prompt,
           aspect_ratio: aspectRatio,
-        }),
+        },
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new IdeogramAPIError(error.error || 'Ideogram request failed', response.status);
+      if (error) {
+        console.error('Ideogram service error:', error);
+        throw new IdeogramAPIError(error.message || 'Ideogram request failed');
       }
 
-      const data = await response.json();
       return data;
     } catch (error) {
       if (error instanceof IdeogramAPIError) {
@@ -54,8 +49,8 @@ class IdeogramClientService {
   }
 
   hasApiKey(): boolean {
-    // Check if server is available (keys are server-side)
-    return true; // Server will handle validation
+    // Keys are managed in Supabase Edge Functions
+    return true;
   }
 }
 

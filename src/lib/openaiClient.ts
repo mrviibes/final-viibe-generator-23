@@ -1,5 +1,5 @@
-// Secure OpenAI client that calls server proxy instead of direct API
-import { getServerUrl } from '../config/runtime';
+// Secure OpenAI client using Supabase Edge Functions
+import { supabase } from "@/integrations/supabase/client";
 
 export interface OpenAISearchResult {
   title: string;
@@ -17,22 +17,16 @@ export interface GenerateTextParams {
 
 class OpenAIClientService {
   async chatJSON(messages: Array<{role: string; content: string}>, options: any = {}): Promise<any> {
-    const response = await fetch(`${getServerUrl()}/api/openai/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ messages, options }),
+    const { data, error } = await supabase.functions.invoke('openai-chat', {
+      body: { messages, options },
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'OpenAI request failed');
+    if (error) {
+      console.error('OpenAI service error:', error);
+      throw new Error(error.message || 'OpenAI request failed');
     }
-
-    const data = await response.json();
     
-    if (data.choices?.[0]?.message?.content) {
+    if (data?.choices?.[0]?.message?.content) {
       try {
         return JSON.parse(data.choices[0].message.content);
       } catch (e) {
@@ -81,8 +75,8 @@ class OpenAIClientService {
   }
 
   hasApiKey(): boolean {
-    // Check if server is available (keys are server-side)
-    return true; // Server will handle validation
+    // Keys are managed in Supabase Edge Functions
+    return true;
   }
 }
 

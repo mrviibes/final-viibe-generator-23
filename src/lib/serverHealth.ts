@@ -1,5 +1,5 @@
-// Server health check service for API validation
-import { getServerUrl } from '../config/runtime';
+// Server health check service using Supabase Edge Functions
+import { supabase } from "@/integrations/supabase/client";
 
 export interface ServerHealth {
   openaiAvailable: boolean;
@@ -22,15 +22,11 @@ class ServerHealthService {
     }
 
     try {
-      const response = await fetch(`${getServerUrl()}/health`, {
-        method: 'GET',
-      });
+      const { data, error } = await supabase.functions.invoke('health');
 
-      if (!response.ok) {
-        throw new Error(`Health check failed: ${response.status}`);
+      if (error) {
+        throw new Error(`Health check failed: ${error.message}`);
       }
-
-      const data = await response.json();
       
       this.healthCache = {
         openaiAvailable: !!data.keys?.openai,
