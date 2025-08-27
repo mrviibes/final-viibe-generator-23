@@ -19,7 +19,7 @@ export interface IdeogramGenerateRequest {
   prompt: string;
   aspect_ratio: 'ASPECT_10_16' | 'ASPECT_16_10' | 'ASPECT_9_16' | 'ASPECT_16_9' | 'ASPECT_3_2' | 'ASPECT_2_3' | 'ASPECT_4_3' | 'ASPECT_3_4' | 'ASPECT_1_1' | 'ASPECT_1_3' | 'ASPECT_3_1';
   model: 'V_1' | 'V_1_TURBO' | 'V_2' | 'V_2_TURBO' | 'V_2A' | 'V_2A_TURBO' | 'V_3';
-  magic_prompt_option: 'AUTO' | 'OFF';
+  magic_prompt_option: 'AUTO';
   seed?: number;
   style_type?: 'AUTO' | 'GENERAL' | 'REALISTIC' | 'DESIGN' | 'RENDER_3D' | 'ANIME';
   count?: number;
@@ -206,110 +206,62 @@ async function generateIdeogramImageFrontend(request: IdeogramGenerateRequest): 
   const settings = getProxySettings();
   
   const makeRequest = async (proxyType: ProxySettings['type'], currentModel: string): Promise<Response> => {
+    let url = IDEOGRAM_API_BASE;
     const headers: Record<string, string> = {
       'Api-Key': key,
+      'Content-Type': 'application/json',
     };
 
-    // Choose endpoint based on model
-    const baseUrl = currentModel === 'V_3' ? 'https://api.ideogram.ai/v3/generate' : IDEOGRAM_API_BASE;
-    let url = baseUrl;
-    
     // Configure URL and headers based on proxy type
     switch (proxyType) {
       case 'cors-anywhere':
-        url = PROXY_CONFIGS['cors-anywhere'] + baseUrl;
+        url = PROXY_CONFIGS['cors-anywhere'] + IDEOGRAM_API_BASE;
         headers['X-Requested-With'] = 'XMLHttpRequest';
         break;
       case 'proxy-cors-sh':
-        url = PROXY_CONFIGS['proxy-cors-sh'] + baseUrl;
+        url = PROXY_CONFIGS['proxy-cors-sh'] + IDEOGRAM_API_BASE;
         if (settings.apiKey) {
           headers['x-cors-api-key'] = settings.apiKey;
         }
         break;
       case 'allorigins':
-        url = PROXY_CONFIGS['allorigins'] + encodeURIComponent(baseUrl);
+        url = PROXY_CONFIGS['allorigins'] + encodeURIComponent(IDEOGRAM_API_BASE);
         break;
       case 'thingproxy':
-        url = PROXY_CONFIGS['thingproxy'] + baseUrl;
+        url = PROXY_CONFIGS['thingproxy'] + IDEOGRAM_API_BASE;
         break;
       case 'direct':
       default:
-        url = baseUrl;
+        // Use direct URL
         break;
     }
 
-    // Handle different request formats for V3 vs legacy models
-    let requestBody: string | FormData;
-    
-    if (currentModel === 'V_3') {
-      // V3 uses multipart/form-data
-      const formData = new FormData();
-      formData.append('prompt', request.prompt);
-      
-      // Map aspect_ratio to resolution for V3
-      const aspectToResolution: Record<string, string> = {
-        'ASPECT_1_1': '1024x1024',
-        'ASPECT_16_9': '1280x720',
-        'ASPECT_9_16': '720x1280',
-        'ASPECT_16_10': '1280x800',
-        'ASPECT_10_16': '800x1280',
-        'ASPECT_3_2': '1536x1024',
-        'ASPECT_2_3': '1024x1536',
-        'ASPECT_4_3': '1152x896',
-        'ASPECT_3_4': '896x1152',
-        'ASPECT_3_1': '1728x576',
-        'ASPECT_1_3': '576x1728'
-      };
-      
-      formData.append('resolution', aspectToResolution[request.aspect_ratio] || '1024x1024');
-      
-      if (request.seed !== undefined) {
-        formData.append('seed', request.seed.toString());
-      }
-      
-      // Map style_type to style for V3 if provided
-      if (request.style_type && request.style_type !== 'AUTO') {
-        const styleMapping: Record<string, string> = {
-          'GENERAL': 'general',
-          'REALISTIC': 'realistic',
-          'DESIGN': 'design',
-          'RENDER_3D': '3d_render',
-          'ANIME': 'anime'
-        };
-        if (styleMapping[request.style_type]) {
-          formData.append('style', styleMapping[request.style_type]);
-        }
-      }
-      
-      requestBody = formData;
-      // Don't set Content-Type for FormData - browser will set it with boundary
-    } else {
-      // Legacy models use JSON format
-      headers['Content-Type'] = 'application/json';
-      
-      const payload: any = {
-        prompt: request.prompt,
-        aspect_ratio: request.aspect_ratio,
-        model: currentModel,
-        magic_prompt_option: request.magic_prompt_option,
-      };
-      
-      if (request.seed !== undefined) {
-        payload.seed = request.seed;
-      }
-      
-      if (request.style_type) {
-        payload.style_type = request.style_type;
-      }
+    // Always use JSON format wrapped in image_request
+    // Use the model as requested (no forced downgrade)
+    let modelToUse = currentModel;
 
-      requestBody = JSON.stringify({ image_request: payload });
+    const payload: any = {
+      prompt: request.prompt,
+      aspect_ratio: request.aspect_ratio,
+      model: modelToUse,
+      magic_prompt_option: request.magic_prompt_option,
+    };
+    
+    if (request.seed !== undefined) {
+      payload.seed = request.seed;
     }
+    
+    if (request.style_type) {
+      payload.style_type = request.style_type;
+    }
+
+    const requestBody = JSON.stringify({ image_request: payload });
 
     // Debug log the request structure (without sensitive headers)
     console.log('Ideogram API request:', { 
       url: url.replace(key, '[REDACTED]'), 
       model: currentModel,
-      requestType: currentModel === 'V_3' ? 'multipart/form-data' : 'application/json'
+      payload: { ...payload, prompt: payload.prompt.substring(0, 50) + '...' }
     });
 
     return fetch(url, {
@@ -398,6 +350,15 @@ async function generateIdeogramImageFrontend(request: IdeogramGenerateRequest): 
       lastError = error instanceof Error ? error : new Error('Unknown error');
       console.log(`${proxyType} failed with model ${currentModel}:`, lastError.message);
       
+      // If V3 failed and we haven't tried V2A_TURBO yet, try downgrading
+      if (currentModel === 'V_3' && (error as any).status !== 403) {
+        try {
+          console.log('Retrying with V_2A_TURBO model...');
+          return await tryRequest(proxyType, 'V_2A_TURBO');
+        } catch (downgradeError) {
+          console.log(`${proxyType} also failed with V_2A_TURBO:`, downgradeError);
+        }
+      }
     }
   }
   // If all methods failed, throw the last error

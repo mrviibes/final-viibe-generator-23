@@ -9,13 +9,12 @@ const corsHeaders = {
 };
 
 const IDEOGRAM_API_BASE = 'https://api.ideogram.ai/generate';
-const IDEOGRAM_API_V3_BASE = 'https://api.ideogram.ai/v3/generate';
 
 interface IdeogramGenerateRequest {
   prompt: string;
   aspect_ratio: 'ASPECT_10_16' | 'ASPECT_16_10' | 'ASPECT_9_16' | 'ASPECT_16_9' | 'ASPECT_3_2' | 'ASPECT_2_3' | 'ASPECT_4_3' | 'ASPECT_3_4' | 'ASPECT_1_1' | 'ASPECT_1_3' | 'ASPECT_3_1';
   model: 'V_1' | 'V_1_TURBO' | 'V_2' | 'V_2_TURBO' | 'V_2A' | 'V_2A_TURBO' | 'V_3';
-  magic_prompt_option: 'AUTO' | 'OFF';
+  magic_prompt_option: 'AUTO';
   seed?: number;
   style_type?: 'AUTO' | 'GENERAL' | 'REALISTIC' | 'DESIGN' | 'RENDER_3D' | 'ANIME';
   count?: number;
@@ -45,131 +44,50 @@ serve(async (req) => {
       });
     }
 
-    // Always use the requested model (V_3)
-    const modelToUse = request.model;
+    // Use requested model, with fallback logic for V_3 if needed
+    let modelToUse = request.model;
+    let shouldRetryWithTurbo = false;
 
     const count = request.count || 1;
     console.log(`Ideogram API call - Model: ${modelToUse}, Count: ${count}, Prompt: ${request.prompt.substring(0, 50)}...`);
 
     if (count === 1) {
-      // Check if we need to use V3 endpoint
-      if (modelToUse === 'V_3') {
-        // V3 endpoint uses multipart/form-data
-        const formData = new FormData();
-        formData.append('prompt', request.prompt);
-        
-        // Map aspect_ratio to resolution for V3
-        const aspectToResolution: Record<string, string> = {
-          'ASPECT_1_1': '1024x1024',
-          'ASPECT_16_9': '1280x720',
-          'ASPECT_9_16': '720x1280',
-          'ASPECT_16_10': '1280x800',
-          'ASPECT_10_16': '800x1280',
-          'ASPECT_3_2': '1536x1024',
-          'ASPECT_2_3': '1024x1536',
-          'ASPECT_4_3': '1152x896',
-          'ASPECT_3_4': '896x1152',
-          'ASPECT_3_1': '1728x576',
-          'ASPECT_1_3': '576x1728'
-        };
-        
-        formData.append('resolution', aspectToResolution[request.aspect_ratio] || '1024x1024');
-        
-        if (request.seed !== undefined) {
-          formData.append('seed', request.seed.toString());
-        }
-        
-        // Map style_type to style for V3 if provided
-        if (request.style_type && request.style_type !== 'AUTO') {
-          const styleMapping: Record<string, string> = {
-            'GENERAL': 'general',
-            'REALISTIC': 'realistic',
-            'DESIGN': 'design',
-            'RENDER_3D': '3d_render',
-            'ANIME': 'anime'
-          };
-          if (styleMapping[request.style_type]) {
-            formData.append('style', styleMapping[request.style_type]);
-          }
-        }
+      // Single image generation (existing logic)
+      const payload: any = {
+        prompt: request.prompt,
+        aspect_ratio: request.aspect_ratio,
+        model: modelToUse,
+        magic_prompt_option: request.magic_prompt_option,
+      };
+      
+      if (request.seed !== undefined) {
+        payload.seed = request.seed;
+      }
+      
+      if (request.style_type) {
+        payload.style_type = request.style_type;
+      }
 
-        const response = await fetch(IDEOGRAM_API_V3_BASE, {
-          method: 'POST',
-          headers: {
-            'Api-Key': ideogramApiKey,
-          },
-          body: formData,
-        });
+      const requestBody = JSON.stringify({ image_request: payload });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`Ideogram V3 API error (${response.status}):`, errorText);
-          
-          let errorMessage = `HTTP ${response.status}`;
-          try {
-            const errorData = JSON.parse(errorText);
-            errorMessage = errorData.error?.message || errorMessage;
-          } catch {
-            errorMessage = errorText || errorMessage;
-          }
-
-          // Handle specific error cases
-          if (response.status === 400 && errorText.includes('content_filtering')) {
-            errorMessage = 'Content was filtered by Ideogram. Try rephrasing your prompt.';
-          } else if (response.status === 429) {
-            errorMessage = 'Rate limit exceeded. Please try again later.';
-          } else if (response.status === 401) {
-            errorMessage = 'Invalid API key. Please check your Ideogram API key.';
-          }
-
-          return new Response(JSON.stringify({ 
-            error: errorMessage,
-            status: response.status 
-          }), {
-            status: response.status,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-
-        const data = await response.json();
-        console.log(`Ideogram V3 API success - Generated ${data.data?.length || 0} image(s)`);
-        
-        return new Response(JSON.stringify(data), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      } else {
-        // Legacy models use the original endpoint
-        const payload: any = {
-          prompt: request.prompt,
-          aspect_ratio: request.aspect_ratio,
-          model: modelToUse,
-          magic_prompt_option: request.magic_prompt_option,
-        };
-        
-        if (request.seed !== undefined) {
-          payload.seed = request.seed;
-        }
-        
-        if (request.style_type) {
-          payload.style_type = request.style_type;
-        }
-
-        const requestBody = JSON.stringify({ image_request: payload });
-
-        const response = await fetch(IDEOGRAM_API_BASE, {
-          method: 'POST',
-          headers: {
-            'Api-Key': ideogramApiKey,
-            'Content-Type': 'application/json',
-          },
-          body: requestBody,
-        });
+      const response = await fetch(IDEOGRAM_API_BASE, {
+        method: 'POST',
+        headers: {
+          'Api-Key': ideogramApiKey,
+          'Content-Type': 'application/json',
+        },
+        body: requestBody,
+      });
 
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`Ideogram API error (${response.status}):`, errorText);
         
-        {
+        // If V_3 fails with certain errors, try fallback to Turbo
+        if (modelToUse === 'V_3' && (response.status === 400 || response.status === 500)) {
+          console.log('⚠️ V_3 failed, attempting fallback to V_2A_TURBO');
+          shouldRetryWithTurbo = true;
+        } else {
           let errorMessage = `HTTP ${response.status}`;
           try {
             const errorData = JSON.parse(errorText);
@@ -197,10 +115,75 @@ serve(async (req) => {
         }
       }
 
+      if (!shouldRetryWithTurbo) {
         const data = await response.json();
         console.log(`Ideogram API success - Generated ${data.data?.length || 0} image(s) with model ${modelToUse}`);
         
         return new Response(JSON.stringify(data), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      // Retry with Turbo if V_3 failed
+      if (shouldRetryWithTurbo) {
+        console.log('Retrying with V_2A_TURBO model...');
+        modelToUse = 'V_2A_TURBO';
+        
+        const fallbackPayload: any = {
+          prompt: request.prompt,
+          aspect_ratio: request.aspect_ratio,
+          model: modelToUse,
+          magic_prompt_option: request.magic_prompt_option,
+        };
+        
+        if (request.seed !== undefined) {
+          fallbackPayload.seed = request.seed;
+        }
+        
+        if (request.style_type) {
+          fallbackPayload.style_type = request.style_type;
+        }
+
+        const fallbackRequestBody = JSON.stringify({ image_request: fallbackPayload });
+
+        const fallbackResponse = await fetch(IDEOGRAM_API_BASE, {
+          method: 'POST',
+          headers: {
+            'Api-Key': ideogramApiKey,
+            'Content-Type': 'application/json',
+          },
+          body: fallbackRequestBody,
+        });
+
+        if (!fallbackResponse.ok) {
+          const errorText = await fallbackResponse.text();
+          console.error(`Fallback to Turbo also failed (${fallbackResponse.status}):`, errorText);
+          
+          let errorMessage = `HTTP ${fallbackResponse.status}`;
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.error?.message || errorMessage;
+          } catch {
+            errorMessage = errorText || errorMessage;
+          }
+
+          return new Response(JSON.stringify({ 
+            error: `V3 failed, Turbo fallback also failed: ${errorMessage}`,
+            status: fallbackResponse.status 
+          }), {
+            status: fallbackResponse.status,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const fallbackData = await fallbackResponse.json();
+        console.log(`Fallback success - Generated ${fallbackData.data?.length || 0} image(s) with Turbo`);
+        
+        // Add a note about the fallback
+        return new Response(JSON.stringify({
+          ...fallbackData,
+          _fallback_note: 'V3 had an issue; used Turbo instead'
+        }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -209,105 +192,43 @@ serve(async (req) => {
       const promises: Promise<any>[] = [];
       
       for (let i = 0; i < count; i++) {
-        if (modelToUse === 'V_3') {
-          // V3 endpoint with multipart/form-data
-          const formData = new FormData();
-          formData.append('prompt', request.prompt);
-          
-          // Map aspect_ratio to resolution for V3
-          const aspectToResolution: Record<string, string> = {
-            'ASPECT_1_1': '1024x1024',
-            'ASPECT_16_9': '1280x720',
-            'ASPECT_9_16': '720x1280',
-            'ASPECT_16_10': '1280x800',
-            'ASPECT_10_16': '800x1280',
-            'ASPECT_3_2': '1536x1024',
-            'ASPECT_2_3': '1024x1536',
-            'ASPECT_4_3': '1152x896',
-            'ASPECT_3_4': '896x1152',
-            'ASPECT_3_1': '1728x576',
-            'ASPECT_1_3': '576x1728'
-          };
-          
-          formData.append('resolution', aspectToResolution[request.aspect_ratio] || '1024x1024');
-          
-          if (request.seed !== undefined) {
-            formData.append('seed', (request.seed + i).toString());
-          }
-          
-          // Map style_type to style for V3 if provided
-          if (request.style_type && request.style_type !== 'AUTO') {
-            const styleMapping: Record<string, string> = {
-              'GENERAL': 'general',
-              'REALISTIC': 'realistic',
-              'DESIGN': 'design',
-              'RENDER_3D': '3d_render',
-              'ANIME': 'anime'
-            };
-            if (styleMapping[request.style_type]) {
-              formData.append('style', styleMapping[request.style_type]);
-            }
-          }
-
-          promises.push(
-            fetch(IDEOGRAM_API_V3_BASE, {
-              method: 'POST',
-              headers: {
-                'Api-Key': ideogramApiKey,
-              },
-              body: formData,
-            }).then(async (response) => {
-              if (!response.ok) {
-                const errorText = await response.text();
-                console.error(`Ideogram V3 API error for image ${i + 1} (${response.status}):`, errorText);
-                return null;
-              }
-              return response.json();
-            }).catch((error) => {
-              console.error(`Network error for V3 image ${i + 1}:`, error);
-              return null;
-            })
-          );
-        } else {
-          // Legacy models use the original endpoint
-          const payload: any = {
-            prompt: request.prompt,
-            aspect_ratio: request.aspect_ratio,
-            model: modelToUse,
-            magic_prompt_option: request.magic_prompt_option,
-          };
-          
-          if (request.seed !== undefined) {
-            payload.seed = request.seed + i; // Vary seed for different results
-          }
-          
-          if (request.style_type) {
-            payload.style_type = request.style_type;
-          }
-
-          const requestBody = JSON.stringify({ image_request: payload });
-
-          promises.push(
-            fetch(IDEOGRAM_API_BASE, {
-              method: 'POST',
-              headers: {
-                'Api-Key': ideogramApiKey,
-                'Content-Type': 'application/json',
-              },
-              body: requestBody,
-            }).then(async (response) => {
-              if (!response.ok) {
-                const errorText = await response.text();
-                console.error(`Ideogram API error for image ${i + 1} (${response.status}):`, errorText);
-                return null; // Return null for failed images
-              }
-              return response.json();
-            }).catch((error) => {
-              console.error(`Network error for image ${i + 1}:`, error);
-              return null;
-            })
-          );
+        const payload: any = {
+          prompt: request.prompt,
+          aspect_ratio: request.aspect_ratio,
+          model: modelToUse,
+          magic_prompt_option: request.magic_prompt_option,
+        };
+        
+        if (request.seed !== undefined) {
+          payload.seed = request.seed + i; // Vary seed for different results
         }
+        
+        if (request.style_type) {
+          payload.style_type = request.style_type;
+        }
+
+        const requestBody = JSON.stringify({ image_request: payload });
+
+        promises.push(
+          fetch(IDEOGRAM_API_BASE, {
+            method: 'POST',
+            headers: {
+              'Api-Key': ideogramApiKey,
+              'Content-Type': 'application/json',
+            },
+            body: requestBody,
+          }).then(async (response) => {
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error(`Ideogram API error for image ${i + 1} (${response.status}):`, errorText);
+              return null; // Return null for failed images
+            }
+            return response.json();
+          }).catch((error) => {
+            console.error(`Network error for image ${i + 1}:`, error);
+            return null;
+          })
+        );
       }
 
       const results = await Promise.all(promises);

@@ -17,7 +17,6 @@ export interface VisualOption {
   background: string;
   prompt: string;
   slot?: string;
-  isSinglePerson?: boolean; // Flag to indicate single-person option
 }
 
 export interface VisualResult {
@@ -241,10 +240,9 @@ function getSlotBasedFallbacks(inputs: VisualInputs): VisualOption[] {
     },
     {
       slot: "singing",
-      subject: "Solo person singing or performing",
+      subject: `${needsPeople ? `${peopleContext} singing or performing` : 'Musical performance scene with performers'}`,
       background: `Concert or performance stage with ${tone} lighting, ${primaryTags} elements, and visible audience`,
-      prompt: `One person singing or performing positioned off-center on concert stage with ${tone} lighting, ${primaryTags} elements, audience clearly visible in background [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: limbs crossing center, harsh shadows in safe zone, multiple performers, groups] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: light text]`,
-      isSinglePerson: true
+      prompt: `${needsPeople ? `${peopleContext} singing or performing` : 'Musical performance scene with performers'} positioned off-center on concert stage with ${tone} lighting, ${primaryTags} elements, audience clearly visible in background [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: limbs crossing center, harsh shadows in safe zone, empty audience areas] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: light text]`
     }
   ];
 }
@@ -266,8 +264,7 @@ RULES:
 - CRITICAL: Visual concepts MUST relate to the provided text/joke content and tone
 - For Pride themes: Include rainbow, drag queens, parades, celebrations, fabulous elements
 - For jokes: Match the humor and subject matter exactly
-- SINGING SLOT: Always show ONE solo person singing/performing (not groups or crowds)
-- SINGLE-PERSON PRIORITY: At least one concept must feature a single individual as the main subject
+- SINGING SLOT: Always include musical/performance elements in the 4th option
 
 Format:
 {
@@ -364,31 +361,6 @@ JSON only.`;
 
     // Apply quality validation to reject vague options
     validOptions = validateVisualOptions(validOptions, enrichedInputs);
-
-    // Ensure at least one single-person option exists
-    const hasSinglePersonOption = validOptions.some(opt => 
-      opt.slot === 'singing' || 
-      opt.isSinglePerson ||
-      (opt.subject.toLowerCase().includes('person ') && !opt.subject.toLowerCase().includes('people'))
-    );
-
-    if (!hasSinglePersonOption && validOptions.length > 0) {
-      // Convert a group option to single-person if no solo option exists
-      const groupOptionIndex = validOptions.findIndex(opt => 
-        opt.subject.toLowerCase().includes('people') || 
-        opt.subject.toLowerCase().includes('group') ||
-        opt.subject.toLowerCase().includes('crowd')
-      );
-      
-      if (groupOptionIndex !== -1) {
-        validOptions[groupOptionIndex] = {
-          ...validOptions[groupOptionIndex],
-          subject: validOptions[groupOptionIndex].subject.replace(/people|group|crowd/gi, 'person'),
-          prompt: validOptions[groupOptionIndex].prompt.replace(/people|group|crowd/gi, 'person').replace(/multiple/gi, 'single'),
-          isSinglePerson: true
-        };
-      }
-    }
 
     // If we rejected too many options, fill with high-quality fallbacks
     if (validOptions.length < 4) {
