@@ -5916,7 +5916,7 @@ const Index = () => {
                                 Option {index + 1}
                               </span>
                             </div>
-                            <p className="text-sm text-card-foreground leading-relaxed">
+                            <p className="text-sm text-card-foreground leading-relaxed whitespace-pre-line">
                               {option}
                             </p>
                           </div>
@@ -6572,10 +6572,10 @@ const Index = () => {
                         <td className="p-3 text-sm">Tone</td>
                         <td className="p-3 text-sm">{selectedTextStyle ? textStyleOptions.find(ts => ts.id === selectedTextStyle)?.name : "Not selected"}</td>
                       </tr>
-                      <tr>
-                        <td className="p-3 text-sm">Final Text</td>
-                        <td className="p-3 text-sm">{selectedGeneratedOption || stepTwoText || "Not generated"}</td>
-                      </tr>
+                       <tr>
+                         <td className="p-3 text-sm">Final Text</td>
+                         <td className="p-3 text-sm whitespace-pre-line">{selectedGeneratedOption || stepTwoText || "Not generated"}</td>
+                       </tr>
                       <tr>
                         <td className="p-3 text-sm">Visual Style</td>
                         <td className="p-3 text-sm">{selectedVisualStyle || "Not selected"}</td>

@@ -36,12 +36,12 @@ export function StackedSelectionCard({ selections }: StackedSelectionCardProps) 
                 </button>
               </div>
               {selection.subtitle && (
-                <p className="text-sm text-muted-foreground mb-1">
+                <p className="text-sm text-muted-foreground mb-1 whitespace-pre-line">
                   {selection.subtitle}
                 </p>
               )}
               {selection.description && (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground whitespace-pre-line">
                   {selection.description}
                 </p>
               )}

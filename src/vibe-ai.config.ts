@@ -493,13 +493,51 @@ function spellcheck(s: string): string[] {
   return issues;
 }
 
-export function postProcessLine(line: string, tone: string, requiredTags?: string[]): VibeCandidate {
+export function postProcessLine(line: string, tone: string, requiredTags?: string[], options?: { allowNewlines?: boolean; format?: 'knockknock' }): VibeCandidate {
   // Trim spaces
   let cleaned = line.trim();
   
-  // Remove banned patterns (emojis, hashtags, quotes, newlines)
-  for (const pattern of BANNED_PATTERNS) {
-    cleaned = cleaned.replace(pattern, '');
+  // Handle knock-knock format
+  const isKnockKnock = options?.format === 'knockknock';
+  
+  if (isKnockKnock) {
+    // For knock-knock jokes, validate the 5-line structure
+    const lines = cleaned.split('\n');
+    if (lines.length !== 5) {
+      return {
+        line: TONE_FALLBACKS[tone.toLowerCase()] || TONE_FALLBACKS.humorous,
+        blocked: true,
+        reason: 'Invalid knock-knock structure - needs exactly 5 lines'
+      };
+    }
+    
+    // Validate basic knock-knock pattern (tolerant)
+    const knockKnockPattern = /knock[,\s]*knock/i;
+    const whoTherePattern = /who'?s\s+there/i;
+    const whoPattern = /who\?/i;
+    
+    if (!knockKnockPattern.test(lines[0]) || 
+        !whoTherePattern.test(lines[1]) || 
+        !whoPattern.test(lines[3])) {
+      return {
+        line: TONE_FALLBACKS[tone.toLowerCase()] || TONE_FALLBACKS.humorous,
+        blocked: true,
+        reason: 'Invalid knock-knock pattern'
+      };
+    }
+    
+    // Use higher length cap for knock-knock (180 chars total, ~60 per line max)
+    if (cleaned.length > 180) {
+      cleaned = cleaned.slice(0, 180);
+    }
+    
+    // Skip savage tone block for knock-knock format and don't remove newlines
+    // Still check for banned words but allow the structure
+  } else {
+    // Remove banned patterns (emojis, hashtags, quotes, newlines) for non-knock-knock
+    for (const pattern of BANNED_PATTERNS) {
+      cleaned = cleaned.replace(pattern, '');
+    }
   }
   
   // Apply text normalization and fixes
@@ -521,9 +559,10 @@ export function postProcessLine(line: string, tone: string, requiredTags?: strin
   // Remove double spaces and clean up
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
   
-  // Hard truncate to 100 characters
-  if (cleaned.length > 100) {
-    cleaned = cleaned.slice(0, 100);
+  // Hard truncate to 100 characters (or 180 for knock-knock)
+  const maxLength = isKnockKnock ? 180 : 100;
+  if (cleaned.length > maxLength) {
+    cleaned = cleaned.slice(0, maxLength);
   }
   
   // Check for banned words
@@ -547,8 +586,8 @@ export function postProcessLine(line: string, tone: string, requiredTags?: strin
     };
   }
   
-  // Enforce savage tone quality - block joke-like content for savage
-  if (tone.toLowerCase() === 'savage') {
+  // Enforce savage tone quality - block joke-like content for savage (skip for knock-knock)
+  if (tone.toLowerCase() === 'savage' && !isKnockKnock) {
     // Block obvious joke patterns that don't fit savage tone
     if (cleaned.match(/^(why did|what do you call|knock knock)/i) || 
         cleaned.match(/\?\!*$/i) ||
@@ -1060,6 +1099,40 @@ export function getStyleKeywords(visualStyle?: string): string {
 
 // Builder for vibe generator chat messages
 export function buildVibeGeneratorMessages(inputs: VibeInputs): Array<{role: string; content: string}> {
+  // Check for knock-knock jokes
+  const isKnockKnock = inputs.subcategory?.toLowerCase().includes("knock");
+  
+  if (isKnockKnock) {
+    console.log("🪵 Using knock-knock format");
+    
+    const recipientInstruction = inputs.recipient_name && inputs.recipient_name !== "-" 
+      ? `\n• Incorporate "${inputs.recipient_name}" naturally into the setup or punchline (PG-rated, no slurs)`
+      : '';
+    
+    const corePrompt = `Generate 6 knock-knock joke options. Each joke must be exactly 5 lines with newlines between them:
+
+Line 1: "Knock, knock."
+Line 2: "Who's there?"
+Line 3: [Setup word or name]
+Line 4: [Setup] who?
+Line 5: [Punchline]
+
+Category: ${inputs.category} > ${inputs.subcategory}
+Tone: ${inputs.tone}
+${inputs.recipient_name && inputs.recipient_name !== "-" ? `Target: ${inputs.recipient_name}` : ''}${recipientInstruction}
+
+Each joke should be a single string with actual newline characters (\\n) between the 5 lines.
+Keep total length under 180 characters including newlines.
+
+Return only: {"lines":["joke1\\nwith\\nnewlines","joke2\\nwith\\nnewlines","joke3\\nwith\\nnewlines","joke4\\nwith\\nnewlines","joke5\\nwith\\nnewlines","joke6\\nwith\\nnewlines"]}`;
+
+    return [
+      { role: 'system', content: 'Generate proper 5-line knock-knock jokes with newlines. JSON array only. No explanations.' },
+      { role: 'user', content: corePrompt }
+    ];
+  }
+
+  // Original logic for non-knock-knock content
   const isMovie = inputs.category === "Pop Culture" && inputs.subcategory?.toLowerCase().includes("movie");
   const hasQuotes = inputs.tags?.some(tag => tag.toLowerCase().includes("quote")) || false;
   const hasPersonalRoast = inputs.tags?.some(tag => 

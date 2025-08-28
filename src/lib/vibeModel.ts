@@ -60,8 +60,12 @@ async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: st
       throw new Error('Invalid response format - no lines array');
     }
     
+    // Check if this is knock-knock format
+    const isKnockKnock = inputs.subcategory?.toLowerCase().includes("knock");
+    const postProcessOptions = isKnockKnock ? { allowNewlines: true, format: 'knockknock' as const } : undefined;
+    
     // Post-process each line with tag validation
-    const candidates = lines.map((line: string) => postProcessLine(line, inputs.tone, inputs.tags));
+    const candidates = lines.map((line: string) => postProcessLine(line, inputs.tone, inputs.tags, postProcessOptions));
     
     // Add API metadata to candidates for later extraction
     if (apiMeta && candidates.length > 0) {
