@@ -1140,6 +1140,12 @@ export function buildVisualGeneratorMessages(inputs: any): Array<{role: string; 
 Tags: ${tags.slice(0, 4).join(', ')}
 ${finalLine ? `JOKE/TEXT: "${finalLine}" - VISUAL CONCEPTS MUST MATCH THIS CONTENT AND TONE` : ''}
 
+TEXT ALIGNMENT REQUIREMENTS (CRITICAL):
+${finalLine ? `- AT LEAST TWO concepts must directly reflect the exact content/semantics of: "${finalLine}"
+- Avoid unrelated gag props (rubber chickens, potatoes, random animals) unless the text mentions them
+- For award/Oscar references, emphasize documentary/poster-like interpretations
+- For LGBTQ/pride themes, include appropriate visual cues (rainbow accents, wardrobe elements)` : ''}
+
 REQUIRED OBJECTS/SUBJECTS (must be visible in each concept):
 - ${subcategory === 'Ice Hockey' ? 'hockey stick and puck' : 'relevant category objects'}
 - Specific, tangible items matching the theme${additionalRequirements}

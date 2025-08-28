@@ -6125,9 +6125,9 @@ const Index = () => {
                 }}>
                                <CardHeader className="pb-2">
                                  <div className="flex items-center justify-between">
-                                   <CardTitle className="text-base font-semibold text-card-foreground">
-                                     Option {index + 1} ({option.slot?.replace('-', ' ') || 'Visual'})
-                                   </CardTitle>
+                                    <CardTitle className="text-base font-semibold text-card-foreground">
+                                      Option {index + 1} ({option.slot?.replace('-', ' ') || 'Visual'}){option.textAligned ? ' 🎯' : ''}
+                                    </CardTitle>
                                    {visualModel === 'fallback' && (
                                      <Badge variant="secondary" className="text-xs">
                                        {visualRecommendations?.errorCode === 'timeout' ? 'Timeout' : 

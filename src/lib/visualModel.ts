@@ -21,6 +21,7 @@ export interface VisualOption {
   background: string;
   prompt: string;
   slot?: string;
+  textAligned?: boolean;
 }
 
 export interface VisualResult {
@@ -128,6 +129,52 @@ function hasVagueFillers(text: string): boolean {
   return vaguePatterns.some(pattern => pattern.test(text));
 }
 
+function extractKeywordsFromText(text: string): string[] {
+  // Extract meaningful keywords from the user's text
+  const words = text.toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .split(/\s+/)
+    .filter(word => word.length > 2);
+  
+  const stopWords = new Set(['the', 'and', 'but', 'for', 'are', 'you', 'all', 'can', 'had', 'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his', 'how', 'man', 'new', 'now', 'old', 'see', 'two', 'way', 'who', 'boy', 'did', 'its', 'let', 'put', 'say', 'she', 'too', 'use', 'any', 'win', 'best', 'would', 'could']);
+  
+  return words
+    .filter(word => !stopWords.has(word))
+    .slice(0, 8); // Extract up to 8 keywords
+}
+
+function computeTextAlignmentScore(option: VisualOption, finalLine: string): number {
+  if (!finalLine) return 0;
+  
+  const keywords = extractKeywordsFromText(finalLine);
+  const fullText = `${option.subject || ''} ${option.background || ''} ${option.prompt}`.toLowerCase();
+  
+  let score = 0;
+  
+  // Check for exact keyword matches (weighted heavily)
+  keywords.forEach(keyword => {
+    if (fullText.includes(keyword)) {
+      score += 3;
+    }
+  });
+  
+  // Check for semantic concepts
+  if (finalLine.toLowerCase().includes('oscar') && fullText.includes('award')) score += 2;
+  if (finalLine.toLowerCase().includes('documentary') && (fullText.includes('poster') || fullText.includes('film'))) score += 2;
+  if ((finalLine.toLowerCase().includes('gay') || finalLine.toLowerCase().includes('pride')) && fullText.includes('rainbow')) score += 2;
+  if (finalLine.toLowerCase().includes('cross') && fullText.includes('dress')) score += 2;
+  
+  // Penalize unrelated gag props
+  const gagProps = ['potato', 'chicken', 'rubber', 'banana', 'whoopee', 'gnome'];
+  gagProps.forEach(prop => {
+    if (fullText.includes(prop) && !finalLine.toLowerCase().includes(prop)) {
+      score -= 2;
+    }
+  });
+  
+  return Math.max(0, score);
+}
+
 function validateVisualOptions(options: VisualOption[], inputs: VisualInputs): VisualOption[] {
   if (!options || options.length === 0) return [];
   
@@ -178,10 +225,74 @@ function validateVisualOptions(options: VisualOption[], inputs: VisualInputs): V
     }
   }
   
+  // Compute text alignment scores and reorder
+  if (inputs.finalLine) {
+    const optionsWithScores = dedupedOptions.map(opt => ({
+      option: opt,
+      score: computeTextAlignmentScore(opt, inputs.finalLine!)
+    }));
+    
+    console.log('📊 Text alignment scores:', optionsWithScores.map(item => ({
+      subject: item.option.subject?.substring(0, 40) + '...',
+      score: item.score
+    })));
+    
+    // Sort by score (descending)
+    optionsWithScores.sort((a, b) => b.score - a.score);
+    
+    // Add alignment indicators
+    const reorderedOptions = optionsWithScores.map(item => ({
+      ...item.option,
+      textAligned: item.score >= 3
+    }));
+    
+    return reorderedOptions.slice(0, 4);
+  }
+  
   return dedupedOptions.slice(0, 4); // Ensure max 4 options
 }
 
 function getSlotBasedFallbacks(inputs: VisualInputs): VisualOption[] {
+  const { category, subcategory, tone, tags, visualStyle, finalLine, specificEntity, subjectOption, dimensions } = inputs;
+  const primaryTags = tags.slice(0, 3).join(', ') || 'dynamic energy';
+  const occasion = subcategory || 'general';
+  
+  // Text-aware fallbacks if finalLine exists
+  if (finalLine) {
+    const keywords = extractKeywordsFromText(finalLine);
+    console.log('🎯 Generating text-aware fallbacks for keywords:', keywords);
+    
+    const textAwareFallbacks: VisualOption[] = [];
+    
+    // Documentary/Award theme fallback
+    if (finalLine.toLowerCase().includes('oscar') || finalLine.toLowerCase().includes('award')) {
+      textAwareFallbacks.push({
+        subject: "Documentary poster motif with Oscar silhouette and subtle rainbow accents",
+        background: "Realistic studio or festival wall with soft vignette and empty central space",
+        prompt: `Documentary-style poster concept featuring an Oscar silhouette and subtle rainbow accents, realistic modern composition with clean central negative space for large text [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [TEXT_HINT: dark text]`,
+        textAligned: true
+      });
+    }
+    
+    // Cross-dressing/Pride theme fallback
+    if (finalLine.toLowerCase().includes('gay') || finalLine.toLowerCase().includes('cross') || finalLine.toLowerCase().includes('pride')) {
+      textAwareFallbacks.push({
+        subject: "Wardrobe and mirror scene with cross-dressing elements and rainbow accents",
+        background: "Clean dressing room with soft lighting, leaving open area for text",
+        prompt: `Realistic dressing room scene with tasteful wardrobe cues (heels, blazer-over-dress on hanger, lipstick on vanity), subtle rainbow color accents, uncluttered background with clear negative space for text [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [TEXT_HINT: dark text]`,
+        textAligned: true
+      });
+    }
+    
+    if (textAwareFallbacks.length > 0) {
+      return textAwareFallbacks.concat(getDefaultFallbacks(inputs)).slice(0, 4);
+    }
+  }
+  
+  return getDefaultFallbacks(inputs);
+}
+
+function getDefaultFallbacks(inputs: VisualInputs): VisualOption[] {
   const { category, subcategory, tone, tags, visualStyle, finalLine, specificEntity, subjectOption, dimensions } = inputs;
   const primaryTags = tags.slice(0, 3).join(', ') || 'dynamic energy';
   const occasion = subcategory || 'general';
@@ -414,8 +525,25 @@ export async function generateVisualRecommendations(
     // Apply quality validation to reject vague options
     validOptions = validateVisualOptions(validOptions, enrichedInputs);
 
-    // If we rejected too many options, fill with high-quality fallbacks
-    if (validOptions.length < 4) {
+    // Check if we have enough text-aligned options
+    const textAlignedCount = validOptions.filter((opt: any) => opt.textAligned).length;
+    const needsMinimumAligned = enrichedInputs.finalLine && textAlignedCount < 2;
+    
+    if (needsMinimumAligned) {
+      console.log(`⚠️ Only ${textAlignedCount} text-aligned options, synthesizing fallbacks`);
+      const fallbacks = getSlotBasedFallbacks(enrichedInputs);
+      const syntheticAligned = fallbacks.filter(opt => opt.textAligned).slice(0, 2 - textAlignedCount);
+      
+      // Merge: aligned options first, then synthetics, then remaining
+      validOptions = [
+        ...validOptions.filter((opt: any) => opt.textAligned),
+        ...syntheticAligned,
+        ...validOptions.filter((opt: any) => !opt.textAligned),
+        ...fallbacks.filter(opt => !opt.textAligned)
+      ].slice(0, 4);
+      
+      console.log('🔄 Merged options with synthetic text-aligned fallbacks');
+    } else if (validOptions.length < 4) {
       console.warn(`⚠️ Only ${validOptions.length} quality options generated, adding fallbacks`);
       const fallbacks = getSlotBasedFallbacks(enrichedInputs);
       validOptions = [...validOptions, ...fallbacks].slice(0, 4);
