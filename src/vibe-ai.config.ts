@@ -42,10 +42,25 @@ export function getRuntimeOverrides(): AIRuntimeOverrides {
         localStorage.removeItem('ideogram_selected_model');
       }
     }
+
+    // Set fast defaults if not explicitly set
+    if (overrides.strictModelEnabled === undefined) {
+      overrides.strictModelEnabled = true;
+    }
+    if (overrides.fastVisualsEnabled === undefined) {
+      overrides.fastVisualsEnabled = true;
+    }
+    if (overrides.model === undefined) {
+      overrides.model = 'gpt-4o-mini';
+    }
     
     return overrides;
   } catch {
-    return {};
+    return {
+      strictModelEnabled: true,
+      fastVisualsEnabled: true,
+      model: 'gpt-4o-mini'
+    };
   }
 }
 
@@ -207,8 +222,9 @@ export const MODEL_FALLBACK_CHAINS = {
 
 // Available models for UI
 export const AVAILABLE_MODELS = [
+  { value: 'gpt-4o-mini', label: 'GPT-4o Mini (Fast)', isRecommended: true },
+  { value: 'gpt-5-mini-2025-08-07', label: 'GPT-5 Mini', isRecommended: false },
   { value: 'gpt-5-2025-08-07', label: 'GPT-5 (Flagship)', isRecommended: false },
-  { value: 'gpt-5-mini-2025-08-07', label: 'GPT-5 Mini', isRecommended: true },
   { value: 'gpt-4.1-2025-04-14', label: 'GPT-4.1', isRecommended: false },
   { value: 'o4-mini-2025-04-16', label: 'O4 Mini (Fast Reasoning)', isRecommended: false },
   { value: 'o3-2025-04-16', label: 'O3 (Powerful Reasoning)', isRecommended: false },
@@ -256,13 +272,13 @@ export const AI_CONFIG = {
   generation: {
     max_candidates: 6,
     temperature: 0.7,
-    max_tokens: 150,
-    model: 'gpt-5-mini-2025-08-07' // High-quality model for better spelling accuracy
+    max_tokens: 120, // Reduced for faster generation
+    model: 'gpt-4o-mini' // Fast mini model by default
   },
   visual_generation: {
     max_tokens: 450, // Reduced for faster concepts
-    fast_max_tokens: 180, // For ultra-fast 3-6s generation
-    model: 'gpt-5-mini-2025-08-07' // Use selected model from settings
+    fast_max_tokens: 160, // For ultra-fast 3-4.5s generation
+    model: 'gpt-4o-mini' // Fast mini model by default
   }
 };
 

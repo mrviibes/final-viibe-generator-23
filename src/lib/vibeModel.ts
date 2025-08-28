@@ -46,8 +46,11 @@ async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: st
     // Use centralized message builder
     const messages = buildVibeGeneratorMessages(inputs);
     
+    // Use smaller token budget for faster generation with mini models
+    const maxTokens = targetModel === 'gpt-4o-mini' ? 120 : config.generation.max_tokens;
+    
     const result = await openAIService.chatJSON(messages, {
-      max_tokens: config.generation.max_tokens,
+      max_completion_tokens: maxTokens,
       temperature: config.generation.temperature,
       model: targetModel
     });
@@ -112,7 +115,7 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
   
   // Get the effective config to check if strict mode is enabled
   const config = getEffectiveConfig();
-  const strictModeEnabled = getRuntimeOverrides().strictModelEnabled ?? false;
+  const strictModeEnabled = getRuntimeOverrides().strictModelEnabled ?? true; // Default to true for speed
   
   // Quality retry: if we have < 4 valid lines, spelling issues, and strict mode is disabled
   if (uniqueValidLines.length < 4 && spellingFiltered > 0 && !strictModeEnabled) {

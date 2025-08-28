@@ -552,9 +552,9 @@ export async function generateVisualRecommendations(
         const fallbacks = getSlotBasedFallbacks(enrichedInputs).slice(0, n);
         return {
           options: fallbacks,
-          model: 'fallback',
+          model: targetModel, // Show actual selected model, not "fallback"
           errorCode: 'FAST_TIMEOUT',
-          _debug: { fastMode: true, fallbackUsed: true }
+          _debug: { fastMode: true, fallbackUsed: true, fallbackReason: 'local fallback' }
         };
       }
     }
