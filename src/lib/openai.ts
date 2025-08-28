@@ -119,12 +119,12 @@ export class OpenAIService {
       
       console.log(`Backend API Response - Model: ${model}, Finish Reason: ${finishReason}, Content Length: ${content?.length || 0}`);
       
-      if (!content || content.trim() === '') {
-        if (finishReason === 'length') {
-          throw new Error('Response truncated - prompt too long. Try shorter input.');
-        }
-        throw new Error(`No content received from backend API (finish_reason: ${finishReason})`);
+    if (!content || content.trim() === '') {
+      if (finishReason === 'length') {
+        throw new Error('Ran out of output tokens - try shorter content or increase token limit.');
       }
+      throw new Error(`No content received from backend API (finish_reason: ${finishReason})`);
+    }
 
       // Parse JSON response
       try {
@@ -267,12 +267,45 @@ export class OpenAIService {
         return result;
       } catch (error) {
         console.error(`❌ Text generation failed with ${MODEL_DISPLAY_NAMES[tryModel] || tryModel}:`, error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
         lastError = error as Error;
         retryAttempt++;
         
         // Don't retry if it's an auth error
-        if (error instanceof Error && error.message.includes('401')) {
+        if (errorMessage.includes('401')) {
           throw error;
+        }
+        
+        // Smart retry for token exhaustion - retry once on same model with higher budget
+        if (errorMessage.includes('Ran out of output tokens') && retryAttempt === 1) {
+          console.log(`🔄 Token exhaustion detected, retrying ${MODEL_DISPLAY_NAMES[tryModel] || tryModel} with higher token budget`);
+          try {
+            const higherTokens = Math.round((max_completion_tokens || max_tokens) * 1.5);
+            const retryResult = await this.attemptChatJSON(messages, { 
+              temperature, 
+              max_tokens: higherTokens, 
+              max_completion_tokens: higherTokens, 
+              model: tryModel 
+            });
+            
+            if (retryResult && typeof retryResult === 'object') {
+              retryResult._apiMeta = {
+                modelUsed: tryModel,
+                textSpeed: this.textSpeed,
+                retryAttempt: 1,
+                originalModel: model !== tryModel ? model : undefined,
+                fallbackReason: 'Token budget retry',
+                apiSource: shouldUseMyKey ? 'my_key' : 'server',
+                strictMode: isStrictMode
+              };
+            }
+            
+            console.log(`✅ Token budget retry successful with ${MODEL_DISPLAY_NAMES[tryModel] || tryModel}`);
+            return retryResult;
+          } catch (retryError) {
+            console.error(`❌ Token budget retry failed:`, retryError);
+            // Continue to next model in fallback chain
+          }
         }
         
         // If in strict mode, don't retry with other models
@@ -353,7 +386,7 @@ export class OpenAIService {
     
     if (!content || content.trim() === '') {
       if (finishReason === 'length') {
-        throw new Error('Response truncated - prompt too long. Try shorter input.');
+        throw new Error('Ran out of output tokens - try shorter content or increase token limit.');
       }
       throw new Error(`No content received from OpenAI (finish_reason: ${finishReason})`);
     }

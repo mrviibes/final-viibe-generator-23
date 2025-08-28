@@ -264,9 +264,9 @@ export const AI_CONFIG = {
     popCultureAllowsSecondary: (cat: Category) => cat === "Pop Culture"
   },
   generation: {
-    max_candidates: 6,
+    max_candidates: 4, // Reduced from 6 to fit within token limits
     temperature: 0.7,
-    max_tokens: 220, // Increased to reduce length truncation errors
+    max_tokens: 480, // Increased significantly to handle 4 JSON options
     model: 'gpt-5-mini-2025-08-07' // High-quality model for better spelling accuracy
   },
   visual_generation: {
@@ -1079,7 +1079,7 @@ export function buildVibeGeneratorMessages(inputs: VibeInputs): Array<{role: str
     ? `\n• Aim to include or reference these tags naturally (paraphrasing is fine): ${inputs.tags.join(', ')}`
     : '';
 
-  const corePrompt = `Generate 6 concise options under 100 chars each for:
+  const corePrompt = `Generate 4 concise options under 100 chars each for:
 Category: ${inputs.category} > ${inputs.subcategory}
 Tone: ${inputs.tone}
 Tags: ${inputs.tags?.join(', ') || 'none'}
@@ -1087,7 +1087,7 @@ ${inputs.recipient_name && inputs.recipient_name !== "-" ? `Target: ${inputs.rec
 
 ${tagRequirement}${specialInstructions}
 
-Return only: {"lines":["option1","option2","option3","option4","option5","option6"]}`;
+Return only: {"lines":["option1","option2","option3","option4"]}`;
 
   const systemMessage = inputs.tone === 'Savage' 
     ? 'Generate short, savage roasts/burns. Make them cutting and direct, NOT joke-like. JSON array only.'
