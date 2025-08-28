@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, RotateCcw, Settings, AlertTriangle } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { ArrowLeft, RotateCcw, Settings, AlertTriangle, Info } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -84,6 +85,21 @@ export default function AiSettings() {
     const newOverrides = { ...overrides, [key]: value };
     setOverrides(newOverrides);
     setHasChanges(true);
+  };
+
+  // Helper to check if current model supports temperature
+  const isTemperatureSupported = (modelId: string) => {
+    return !modelId.includes('gpt-5') && !modelId.includes('o3');
+  };
+
+  const currentModel = overrides.model || AI_CONFIG.generation.model;
+  const temperatureSupported = isTemperatureSupported(currentModel);
+
+  // Clamp temperature to valid range
+  const handleTemperatureChange = (value: number | number[]) => {
+    const temp = Array.isArray(value) ? value[0] : value;
+    const clampedTemp = Math.max(0, Math.min(2, temp));
+    updateOverride('temperature', clampedTemp);
   };
 
   const saveChanges = () => {
@@ -213,8 +229,47 @@ export default function AiSettings() {
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="temperature">Temperature: {overrides.temperature ?? AI_CONFIG.generation.temperature}</Label>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="temperature">
+                    Temperature: {(overrides.temperature ?? AI_CONFIG.generation.temperature).toFixed(1)}
+                  </Label>
+                  {!temperatureSupported && (
+                    <Badge variant="secondary" className="gap-1">
+                      <Info className="h-3 w-3" />
+                      Ignored by {currentModel.includes('gpt-5') ? 'GPT-5' : 'O3'}
+                    </Badge>
+                  )}
+                </div>
+                
+                {!temperatureSupported && (
+                  <div className="flex items-start gap-2 p-3 bg-muted rounded-lg">
+                    <AlertTriangle className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-muted-foreground">
+                      <p className="font-medium">Temperature Not Supported</p>
+                      <p>The selected model ({currentModel.includes('gpt-5') ? 'GPT-5' : 'O3'}) automatically optimizes creativity and ignores the temperature parameter.</p>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="space-y-3">
+                  <Slider
+                    value={[overrides.temperature ?? AI_CONFIG.generation.temperature]}
+                    onValueChange={handleTemperatureChange}
+                    max={2}
+                    min={0}
+                    step={0.1}
+                    className={`w-full ${!temperatureSupported ? 'opacity-50' : ''}`}
+                    disabled={!temperatureSupported}
+                  />
+                  
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>0.0 (Focused)</span>
+                    <span>1.0 (Balanced)</span>
+                    <span>2.0 (Creative)</span>
+                  </div>
+                </div>
+                
                 <Input
                   id="temperature"
                   type="number"
@@ -222,11 +277,20 @@ export default function AiSettings() {
                   max="2"
                   step="0.1"
                   value={overrides.temperature ?? AI_CONFIG.generation.temperature}
-                  onChange={(e) => updateOverride('temperature', parseFloat(e.target.value))}
+                  onChange={(e) => {
+                    const value = parseFloat(e.target.value);
+                    if (!isNaN(value)) handleTemperatureChange(value);
+                  }}
+                  className={!temperatureSupported ? 'opacity-50' : ''}
+                  disabled={!temperatureSupported}
+                  placeholder="0.0 - 2.0"
                 />
-                <p className="text-xs text-muted-foreground">
-                  Higher values = more creative, lower values = more focused
-                </p>
+                
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p><strong>Range:</strong> 0.0 to 2.0</p>
+                  <p><strong>Recommended:</strong> 0.3-0.7 for factual content, 0.7-1.2 for creative writing, 1.2-2.0 for experimental/artistic content</p>
+                  <p><strong>Note:</strong> GPT-5 and O3 models automatically optimize creativity and ignore this setting.</p>
+                </div>
               </div>
             </CardContent>
           </Card>
