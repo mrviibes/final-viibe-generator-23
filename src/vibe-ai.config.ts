@@ -872,45 +872,10 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   
   // TYPOGRAPHY STYLE PLACEMENT (if present)
   if (handoff.key_line && handoff.key_line.trim()) {
-    if (typographyStyle === 'poster') {
-      parts.push("POSTER STYLE TEXT: Large, bold, centered text prominently displayed. Make text the main focal point with high impact typography. Use large font sizes that dominate the composition.");
-    } else {
+    if (typographyStyle !== 'poster') {
       parts.push("Place text in natural negative space areas like sky, walls, or empty backgrounds. Use TOP, BOTTOM, LEFT, or RIGHT zones rather than always centering. Ensure high contrast and avoid overlapping with faces or main subjects.");
     }
   }
-  
-  // AVOID LIST
-  const avoidList = ["typos", "misspellings", "extra text", "wrong spelling"];
-  if (handoff.visual_style?.toLowerCase() === 'realistic') {
-    avoidList.push("cartoon style", "flat colors");
-  }
-  if (cleanBackground) {
-    avoidList.push("visual clutter", "decorative elements");
-  }
-  if (needsPeople) {
-    avoidList.push("empty scenes", "isolated backgrounds");
-  }
-  if (typographyStyle === 'poster') {
-    avoidList.push("small text", "hidden text", "subtle typography");
-  }
-  
-  // ADD DEFAULT NEGATIVE PROMPT (always applied, tokenized and deduplicated)
-  // Tokenize the default negative prompt by common delimiters
-  const negativeItems = DEFAULT_NEGATIVE_PROMPT
-    .split(/[,;|\n]+/)
-    .map(item => item.trim())
-    .filter(item => item.length > 0);
-  
-  console.log('🚫 Parsed negative prompt items:', negativeItems);
-  
-  // Add to avoid list (avoiding duplicates)
-  negativeItems.forEach(item => {
-    if (!avoidList.some(existing => existing.toLowerCase() === item.toLowerCase())) {
-      avoidList.push(item);
-    }
-  });
-  
-  parts.push(`Avoid: ${avoidList.join(', ')}.`);
   
   return parts.join(' ');
 }
