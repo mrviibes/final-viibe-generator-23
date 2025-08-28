@@ -154,8 +154,27 @@ function validateVisualOptions(options: VisualOption[], inputs: VisualInputs): V
       }
     }
     
-    // Check for composition variety (avoid duplicates)
-    const compositionKey = `${option.subject.substring(0, 20)}-${option.background.substring(0, 20)}`;
+    // Filter out off-topic music content unless relevant
+    const musicKeywords = ['singing', 'concert', 'music', 'band', 'album', 'song', 'lyrics'];
+    const hasMusic = musicKeywords.some(keyword => 
+      option.subject.toLowerCase().includes(keyword) ||
+      option.background.toLowerCase().includes(keyword) ||
+      option.prompt.toLowerCase().includes(keyword)
+    );
+    
+    if (hasMusic) {
+      const musicRelevant = inputs.tags.some(tag => 
+        musicKeywords.some(keyword => tag.toLowerCase().includes(keyword))
+      ) || (inputs.finalLine && musicKeywords.some(keyword => inputs.finalLine.toLowerCase().includes(keyword)));
+      
+      if (!musicRelevant) {
+        console.warn('🚫 Rejected off-topic music option:', option.subject);
+        return false;
+      }
+    }
+    
+    // Check for composition variety (avoid duplicates) - improved deduplication
+    const compositionKey = `${option.prompt.substring(0, 40)}-${option.subject.substring(0, 20)}`;
     if (seenCompositions.has(compositionKey)) {
       console.warn('🚫 Rejected duplicate composition:', option.subject);
       return false;
@@ -279,28 +298,24 @@ function getSlotBasedFallbacks(inputs: VisualInputs): VisualOption[] {
   
   return [
     {
-      slot: "background-only",
-      subject: `${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${tone} ${randomScene}`,
+      subject: `Clean ${tone} background environment`,
       background: `${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${tone} ${visualStyle || 'modern'} environment showcasing ${primaryTags}`,
-      prompt: `${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${tone} ${visualStyle || 'modern'} environment showcasing ${primaryTags}, ${randomEnergy} composition without text or typography [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: busy patterns, high-frequency texture, harsh shadows in center] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: dark text]`
+      prompt: `${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${tone} ${visualStyle || 'modern'} environment showcasing ${primaryTags}, clean background with natural negative space for text [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: busy patterns, high-frequency texture, harsh shadows in center] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: dark text]`
     },
     {
-      slot: "subject+background", 
-      subject: `${needsPeople ? `${peopleContext} immersed in ` : ''}${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${occasion} moment`,
+      subject: `${needsPeople ? `${peopleContext} immersed in ` : ''}Dynamic ${occasion} action scene`,
       background: `${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${tone} atmosphere with ${primaryTags}${needsPeople ? ' and visible crowd' : ''}`,
-      prompt: `${needsPeople ? `${peopleContext} immersed in ` : ''}${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${occasion} moment positioned on right third in ${randomEnergy} ${tone} atmosphere with ${primaryTags}${needsPeople ? ', multiple people clearly visible in background' : ''} [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: faces crossing center, busy patterns in center${needsPeople ? ', empty backgrounds' : ''}] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: light text]`
+      prompt: `${needsPeople ? `${peopleContext} immersed in ` : ''}Dynamic ${occasion} action scene positioned on right third in ${randomEnergy} ${tone} atmosphere with ${primaryTags}${needsPeople ? ', multiple people clearly visible in background' : ''} [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: faces crossing center, busy patterns in center${needsPeople ? ', empty backgrounds' : ''}] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: light text]`
     },
     {
-      slot: "object",
-      subject: `${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${occasion} symbols and elements`,
+      subject: `${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${occasion} objects and symbols`,
       background: `Bold ${tone} ${randomScene} with ${primaryTags} accents`,
-      prompt: `${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${occasion} symbols and elements anchored bottom third on bold ${tone} ${randomScene} with ${primaryTags} accents [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: reflective glare in center, busy patterns] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: dark text]`
+      prompt: `${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${occasion} objects and symbols anchored bottom third on bold ${tone} ${randomScene} with ${primaryTags} accents [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: reflective glare in center, busy patterns] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: dark text]`
     },
     {
-      slot: "singing",
-      subject: `${needsPeople ? `${peopleContext} singing or performing` : 'Musical performance scene with performers'}`,
-      background: `Concert or performance stage with ${tone} lighting, ${primaryTags} elements, and visible audience`,
-      prompt: `${needsPeople ? `${peopleContext} singing or performing` : 'Musical performance scene with performers'} positioned off-center on concert stage with ${tone} lighting, ${primaryTags} elements, audience clearly visible in background [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: limbs crossing center, harsh shadows in safe zone, empty audience areas] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: light text]`
+      subject: `${needsPeople ? `${peopleContext} in` : 'Creative'} celebration atmosphere`,
+      background: `Festive ${tone} environment with ${primaryTags} elements and vibrant colors`,
+      prompt: `${needsPeople ? `${peopleContext} in` : 'Creative'} celebration atmosphere positioned off-center with festive ${tone} environment, ${primaryTags} elements, vibrant colors and party elements [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: limbs crossing center, harsh shadows in safe zone] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: light text]`
     }
   ];
 }

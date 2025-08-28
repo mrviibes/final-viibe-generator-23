@@ -1032,6 +1032,12 @@ export function buildVisualGeneratorMessages(inputs: any): Array<{role: string; 
     additionalRequirements += '\n- SPELLING ACCURACY: Ensure all visible text elements are spelled correctly';
   }
 
+  // Check if music/singing content is actually relevant
+  const musicKeywords = ['music', 'song', 'sing', 'concert', 'band', 'album', 'lyrics'];
+  const hasMusicRelevance = tags.some(tag => 
+    musicKeywords.some(keyword => tag.toLowerCase().includes(keyword))
+  ) || (finalLine && musicKeywords.some(keyword => finalLine.toLowerCase().includes(keyword)));
+
   // Add variety and creativity requirements
   const userPrompt = `${category}>${subcategory}, ${tone}, ${visualStyle || '3d-animated'}
 Tags: ${tags.slice(0, 4).join(', ')}
@@ -1042,11 +1048,13 @@ REQUIRED OBJECTS/SUBJECTS (must be visible in each concept):
 - Specific, tangible items matching the theme${additionalRequirements}
 
 VARIETY RULES:
+- Generate exactly one background-only concept with clean negative space
+- Create 2-3 distinct subject+background or action/scene concepts
+- Include one object-centric or detail-focused concept
 - Each concept must be completely different in composition
 - Mix close-ups, wide shots, action scenes, and environmental shots
 - Vary camera angles: high angle, low angle, eye level, dramatic perspectives
-- Include at least one concept with multiple people
-- Create excitement and visual interest in every option
+${!hasMusicRelevance ? '- DO NOT include singing, concerts, or music themes unless explicitly relevant to the content' : ''}
 
 TEXT PLACEMENT DIRECTIVES:
 - Find natural negative space areas for text (sky, walls, backgrounds)
@@ -1056,7 +1064,7 @@ TEXT PLACEMENT DIRECTIVES:
 
 IMPORTANT: Visual concepts must directly relate to the joke/text content above. For Pride themes, include rainbow colors, drag queens, parades, celebration elements.
 
-4 concepts. Each 40-60 words. Include [TAGS: ${tags.slice(0, 3).join(', ')}] [TEXT_SAFE_ZONE: varied - not just center]
+4 unique concepts. Each 40-60 words. No slots required.
 
 JSON only.`;
 
