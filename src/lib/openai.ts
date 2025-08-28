@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { buildPopCultureSearchPrompt, buildGenerateTextMessages, getEffectiveConfig, MODEL_DISPLAY_NAMES, getSmartFallbackChain } from "../vibe-ai.config";
+import { buildPopCultureSearchPrompt, buildGenerateTextMessages, getEffectiveConfig, MODEL_DISPLAY_NAMES, getSmartFallbackChain, getRuntimeOverrides } from "../vibe-ai.config";
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -200,6 +200,27 @@ export class OpenAIService {
       model = 'gpt-5-mini-2025-08-07'
     } = options;
 
+    // Check if strict mode is enabled - only use the user's selected model
+    const { strictModelEnabled } = getRuntimeOverrides();
+    
+    if (strictModelEnabled) {
+      console.log(`🔒 Strict mode enabled - using only selected model: ${MODEL_DISPLAY_NAMES[model] || model}`);
+      const result = await this.attemptChatJSON(messages, options);
+      
+      // Add metadata about the API call
+      if (result && typeof result === 'object') {
+        result._apiMeta = {
+          modelUsed: model,
+          retryAttempt: 0,
+          originalModel: model,
+          textSpeed: this.textSpeed,
+          strictMode: true
+        };
+      }
+      
+      return result;
+    }
+
     // Use smart fallback chain based on the requested model
     const retryModels = getSmartFallbackChain(model, 'text');
     console.log(`📋 Text generation retry chain: ${retryModels.map(m => MODEL_DISPLAY_NAMES[m] || m).join(' → ')}`);
@@ -357,11 +378,16 @@ export class OpenAIService {
     const prompt = buildPopCultureSearchPrompt(category, searchTerm);
 
     try {
+      // Use effective model from settings if strict mode is enabled
+      const { strictModelEnabled } = getRuntimeOverrides();
+      const effectiveConfig = getEffectiveConfig();
+      const searchModel = strictModelEnabled ? effectiveConfig.generation.model : 'gpt-4.1-2025-04-14';
+      
       const result = await this.chatJSON([
         { role: 'user', content: prompt }
       ], {
         max_completion_tokens: 500,
-        model: 'gpt-4.1-2025-04-14' // More reliable model
+        model: searchModel
       });
 
       // Post-process to ensure we have exactly 5 valid items

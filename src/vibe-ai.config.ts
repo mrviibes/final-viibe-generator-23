@@ -23,6 +23,7 @@ export interface AIRuntimeOverrides {
   magicPromptEnabled?: boolean;
   ideogramModel?: 'V_2A_TURBO' | 'V_3';
   typographyStyle?: 'poster' | 'negative_space';
+  strictModelEnabled?: boolean;
 }
 
 // Get runtime overrides from localStorage

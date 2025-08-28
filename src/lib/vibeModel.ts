@@ -8,6 +8,7 @@ import {
   MODEL_DISPLAY_NAMES,
   SYSTEM_PROMPTS,
   buildVibeGeneratorMessages,
+  getRuntimeOverrides,
   type VibeInputs,
   type VibeCandidate,
   type VibeResult
@@ -109,12 +110,14 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
   let originalModel: string | undefined;
   let modelUsed = apiMeta?.modelUsed || 'gpt-5-mini-2025-08-07';
   
-  // Quality retry: if we have < 4 valid lines and spelling issues, try with next model in chain
-  if (uniqueValidLines.length < 4 && spellingFiltered > 0) {
+  // Get the effective config to check if strict mode is enabled
+  const config = getEffectiveConfig();
+  const strictModeEnabled = getRuntimeOverrides().strictModelEnabled ?? false;
+  
+  // Quality retry: if we have < 4 valid lines, spelling issues, and strict mode is disabled
+  if (uniqueValidLines.length < 4 && spellingFiltered > 0 && !strictModeEnabled) {
     console.log(`🔄 Quality retry: only ${uniqueValidLines.length} valid lines, ${spellingFiltered} spelling filtered.`);
     
-    // Get the effective config to know user's preferred model
-    const config = getEffectiveConfig();
     const userModel = config.generation.model;
     
     // Get fallback chain starting with user's model

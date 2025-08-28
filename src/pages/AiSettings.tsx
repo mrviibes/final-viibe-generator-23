@@ -255,6 +255,19 @@ export default function AiSettings() {
 
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
+                  <Label>Strict Model Mode</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Only use selected model (disable fallback/quality retry)
+                  </p>
+                </div>
+                <Switch
+                  checked={overrides.strictModelEnabled ?? false}
+                  onCheckedChange={(checked) => updateOverride('strictModelEnabled', checked)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
                   <Label>Magic Prompt Enabled</Label>
                   <p className="text-sm text-muted-foreground">
                     Use enhanced prompt engineering for better results (Turbo/V2 only - ignored by V3)
