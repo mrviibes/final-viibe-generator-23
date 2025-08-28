@@ -1,5 +1,5 @@
 import { openAIService } from './openai';
-import { SYSTEM_PROMPTS, buildVisualGeneratorMessages, getStyleKeywords, getEffectiveConfig, isTemperatureSupported } from '../vibe-ai.config';
+import { SYSTEM_PROMPTS, buildVisualGeneratorMessages, getStyleKeywords, getEffectiveConfig, isTemperatureSupported, BACKGROUND_PRESETS } from '../vibe-ai.config';
 
 export interface VisualInputs {
   category: string;
@@ -12,6 +12,8 @@ export interface VisualInputs {
   subjectOption?: string; // single-person, multiple-people, no-subject
   subjectDescription?: string; // custom description for manual entry
   dimensions?: string; // square, 4:5, 9:16, etc.
+  targetSlot?: string; // background-only, subject+background, object, singing
+  backgroundPreset?: string; // minimal, urban, nature, etc.
 }
 
 export interface VisualOption {

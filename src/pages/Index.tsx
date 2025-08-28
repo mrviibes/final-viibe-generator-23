@@ -24,6 +24,7 @@ import { buildIdeogramPrompt, getAspectRatioForIdeogram, getStyleTypeForIdeogram
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
 import { normalizeTypography, suggestContractions, isTextMisspelled } from "@/lib/textUtils";
+import { BACKGROUND_PRESETS } from "../vibe-ai.config";
 const styleOptions = [{
   id: "celebrations",
   name: "Celebrations",
@@ -4116,6 +4117,10 @@ const Index = () => {
   const [visualRecommendations, setVisualRecommendations] = useState<any>(null);
   const [selectedRecommendation, setSelectedRecommendation] = useState<number | null>(null);
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
+  
+  // Background style and focus state
+  const [backgroundPreset, setBackgroundPreset] = useState<string>('');
+  const [targetSlot, setTargetSlot] = useState<string>('');
 
   // Text speed locked to fast (removed state)
 
@@ -4519,7 +4524,9 @@ const Index = () => {
         finalLine,
         subjectOption: selectedSubjectOption || undefined,
         subjectDescription: subjectDescription || undefined,
-        dimensions: selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || undefined
+        dimensions: selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || undefined,
+        targetSlot: targetSlot || undefined,
+        backgroundPreset: backgroundPreset || undefined
       }, 4);
       console.log('🎨 Visual generation completed with result:', {
         optionsCount: visualResult.options.length,
@@ -5995,13 +6002,53 @@ const Index = () => {
                     {/* Subject generation form for AI Assist - show only if no visual is selected yet */}
                     {selectedSubjectOption === "ai-assist" && selectedVisualIndex === null && showSubjectTagEditor && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <div className="text-center mb-8">
-                          <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Add relevant tags for content generation</h2>
-                          <p className="text-sm text-muted-foreground/70">(female endorser, tight blue jeans, sneakers, busy park)</p>
+                          <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Customize Your Visual Generation</h2>
+                          <p className="text-sm text-muted-foreground/70">Set background style, focus, and add tags for better results</p>
                         </div>
 
                         <div className="max-w-lg mx-auto space-y-6">
+                          {/* Background Style and Focus Selectors */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium text-foreground">Background Style</label>
+                              <Select value={backgroundPreset || ''} onValueChange={setBackgroundPreset}>
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="Select style" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="">Auto (default)</SelectItem>
+                                  {BACKGROUND_PRESETS.map(preset => (
+                                    <SelectItem key={preset.id} value={preset.id}>
+                                      {preset.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium text-foreground">Focus</label>
+                              <Select value={targetSlot || ''} onValueChange={setTargetSlot}>
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="Select focus" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="">Mixed (default)</SelectItem>
+                                  <SelectItem value="background-only">Background Only</SelectItem>
+                                  <SelectItem value="subject+background">Subject + Background</SelectItem>
+                                  <SelectItem value="object">Objects/Props</SelectItem>
+                                  <SelectItem value="singing">Musical/Performance</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
                           {/* Tag Input */}
                           <div className="space-y-4">
+                            <div className="text-center">
+                              <label className="text-sm font-medium text-foreground">Additional Tags</label>
+                              <p className="text-xs text-muted-foreground mt-1">Add specific details (female endorser, tight blue jeans, sneakers, busy park)</p>
+                            </div>
                             <Input value={subjectTagInput} onChange={e => setSubjectTagInput(e.target.value)} onKeyDown={handleSubjectTagInputKeyDown} placeholder="Enter tags (press Enter or comma to add)" className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
                             
                             {/* Generate Button - Below the input */}
@@ -6061,23 +6108,32 @@ const Index = () => {
                            <p className="text-sm text-muted-foreground">Choose one of these AI-generated concepts</p>
                          </div>
                         
-                        <div className="grid grid-cols-1 gap-6 max-w-2xl mx-auto">
-                          {visualOptions.map((option, index) => <Card key={index} className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-1 w-full hover:bg-accent/50" onClick={() => {
+                         <div className="grid grid-cols-1 gap-6 max-w-2xl mx-auto">
+                           {visualOptions.map((option, index) => <Card key={index} className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-1 w-full hover:bg-accent/50" onClick={() => {
                   setSelectedVisualIndex(index);
                   setShowSubjectTagEditor(false); // Keep tag editor hidden once visual is selected
                 }}>
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-base font-semibold text-card-foreground">
-                                  Option {index + 1} ({option.slot?.replace('-', ' ') || 'Visual'})
-                                </CardTitle>
-                              </CardHeader>
-                              <CardContent className="pt-0">
-                                <p className="text-sm text-muted-foreground line-clamp-2">
-                                  {option.subject} - {option.background}
-                                </p>
-                              </CardContent>
-                            </Card>)}
-                        </div>
+                               <CardHeader className="pb-2">
+                                 <div className="flex items-center justify-between">
+                                   <CardTitle className="text-base font-semibold text-card-foreground">
+                                     Option {index + 1} ({option.slot?.replace('-', ' ') || 'Visual'})
+                                   </CardTitle>
+                                   {visualModel === 'fallback' && (
+                                     <Badge variant="secondary" className="text-xs">
+                                       {visualRecommendations?.errorCode === 'timeout' ? 'Timeout' : 
+                                        visualRecommendations?.errorCode === 'unauthorized' ? 'Auth Error' :
+                                        visualRecommendations?.errorCode === 'network' ? 'Network Error' : 'Fallback'}
+                                     </Badge>
+                                   )}
+                                 </div>
+                               </CardHeader>
+                               <CardContent className="pt-0">
+                                 <p className="text-sm text-muted-foreground line-clamp-2">
+                                   {option.subject} - {option.background}
+                                 </p>
+                               </CardContent>
+                             </Card>)}
+                         </div>
                       </div>}
 
                     {/* Dimensions Selection - Show when AI assist visual is selected */}
@@ -6668,16 +6724,18 @@ const Index = () => {
                  const tone = selectedTextStyleObj?.name || 'Humorous';
                  const finalLine = selectedGeneratedOption || (isCustomTextConfirmed ? stepTwoText : undefined);
                  
-                  const visualResult = await generateVisualRecommendations({
-                    category,
-                    subcategory,
-                    tone: tone.toLowerCase(),
-                    tags: finalTags,
-                    visualStyle: selectedVisualStyle || undefined,
-                    finalLine,
-                    subjectOption: selectedSubjectOption || undefined,
-                    subjectDescription: subjectDescription || undefined,
-                    dimensions: selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || undefined
+                   const visualResult = await generateVisualRecommendations({
+                     category,
+                     subcategory,
+                     tone: tone.toLowerCase(),
+                     tags: finalTags,
+                     visualStyle: selectedVisualStyle || undefined,
+                     finalLine,
+                     subjectOption: selectedSubjectOption || undefined,
+                     subjectDescription: subjectDescription || undefined,
+                     dimensions: selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || undefined,
+                     targetSlot: targetSlot || undefined,
+                     backgroundPreset: backgroundPreset || undefined
                   }, 4);
                  
                  setVisualRecommendations(visualResult);

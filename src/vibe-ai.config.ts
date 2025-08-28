@@ -656,6 +656,39 @@ function imagePromptVariants(u: UserInputs): GeneratedImagePrompt[] {
 }
 
 // =========================
+// 8.5) Background Style System
+// =========================
+export interface BackgroundPreset {
+  id: string;
+  name: string;
+  keywords: string[];
+  textSafeZone: 'top' | 'bottom' | 'left' | 'right' | 'corners';
+  style: string;
+}
+
+export const BACKGROUND_PRESETS: BackgroundPreset[] = [
+  { id: 'minimal', name: 'Clean & Minimal', keywords: ['minimal background', 'clean white space', 'simple backdrop'], textSafeZone: 'corners', style: 'modern minimalist' },
+  { id: 'urban', name: 'Urban Street', keywords: ['city street', 'urban landscape', 'graffiti wall', 'brick wall'], textSafeZone: 'top', style: 'gritty urban' },
+  { id: 'nature', name: 'Natural Outdoors', keywords: ['forest background', 'mountain vista', 'beach setting', 'park scene'], textSafeZone: 'bottom', style: 'natural lighting' },
+  { id: 'neon', name: 'Neon Nights', keywords: ['neon lights', 'night city', 'glowing signs', 'electric atmosphere'], textSafeZone: 'corners', style: 'cyberpunk aesthetic' },
+  { id: 'vintage', name: 'Retro Vintage', keywords: ['retro diner', 'vintage wallpaper', '80s aesthetic', 'old school'], textSafeZone: 'left', style: 'vintage film' },
+  { id: 'gradient', name: 'Gradient Backdrop', keywords: ['gradient background', 'color wash', 'studio backdrop', 'seamless blend'], textSafeZone: 'right', style: 'studio photography' },
+  { id: 'texture', name: 'Textured Surface', keywords: ['marble texture', 'wood grain', 'concrete wall', 'fabric backdrop'], textSafeZone: 'top', style: 'tactile texture' },
+  { id: 'sports', name: 'Sports Venue', keywords: ['stadium background', 'gym setting', 'field view', 'arena lights'], textSafeZone: 'bottom', style: 'dynamic sports' },
+  { id: 'abstract', name: 'Abstract Art', keywords: ['abstract shapes', 'geometric patterns', 'artistic background', 'modern art'], textSafeZone: 'corners', style: 'contemporary art' },
+  { id: 'workspace', name: 'Modern Workspace', keywords: ['office setting', 'modern desk', 'workspace backdrop', 'professional environment'], textSafeZone: 'left', style: 'professional lighting' },
+  { id: 'party', name: 'Party Scene', keywords: ['party atmosphere', 'celebration backdrop', 'festive setting', 'balloons and lights'], textSafeZone: 'top', style: 'festive energy' },
+  { id: 'luxury', name: 'Luxury Style', keywords: ['luxury interior', 'marble columns', 'gold accents', 'upscale setting'], textSafeZone: 'right', style: 'elegant luxury' },
+  { id: 'cosmic', name: 'Space & Cosmic', keywords: ['starry night', 'galaxy background', 'cosmic setting', 'space theme'], textSafeZone: 'bottom', style: 'cosmic wonder' },
+  { id: 'industrial', name: 'Industrial Edge', keywords: ['industrial setting', 'metal backdrop', 'warehouse vibe', 'concrete industrial'], textSafeZone: 'corners', style: 'industrial grit' },
+  { id: 'artistic', name: 'Creative Studio', keywords: ['art studio', 'creative workspace', 'artistic chaos', 'paint splatter'], textSafeZone: 'left', style: 'artistic freedom' }
+];
+
+export function getBackgroundPreset(presetId: string): BackgroundPreset | null {
+  return BACKGROUND_PRESETS.find(p => p.id === presetId) || null;
+}
+
+// =========================
 // 9) Ideogram-specific Functions
 // =========================
 export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: boolean = false): string {
