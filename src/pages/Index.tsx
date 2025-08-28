@@ -4041,7 +4041,7 @@ const Index = () => {
   const popSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [stepTwoText, setStepTwoText] = useState<string>("");
   const [isCustomTextConfirmed, setIsCustomTextConfirmed] = useState<boolean>(false);
-  const [negativePrompt, setNegativePrompt] = useState<string>("");
+  const [negativePrompt, setNegativePrompt] = useState<string>("misspellings, distorted letters, extra characters, typos, random symbols, unreadable fonts, cartoon style, flat colors, empty background, isolated subject, small text, hidden text");
   const [showIdeogramKeyDialog, setShowIdeogramKeyDialog] = useState<boolean>(false);
   const [showProxySettingsDialog, setShowProxySettingsDialog] = useState<boolean>(false);
   const [showCorsRetryDialog, setShowCorsRetryDialog] = useState<boolean>(false);
@@ -6740,6 +6740,18 @@ const Index = () => {
               })()}
                   </div>
                 </div>
+
+                {/* Negative Prompt Display */}
+                {negativePrompt.trim() && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium text-foreground">Applied Negative Prompt</h3>
+                    <div className="bg-muted/30 rounded-lg p-6">
+                      <p className="text-sm text-foreground font-mono leading-relaxed">
+                        {negativePrompt}
+                      </p>
+                    </div>
+                  </div>
+                )}
             </div>
           </>}
 
