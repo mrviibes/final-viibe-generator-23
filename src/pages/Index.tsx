@@ -13,11 +13,8 @@ import { ApiKeyDialog } from "@/components/ApiKeyDialog";
 import { IdeogramKeyDialog } from "@/components/IdeogramKeyDialog";
 import { ProxySettingsDialog } from "@/components/ProxySettingsDialog";
 import { CorsRetryDialog } from "@/components/CorsRetryDialog";
-import { IdeogramErrorDialog } from "@/components/IdeogramErrorDialog";
 import { StepProgress } from "@/components/StepProgress";
 import { StackedSelectionCard } from "@/components/StackedSelectionCard";
-import { IdeogramSpellingOverlay } from "@/components/IdeogramSpellingOverlay";
-import { ExactTextOverlay } from "@/components/ExactTextOverlay";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigate } from "react-router-dom";
 import { generateCandidates, VibeResult } from "@/lib/vibeModel";
@@ -4020,7 +4017,6 @@ const Index = () => {
   const [customHeight, setCustomHeight] = useState<string>("");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState<string>("");
-  const [exactWords, setExactWords] = useState<string>("");
   const [textGenerationStartTime, setTextGenerationStartTime] = useState<number>(0);
   const [visualGenerationStartTime, setVisualGenerationStartTime] = useState<number>(0);
   const [generatedOptions, setGeneratedOptions] = useState<string[]>([]);
@@ -4051,8 +4047,6 @@ const Index = () => {
   const [showIdeogramKeyDialog, setShowIdeogramKeyDialog] = useState<boolean>(false);
   const [showProxySettingsDialog, setShowProxySettingsDialog] = useState<boolean>(false);
   const [showCorsRetryDialog, setShowCorsRetryDialog] = useState<boolean>(false);
-  const [ideogramError, setIdeogramError] = useState<IdeogramAPIError | null>(null);
-  const [showIdeogramErrorDialog, setShowIdeogramErrorDialog] = useState<boolean>(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState<boolean>(false);
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
@@ -4061,14 +4055,6 @@ const Index = () => {
   const [showProxySettings, setShowProxySettings] = useState(false);
   const [proxySettings, setLocalProxySettings] = useState(() => getProxySettings());
   const [proxyApiKey, setProxyApiKey] = useState('');
-  
-  // Exact text overlay and spelling features
-  const [showExactTextOverlay, setShowExactTextOverlay] = useState<boolean>(false);
-  const [backgroundImageUrl, setBackgroundImageUrl] = useState<string>("");
-  const [originalTextRequest, setOriginalTextRequest] = useState<string>("");
-  const [showSpellingOverlay, setShowSpellingOverlay] = useState<boolean>(false);
-  const [lastModelUsed, setLastModelUsed] = useState<string>("");
-  const [isV3Unavailable, setIsV3Unavailable] = useState<boolean>(false);
   
 
   // Remember choices toggle and load saved choices
@@ -4174,18 +4160,6 @@ const Index = () => {
       handleGenerateImage(1); // Generate 1 image automatically
     }
   }, [currentStep, visualRecommendations]);
-
-  // Listen for custom event to show Ideogram API key dialog
-  useEffect(() => {
-    const handleShowDialog = () => {
-      setShowIdeogramKeyDialog(true);
-    };
-
-    window.addEventListener('showIdeogramKeyDialog', handleShowDialog);
-    return () => {
-      window.removeEventListener('showIdeogramKeyDialog', handleShowDialog);
-    };
-  }, []);
 
   // Visual AI recommendations state
   const [isTestingProxy, setIsTestingProxy] = useState(false);
@@ -4597,7 +4571,7 @@ const Index = () => {
       // Clear previous selection and set new options
       setSelectedVisualIndex(null);
       setVisualOptions(visualResult.options);
-      setVisualModel(visualResult.modelDisplayName || visualResult.model); // Use display name for UI
+      setVisualModel(visualResult.model); // Track which model was used
 
       // Clear only the input, keep tags for the summary, and hide editor
       setSubjectTagInput("");
@@ -4712,7 +4686,6 @@ const Index = () => {
         subcategory,
         tone: tone as any,
         tags: finalTagsForGeneration,
-        exactWords: exactWords.trim() || undefined,
         recipient_name: selectedPick || "-"
       }, 4);
 
@@ -4898,34 +4871,8 @@ const Index = () => {
     } catch (error) {
       console.error('Image generation failed:', error);
       if (error instanceof IdeogramAPIError) {
-        console.log('[handleGenerateImage] Processing IdeogramAPIError:', {
-          errorType: error.errorType,
-          shouldRetryWithTurbo: error.shouldRetryWithTurbo,
-          shouldShowExactTextOverlay: error.shouldShowExactTextOverlay,
-          message: error.message
-        });
-        
-        // Handle specific errors with enhanced UX
-        if (error.errorType === 'V3_UNAVAILABLE_FOR_EXACT_TEXT') {
-          if (error.shouldShowExactTextOverlay) {
-            // Auto-trigger exact text overlay for V3 unavailable with exact text
-            setOriginalTextRequest(selectedGeneratedOption || stepTwoText || "");
-            setShowExactTextOverlay(true);
-            sonnerToast.info(
-              "V3 temporarily unavailable. Opening caption overlay for perfect text.",
-              { duration: 4000 }
-            );
-          }
-          // Always show error dialog with options for V3_UNAVAILABLE_FOR_EXACT_TEXT
-          setIdeogramError(error);
-          setShowIdeogramErrorDialog(true);
-          setImageGenerationError('V3 model temporarily unavailable. See options below.');
-        } else if (error.errorType === 'V3_UNAVAILABLE') {
-          // V3 unavailable without exact text - show error dialog with turbo retry
-          setIdeogramError(error);
-          setShowIdeogramErrorDialog(true);
-          setImageGenerationError('V3 model temporarily unavailable. Try Turbo model for reliable generation.');
-        } else if (error.message === 'CORS_DEMO_REQUIRED') {
+        // Handle specific CORS demo activation error
+        if (error.message === 'CORS_DEMO_REQUIRED') {
           setShowCorsRetryDialog(true);
           setImageGenerationError('CORS proxy needs activation. Click "Enable CORS Proxy" button below, then try again.');
         } else if (error.message.includes('proxy.cors.sh') && !getProxySettings().apiKey) {
@@ -4935,24 +4882,16 @@ const Index = () => {
           setImageGenerationError('Connection failed. Trying alternative proxy methods automatically...');
           setTimeout(() => setShowProxySettingsDialog(true), 2000);
         } else {
-          // Show the enhanced error dialog for all other IdeogramAPIErrors
-          setIdeogramError(error);
-          setShowIdeogramErrorDialog(true);
-          // For specific error types, show more helpful messages in the card
-          if (error.errorType === 'V3_UNAVAILABLE' || error.errorType === 'V3_UNAVAILABLE_FOR_EXACT_TEXT') {
-            setImageGenerationError('V3 model temporarily unavailable. Click "Show Details" for options.');
-          } else if (error.errorType === 'MISSING_BACKEND_KEY') {
-            setImageGenerationError('Backend API key not configured. Click "Show Details" to set frontend key.');
-          } else {
-            setImageGenerationError(error.message);
-          }
+          setImageGenerationError(error.message);
         }
       } else {
-        const genericError = new IdeogramAPIError('An unexpected error occurred while generating the image.');
-        setIdeogramError(genericError);
-        setShowIdeogramErrorDialog(true);
         setImageGenerationError('An unexpected error occurred while generating the image.');
       }
+      toast({
+        title: "Generation Failed",
+        description: imageGenerationError || "Failed to generate image. Please try again.",
+        variant: "destructive"
+      });
     } finally {
       setIsGeneratingImage(false);
     }
@@ -5089,7 +5028,7 @@ const Index = () => {
       }
     }, 250);
   };
-  return <div className="min-h-screen bg-background py-8 px-4 pb-32">{/* Reduced top padding from py-12 to py-8 */}
+  return <div className="min-h-screen bg-background py-12 px-4 pb-32">
       <div className="max-w-6xl mx-auto">
         {/* Main Title */}
         <div className="text-center mb-8">
@@ -5902,25 +5841,13 @@ const Index = () => {
                 {/* Show AI Assist form when selected and no options generated yet */}
                 {selectedCompletionOption === "ai-assist" && generatedOptions.length === 0 && <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div className="text-center mb-6">
-                      <h3 className="text-xl text-muted-foreground">Generate 4 creative options from your keywords</h3>
-                      <p className="text-sm text-muted-foreground mt-2">AI will create diverse text variations based on your inputs</p>
+                      <p className="text-xl text-muted-foreground">Add relevant tags for content generation</p>
                     </div>
 
                     <div className="max-w-md mx-auto space-y-6">
                       {/* Tags Input */}
                       <div className="space-y-3">
-                        <label className="text-sm font-medium">Tags & Keywords</label>
-                        <p className="text-xs text-muted-foreground">
-                          Short words or phrases to inspire the AI. For full sentences, use "Write Myself" option.
-                        </p>
-                        <Input value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={handleTagInputKeyDown} placeholder="e.g. birthday, funny, pizza night, adventure..." className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
-                        
-                        {/* Smart tag detection warning */}
-                        {tagInput.length > 20 && tagInput.includes(' ') && (
-                          <div className="text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-2">
-                            💡 This looks like a full sentence. Consider using "Write Myself" option for exact wording.
-                          </div>
-                        )}
+                        <Input value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={handleTagInputKeyDown} placeholder="Enter tags (press Enter or comma to add)" className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
                         
                         {/* Display Tags */}
                         {tags.length > 0 && <div className="flex flex-wrap gap-2 justify-center">
@@ -5929,25 +5856,6 @@ const Index = () => {
                                 <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => removeTag(tag)} />
                               </Badge>)}
                           </div>}
-                      </div>
-
-                      {/* Exact Words Input */}
-                      <div className="space-y-3">
-                        <label className="text-sm font-medium">Exact Words (optional)</label>
-                        <p className="text-xs text-muted-foreground">
-                          Specific words or short phrases that MUST appear in the generated text (80-95 chars ideal, 100 max)
-                        </p>
-                        <Input
-                          value={exactWords}
-                          onChange={(e) => setExactWords(e.target.value)}
-                          placeholder="Required words or phrases to include..."
-                          className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-4 text-base font-medium rounded-lg"
-                        />
-                        {exactWords && (
-                          <div className="text-xs text-muted-foreground text-right">
-                            {exactWords.length}/100 characters
-                          </div>
-                        )}
                       </div>
 
                       {/* Generate Button */}
@@ -5999,52 +5907,21 @@ const Index = () => {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-6">
-                      {generatedOptions.slice(0, 4).map((option, index) => {
-                        // Check which tags are matched in this option
-                        const matchedTags = tags.filter(tag => 
-                          option.toLowerCase().includes(tag.toLowerCase())
-                        );
-                        const hasExactWords = exactWords && exactWords.trim() && 
-                          option.toLowerCase().includes(exactWords.trim().toLowerCase());
-                        
-                        return (
-                          <Card key={index} className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-1 p-4 hover:bg-accent/50" onClick={() => {
-                            setSelectedGeneratedOption(option);
-                            setSelectedGeneratedIndex(index);
-                          }}>
-                            <div className="space-y-3">
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium text-muted-foreground">
-                                  Option {index + 1}
-                                </span>
-                                <div className="flex gap-1">
-                                  {hasExactWords && (
-                                    <Badge variant="default" className="text-xs">
-                                      Exact words ✓
-                                    </Badge>
-                                  )}
-                                  {matchedTags.length > 0 && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      {matchedTags.length} tag{matchedTags.length > 1 ? 's' : ''} ✓
-                                    </Badge>
-                                  )}
-                                </div>
-                              </div>
-                              <p className="text-sm text-card-foreground leading-relaxed whitespace-pre-line">
-                                {option}
-                              </p>
-                              {/* Show matched elements */}
-                              {(matchedTags.length > 0 || hasExactWords) && (
-                                <div className="text-xs text-muted-foreground">
-                                  {hasExactWords && <span>Contains: "{exactWords.trim()}"</span>}
-                                  {hasExactWords && matchedTags.length > 0 && <span> • </span>}
-                                  {matchedTags.length > 0 && <span>Tags: {matchedTags.join(', ')}</span>}
-                                </div>
-                              )}
+                      {generatedOptions.slice(0, 4).map((option, index) => <Card key={index} className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-1 p-4 hover:bg-accent/50" onClick={() => {
+                setSelectedGeneratedOption(option);
+                setSelectedGeneratedIndex(index);
+              }}>
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium text-muted-foreground">
+                                Option {index + 1}
+                              </span>
                             </div>
-                          </Card>
-                        );
-                      })}
+                            <p className="text-sm text-card-foreground leading-relaxed whitespace-pre-line">
+                              {option}
+                            </p>
+                          </div>
+                        </Card>)}
                     </div>
 
                   </div>}
@@ -6052,22 +5929,17 @@ const Index = () => {
                 {/* Show Write Myself input panel when selected but not confirmed */}
                 {selectedCompletionOption === "write-myself" && !isCustomTextConfirmed && <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div className="text-center mb-6">
-                      <h3 className="text-xl text-muted-foreground">Use your exact text</h3>
-                      <p className="text-sm text-muted-foreground mt-2">Perfect for full sentences or specific wording</p>
+                      <p className="text-xl text-muted-foreground">Write your custom text</p>
                     </div>
 
                     <div className="max-w-md mx-auto space-y-6">
                       {/* Custom Text Input */}
                       <div className="space-y-3">
-                        <label className="text-sm font-medium">Your Text</label>
-                        <p className="text-xs text-muted-foreground mb-2">
-                          Enter your exact text (80-95 chars ideal, 100 max for legibility)
-                        </p>
                         <Textarea value={stepTwoText} onChange={e => {
                   if (e.target.value.length <= 100) {
                     setStepTwoText(e.target.value);
                   }
-                }} placeholder="Write your custom text here..." className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 min-h-[120px] text-base font-medium rounded-lg resize-none" />
+                }} placeholder="Enter your custom text (100 characters max)" className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 min-h-[120px] text-base font-medium rounded-lg resize-none" />
                         
                         {/* Character Counter */}
                         <div className="text-center">
@@ -6245,22 +6117,15 @@ const Index = () => {
                                 </Button>
                               </div>
                              {visualOptions.length > 0 && visualModel && (
-                                <p className="text-xs text-muted-foreground mb-2">
-                                  Using {visualModel} • Generated in {((Date.now() - visualGenerationStartTime) / 1000).toFixed(1)}s
-                                  {visualModel.includes('local presets') && " • Used fallback"}
-                                </p>
-                              )}
-                             {visualModel && visualModel.includes('local presets') && <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 text-xs p-2 rounded-lg mb-3 max-w-md mx-auto">
-                                 {getErrorMessage(visualRecommendations?.errorCode)}
-                               </div>}
-                            <div className="flex items-center gap-2 justify-center mb-2">
-                              <p className="text-sm text-muted-foreground">Choose one of these AI-generated concepts</p>
-                              {visualRecommendations?._seasonalBoost && (
-                                <Badge variant="secondary" className="text-xs">
-                                  Seasonal boost: {visualRecommendations._seasonalBoost}
-                                </Badge>
-                              )}
-                            </div>
+                               <p className="text-xs text-muted-foreground mb-2">
+                                 Using {visualModel.includes('gpt-5-mini') ? 'gpt-5-mini' : visualModel} • Generated in {((Date.now() - visualGenerationStartTime) / 1000).toFixed(1)}s
+                                 {visualModel === 'fallback' && " • Used fallback"}
+                               </p>
+                             )}
+                            {visualModel === 'fallback' && <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 text-xs p-2 rounded-lg mb-3 max-w-md mx-auto">
+                                {getErrorMessage(visualRecommendations?.errorCode)}
+                              </div>}
+                           <p className="text-sm text-muted-foreground">Choose one of these AI-generated concepts</p>
                          </div>
                         
                          <div className="grid grid-cols-1 gap-6 max-w-2xl mx-auto">
@@ -6271,16 +6136,9 @@ const Index = () => {
                                <CardHeader className="pb-2">
                                  <div className="flex items-center justify-between">
                                      <CardTitle className="text-base font-semibold text-card-foreground">
-                                        <div className="flex items-center gap-2">
-                                          <span>Option {index + 1} ({option.slot?.replace('-', ' ') || 'Visual'})</span>
-                                          {visualRecommendations?._seasonalBoost === 'Christmas' && (() => {
-                                            const christmasKeywords = ['christmas', 'tree', 'ornament', 'festive', 'holiday', 'red and green', 'lights', 'santa', 'winter', 'snow'];
-                                            const fullText = `${option.subject} ${option.background} ${option.prompt}`.toLowerCase();
-                                            return christmasKeywords.some(keyword => fullText.includes(keyword));
-                                          })() && (
-                                            <span className="text-lg">🎄</span>
-                                          )}
-                                          {option.textAligned && (
+                                       <div className="flex items-center gap-2">
+                                         <span>Option {index + 1} ({option.slot?.replace('-', ' ') || 'Visual'})</span>
+                                         {option.textAligned && (
                                            <TooltipProvider>
                                              <Tooltip>
                                                <TooltipTrigger asChild>
@@ -6558,30 +6416,21 @@ const Index = () => {
                           ))}
                         </div>
                       </div>}
-                     </div> : imageGenerationError ? <div className="flex flex-col items-center gap-4 text-center max-w-md">
-                       <AlertCircle className="h-8 w-8 text-destructive" />
-                       <div>
-                         <p className="text-destructive text-lg font-medium">Generation Failed</p>
-                         <p className="text-muted-foreground text-sm mt-1">{imageGenerationError}</p>
-                       </div>
-                       <div className="flex gap-2">
-                         <Button onClick={() => handleGenerateImage(1)} variant="outline" size="sm">
-                           Try Again
-                         </Button>
-                         {imageGenerationError.includes('CORS proxy needs activation') && <Button variant="brand" size="sm" onClick={() => setShowCorsRetryDialog(true)}>
-                             Enable CORS Proxy
-                           </Button>}
-                         {ideogramError && (
-                           <Button 
-                             onClick={() => setShowIdeogramErrorDialog(true)} 
-                             variant="secondary" 
-                             size="sm"
-                           >
-                             Show Details
-                           </Button>
-                         )}
-                       </div>
-                     </div> : <p className="text-muted-foreground text-lg">Preparing your vibe...</p>}
+                    </div> : imageGenerationError ? <div className="flex flex-col items-center gap-4 text-center max-w-md">
+                      <AlertCircle className="h-8 w-8 text-destructive" />
+                      <div>
+                        <p className="text-destructive text-lg font-medium">Generation Failed</p>
+                        <p className="text-muted-foreground text-sm mt-1">{imageGenerationError}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button onClick={() => handleGenerateImage(1)} variant="outline" size="sm">
+                          Try Again
+                        </Button>
+                        {imageGenerationError.includes('CORS proxy needs activation') && <Button variant="brand" size="sm" onClick={() => setShowCorsRetryDialog(true)}>
+                            Enable CORS Proxy
+                          </Button>}
+                      </div>
+                    </div> : <p className="text-muted-foreground text-lg">Preparing your vibe...</p>}
                 </div>
                 
                  {/* Text Misspelling Detection */}
@@ -6938,65 +6787,62 @@ const Index = () => {
                return;
              }
              
-            if (currentStep === 4 && isStep4Complete()) {
-              // Start manual image generation on Step 4
-              setIsGeneratingImage(true);
-              
-              // Define shared variables for error handling
-              const finalText = selectedGeneratedOption || stepTwoText || "";
-              let model: 'V_1' | 'V_1_TURBO' | 'V_2' | 'V_2_TURBO' | 'V_2A' | 'V_2A_TURBO' | 'V_3' = 'V_2_TURBO';
-              
-             try {
-               const visualStyle = selectedVisualStyle || "";
-               const subcategory = (() => {
-                 if (selectedStyle === 'celebrations' && selectedSubOption) {
-                   const celebOption = celebrationOptions.find(c => c.id === selectedSubOption);
-                   return celebOption?.name || selectedSubOption;
-                 } else if (selectedStyle === 'pop-culture' && selectedSubOption) {
-                   const popOption = popCultureOptions.find(p => p.id === selectedSubOption);
-                   return popOption?.name || selectedSubOption;
-                 }
-                 return selectedSubOption || 'general';
-               })();
-               const selectedTextStyleObj = textStyleOptions.find(ts => ts.id === selectedTextStyle);
-               const tone = selectedTextStyleObj?.name || 'Humorous';
-               const allTags = [...tags, ...subjectTags];
+             if (currentStep === 4 && isStep4Complete()) {
+               // Start manual image generation on Step 4
+               setIsGeneratingImage(true);
+              try {
+                const finalText = selectedGeneratedOption || stepTwoText || "";
+                const visualStyle = selectedVisualStyle || "";
+                const subcategory = (() => {
+                  if (selectedStyle === 'celebrations' && selectedSubOption) {
+                    const celebOption = celebrationOptions.find(c => c.id === selectedSubOption);
+                    return celebOption?.name || selectedSubOption;
+                  } else if (selectedStyle === 'pop-culture' && selectedSubOption) {
+                    const popOption = popCultureOptions.find(p => p.id === selectedSubOption);
+                    return popOption?.name || selectedSubOption;
+                  }
+                  return selectedSubOption || 'general';
+                })();
+                const selectedTextStyleObj = textStyleOptions.find(ts => ts.id === selectedTextStyle);
+                const tone = selectedTextStyleObj?.name || 'Humorous';
+                const allTags = [...tags, ...subjectTags];
 
-               // Get chosen visual concept if selected
-               const chosenVisual = selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].prompt : undefined;
+                // Get chosen visual concept if selected
+                const chosenVisual = selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].prompt : undefined;
 
-               // Build comprehensive Ideogram handoff payload
-               const categoryName = selectedStyle ? styleOptions.find(s => s.id === selectedStyle)?.name || "" : "";
-               const aspectRatio = selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || "";
+                // Build comprehensive Ideogram handoff payload
+                const categoryName = selectedStyle ? styleOptions.find(s => s.id === selectedStyle)?.name || "" : "";
+                const aspectRatio = selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || "";
 
-               // Get secondary subcategory for pop culture
-               const subcategorySecondary = selectedStyle === 'pop-culture' && selectedPick ? selectedPick : undefined;
-               const ideogramPayload = buildIdeogramHandoff({
-                 // Core parameters
-                 visual_style: visualStyle,
-                 subcategory: subcategory,
-                 tone: tone.toLowerCase(),
-                 final_line: finalText,
-                 tags_csv: allTags.join(', '),
-                 chosen_visual: chosenVisual,
-                 // Extended parameters
-                 category: categoryName,
-                 subcategory_secondary: subcategorySecondary,
-                 aspect_ratio: aspectRatio,
-                 text_tags_csv: tags.join(', '),
-                 visual_tags_csv: subjectTags.join(', '),
-                 ai_text_assist_used: selectedCompletionOption === "ai-assist",
-                 ai_visual_assist_used: selectedSubjectOption === "ai-assist",
-                 negative_prompt: negativePrompt,
-                 // Visual AI Recommendations
-                 rec_subject: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].subject : selectedSubjectOption === "design-myself" ? subjectDescription : undefined,
-                 rec_background: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined
-               });
+                // Get secondary subcategory for pop culture
+                const subcategorySecondary = selectedStyle === 'pop-culture' && selectedPick ? selectedPick : undefined;
+                const ideogramPayload = buildIdeogramHandoff({
+                  // Core parameters
+                  visual_style: visualStyle,
+                  subcategory: subcategory,
+                  tone: tone.toLowerCase(),
+                  final_line: finalText,
+                  tags_csv: allTags.join(', '),
+                  chosen_visual: chosenVisual,
+                  // Extended parameters
+                  category: categoryName,
+                  subcategory_secondary: subcategorySecondary,
+                  aspect_ratio: aspectRatio,
+                  text_tags_csv: tags.join(', '),
+                  visual_tags_csv: subjectTags.join(', '),
+                  ai_text_assist_used: selectedCompletionOption === "ai-assist",
+                  ai_visual_assist_used: selectedSubjectOption === "ai-assist",
+                  negative_prompt: negativePrompt,
+                  // Visual AI Recommendations
+                  rec_subject: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].subject : selectedSubjectOption === "design-myself" ? subjectDescription : undefined,
+                  rec_background: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined
+                });
 
-               // Generate the Ideogram prompt
-               const promptText = buildIdeogramPrompt(ideogramPayload);
-               const aspectRatioKey = getAspectRatioForIdeogram(selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || "");
-               let styleType = getStyleTypeForIdeogram(visualStyle);
+                // Generate the Ideogram prompt
+                const promptText = buildIdeogramPrompt(ideogramPayload);
+                const aspectRatioKey = getAspectRatioForIdeogram(selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || "");
+                let styleType = getStyleTypeForIdeogram(visualStyle);
+                let model: 'V_1' | 'V_1_TURBO' | 'V_2' | 'V_2_TURBO' | 'V_2A' | 'V_2A_TURBO' | 'V_3' = 'V_2_TURBO';
 
                 // Get model from AI settings instead of auto-selecting based on style
                 const runtimeOverrides = getRuntimeOverrides();
@@ -7051,13 +6897,8 @@ const Index = () => {
                   let fallbackNote = '';
                   
                   if (result._fallback_note) {
-                    actualModelUsed = (result.model_used || 'V_2A_TURBO') as 'V_2A_TURBO' | 'V_3';
+                    actualModelUsed = 'V_2A_TURBO';
                     fallbackNote = ' (fallback)';
-                    setLastModelUsed(actualModelUsed);
-                    setShowSpellingOverlay(true);
-                    setOriginalTextRequest(finalText);
-                  } else {
-                    setLastModelUsed(actualModelUsed);
                   }
                   
                   console.log(`Final model used: ${actualModelUsed}${fallbackNote ? ' (fell back from V3)' : ''}`);
@@ -7069,17 +6910,7 @@ const Index = () => {
                 }
               } catch (error) {
                 console.error("Error generating image:", error);
-                setLastModelUsed(model);
-                
-                // Check if this is a V3 unavailable error for exact text
-                if (error instanceof Error && error.message.includes('V3 model required for exact text')) {
-                  setIsV3Unavailable(true);
-                  setShowSpellingOverlay(true);
-                  setOriginalTextRequest(finalText);
-                  sonnerToast.error("V3 model unavailable for exact text rendering. Use caption overlay for guaranteed accuracy.");
-                } else {
-                  sonnerToast.error("Failed to generate your vibe. Please try again.");
-                }
+                sonnerToast.error("Failed to generate your vibe. Please try again.");
               } finally {
                 setIsGeneratingImage(false);
               }
@@ -7187,84 +7018,6 @@ const Index = () => {
 
         {/* CORS Retry Dialog */}
         <CorsRetryDialog open={showCorsRetryDialog} onOpenChange={setShowCorsRetryDialog} onRetry={handleGenerateImage} />
-
-        {/* Enhanced Ideogram Error Dialog */}
-        {ideogramError && (
-          <IdeogramErrorDialog
-            open={showIdeogramErrorDialog}
-            onOpenChange={setShowIdeogramErrorDialog}
-            error={ideogramError}
-            onRetryWithTurbo={() => {
-              // Switch to Turbo model and retry
-              const runtimeOverrides = getRuntimeOverrides();
-              const originalModel = runtimeOverrides.ideogramModel;
-              
-              // Temporarily set to Turbo
-              const tempOverrides = { ...runtimeOverrides, ideogramModel: 'V_2A_TURBO' as const };
-              localStorage.setItem('vibe_ai_runtime_overrides', JSON.stringify(tempOverrides));
-              
-              // Retry generation
-              handleGenerateImage(1).finally(() => {
-                // Restore original model
-                if (originalModel) {
-                  const restoredOverrides = { ...runtimeOverrides, ideogramModel: originalModel };
-                  localStorage.setItem('vibe_ai_runtime_overrides', JSON.stringify(restoredOverrides));
-                }
-              });
-            }}
-            onShowExactTextOverlay={() => {
-              const finalText = selectedGeneratedOption || stepTwoText || "";
-              setOriginalTextRequest(finalText);
-              setShowExactTextOverlay(true);
-            }}
-            onRegularRetry={() => handleGenerateImage(1)}
-          />
-        )}
-
-        {/* Spelling/Text Quality Overlay */}
-        {showSpellingOverlay && (
-          <IdeogramSpellingOverlay
-            originalPrompt={originalTextRequest}
-            generatedImageUrl={generatedImages[selectedImageIndex]}
-            onRegenerate={() => {
-              setShowSpellingOverlay(false);
-              setIsV3Unavailable(false);
-              handleGenerateImage();
-            }}
-            onDismiss={() => {
-              setShowSpellingOverlay(false);
-              setIsV3Unavailable(false);
-            }}
-            modelUsed={lastModelUsed}
-            isV3Unavailable={isV3Unavailable}
-            onUseExactTextOverlay={() => {
-              setShowSpellingOverlay(false);
-              setBackgroundImageUrl(generatedImages[selectedImageIndex]);
-              setShowExactTextOverlay(true);
-            }}
-          />
-        )}
-
-        {/* Exact Text Caption Overlay */}
-        {showExactTextOverlay && backgroundImageUrl && (
-          <ExactTextOverlay
-            imageUrl={backgroundImageUrl}
-            originalText={originalTextRequest}
-            onClose={() => {
-              setShowExactTextOverlay(false);
-              setBackgroundImageUrl("");
-            }}
-            onSave={(finalImageUrl) => {
-              // Replace the current image with the captioned version
-              const newImages = [...generatedImages];
-              newImages[selectedImageIndex] = finalImageUrl;
-              setGeneratedImages(newImages);
-              setShowExactTextOverlay(false);
-              setBackgroundImageUrl("");
-              sonnerToast.success("Caption overlay applied successfully!");
-            }}
-          />
-        )}
 
       </div>
     </div>;

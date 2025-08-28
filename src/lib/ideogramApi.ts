@@ -36,19 +36,10 @@ export interface IdeogramGenerateResponse {
   _fallback_note?: string;
   endpoint_used?: string;
   model_used?: string;
-  _model_used?: string;
-  _original_model_requested?: string;
-  errorType?: string;
 }
 
 export class IdeogramAPIError extends Error {
-  constructor(
-    message: string, 
-    public status?: number, 
-    public errorType?: string,
-    public shouldRetryWithTurbo?: boolean,
-    public shouldShowExactTextOverlay?: boolean
-  ) {
+  constructor(message: string, public status?: number) {
     super(message);
     this.name = 'IdeogramAPIError';
   }
@@ -160,15 +151,12 @@ export async function generateIdeogramImage(request: IdeogramGenerateRequest): P
   const requestWithModel: IdeogramGenerateRequest = { ...request };
   
   // Always use backend API for V_3 model to ensure proper V3 endpoint usage
-  // Also prioritize backend for exact text requests to get better V3 routing
-  const isExactTextRequest = /EXACT TEXT:/i.test(request.prompt);
-  const forceBackend = requestWithModel.model === 'V_3' || isExactTextRequest;
+  const forceBackend = requestWithModel.model === 'V_3';
   
-  // Try backend API first if enabled or if V_3 model or exact text request
+  // Try backend API first if enabled or if V_3 model
   if (useBackendAPI || forceBackend) {
-    const reasonForBackend = requestWithModel.model === 'V_3' ? 'V3 model' : 
-                           isExactTextRequest ? 'exact text request' : 'backend';
-    console.log(`Calling Ideogram backend (${reasonForBackend}) - Model: ${request.model}, Style: ${request.style_type || 'AUTO'}, Prompt: ${request.prompt.substring(0, 50)}...`);
+    const apiPath = forceBackend ? 'backend (V3 model)' : 'backend';
+    console.log(`Calling Ideogram ${apiPath} - Model: ${request.model}, Style: ${request.style_type || 'AUTO'}, Prompt: ${request.prompt.substring(0, 50)}...`);
     
     try {
       const { data, error } = await supabase.functions.invoke('ideogram-generate', {
@@ -177,14 +165,6 @@ export async function generateIdeogramImage(request: IdeogramGenerateRequest): P
 
       if (error) {
         console.error('Backend Ideogram API error:', error);
-        
-        // Surface real backend error by making a direct fetch to get JSON response
-        const backendError = await surfaceBackendError(requestWithModel);
-        if (backendError) {
-          throw backendError;
-        }
-        
-        // Fallback to generic error if surfacing fails
         throw new IdeogramAPIError(`Backend API error: ${error.message}`);
       }
 
@@ -195,28 +175,13 @@ export async function generateIdeogramImage(request: IdeogramGenerateRequest): P
       // Check for fallback notification and log V3 status
       if (data._fallback_note) {
         console.log('⚠️ V3 unavailable, used fallback:', data._fallback_note);
-        if (isExactTextRequest) {
-          console.log('⚠️ Exact text request fell back to V2A_TURBO - text quality may be affected');
-        }
       } else if (data.endpoint_used && data.endpoint_used.startsWith('v3')) {
         console.log(`✅ V3 endpoint working (${data.endpoint_used})`);
-        if (isExactTextRequest) {
-          console.log('✅ Exact text request using V3 - enhanced text rendering');
-        }
       }
 
       const modelUsed = data._fallback_note ? 'V_2A_TURBO (fallback)' : request.model;
       console.log(`Backend Ideogram API success - Generated ${data.data?.length || 0} image(s) with Model: ${modelUsed}, Style: ${request.style_type || 'AUTO'}`);
-      
-      // Add metadata for UI handling
-      const responseWithMetadata = {
-        ...data,
-        model_used: modelUsed,
-        exact_text_request: isExactTextRequest,
-        spelling_guarantee_active: isExactTextRequest && !data._fallback_note
-      } as IdeogramGenerateResponse;
-      
-      return responseWithMetadata;
+      return data as IdeogramGenerateResponse;
 
     } catch (error) {
       console.error('Backend Ideogram API call failed:', error);
@@ -436,224 +401,4 @@ async function generateIdeogramImageFrontend(request: IdeogramGenerateRequest): 
   throw new IdeogramAPIError(
     `All connection methods failed. Last error: ${lastError?.message || 'Unknown error'}`
   );
-}
-
-// Surface real backend error by making direct fetch to get JSON details
-async function surfaceBackendError(request: IdeogramGenerateRequest): Promise<IdeogramAPIError | null> {
-  try {
-    console.log('Surfacing backend error for request:', { prompt: request.prompt.substring(0, 100) + '...' });
-    
-    // Create a direct fetch call with anon key to get the actual backend error
-    const functionUrl = `https://qdigssobxfgoeuvkejpo.supabase.co/functions/v1/ideogram-generate`;
-    
-    const response = await fetch(functionUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkaWdzc29ieGZnb2V1dmtlanBvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ5NzI0OTgsImV4cCI6MjA3MDU0ODQ5OH0.TfV0LEBdE6fFoCT8Xz0jgV53XC4Exf0YVq_15z8Lfnw`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(request)
-    });
-
-    if (!response.ok) {
-      try {
-        const errorText = await response.text();
-        console.log('Raw backend response:', { status: response.status, text: errorText });
-        
-        // Try to parse as JSON first
-        let errorData;
-        try {
-          errorData = JSON.parse(errorText);
-        } catch {
-          // Check for specific 404 V3 unavailable pattern based on edge function logs
-          if (response.status === 404 && errorText.includes('Not Found')) {
-            // This is the V3 unavailable scenario we see in logs
-            errorData = {
-              errorType: 'V3_UNAVAILABLE',
-              message: 'V3 model temporarily unavailable',
-              status: 404,
-              shouldRetryWithTurbo: true,
-              shouldShowExactTextOverlay: request.prompt?.includes('EXACT TEXT:') || false
-            };
-          } else {
-            // If not JSON, treat as plain text
-            errorData = { error: errorText };
-          }
-        }
-        
-        return mapBackendErrorToUserError(response.status, errorData, request);
-      } catch (parseError) {
-        console.log('Failed to parse backend error response:', parseError);
-        return new IdeogramAPIError(
-          `Backend error ${response.status}: Unable to process response`,
-          response.status
-        );
-      }
-    }
-  } catch (error) {
-    console.log('Could not surface backend error details:', error);
-  }
-  
-  return null;
-}
-
-// Map backend errors to user-friendly messages with specific actions
-function mapBackendErrorToUserError(status: number, errorData: any, request: IdeogramGenerateRequest): IdeogramAPIError {
-  const isExactTextRequest = /EXACT TEXT:/i.test(request.prompt);
-  
-  console.log('[mapBackendErrorToUserError] Processing error:', { 
-    status, 
-    errorType: errorData.errorType, 
-    isExactTextRequest, 
-    model: request.model 
-  });
-  
-  // Handle specific V3 unavailable scenarios with correct error types
-  if (errorData.errorType === 'V3_UNAVAILABLE_FOR_EXACT_TEXT' || 
-      (errorData.errorType === 'V3_UNAVAILABLE' && isExactTextRequest) ||
-      (status === 404 && request.model === 'V_3' && isExactTextRequest)) {
-    console.log('[mapBackendErrorToUserError] Mapping to V3_UNAVAILABLE_FOR_EXACT_TEXT');
-    return new IdeogramAPIError(
-      'V3 model is temporarily unavailable. Use Caption Overlay for guaranteed text accuracy or try Turbo model.',
-      status,
-      'V3_UNAVAILABLE_FOR_EXACT_TEXT',
-      true, // shouldRetryWithTurbo
-      true  // shouldShowExactTextOverlay
-    );
-  }
-  
-  if (errorData.errorType === 'V3_UNAVAILABLE' || (status === 404 && request.model === 'V_3')) {
-    console.log('[mapBackendErrorToUserError] Mapping to V3_UNAVAILABLE');
-    return new IdeogramAPIError(
-      'V3 model is temporarily unavailable. Try the Turbo model for reliable generation.',
-      status,
-      'V3_UNAVAILABLE',
-      true, // shouldRetryWithTurbo
-      false // shouldShowExactTextOverlay
-    );
-  }
-  
-  // Handle other specific error types
-  if (errorData.errorType) {
-    switch (errorData.errorType) {
-      case 'MISSING_BACKEND_KEY':
-        return new IdeogramAPIError(
-          'Ideogram API key not configured in backend. Set a frontend API key to continue.',
-          status,
-          'MISSING_BACKEND_KEY'
-        );
-      case 'RATE_LIMIT':
-        return new IdeogramAPIError(
-          'Rate limit exceeded. Please wait a moment before trying again.',
-          status,
-          'RATE_LIMIT'
-        );
-      case 'CONTENT_POLICY':
-        return new IdeogramAPIError(
-          'Content policy violation. Please modify your prompt and try again.',
-          status,
-          'CONTENT_POLICY'
-        );
-      default:
-        return new IdeogramAPIError(
-          errorData.message || 'Ideogram API error',
-          status,
-          errorData.errorType
-        );
-    }
-  }
-  
-  // Handle HTTP status codes
-  switch (status) {
-    case 503:
-      return new IdeogramAPIError(
-        'Ideogram service temporarily unavailable. Please try again in a moment.',
-        status,
-        'SERVICE_UNAVAILABLE',
-        true // Allow retry with turbo
-      );
-    case 401:
-      return new IdeogramAPIError(
-        'Invalid API key. Please check your API key configuration.',
-        status,
-        'INVALID_API_KEY'
-      );
-    case 429:
-      return new IdeogramAPIError(
-        'Rate limit exceeded. Please wait before trying again.',
-        status,
-        'RATE_LIMIT'
-      );
-    default:
-      const message = errorData.error || errorData.message || `HTTP ${status} error`;
-      return new IdeogramAPIError(
-        message,
-        status,
-        'UNKNOWN_ERROR',
-        status >= 500 // Retry on server errors
-      );
-  }
-}
-
-// Test Ideogram backend connectivity
-// Test V3 endpoint connectivity specifically
-export async function testV3Endpoint(): Promise<{ success: boolean; error?: string }> {
-  try {
-    const testRequest: IdeogramGenerateRequest = {
-      prompt: "EXACT TEXT: \"Test\"",
-      aspect_ratio: 'ASPECT_1_1',
-      model: 'V_3',
-      magic_prompt_option: 'OFF',
-      count: 1
-    };
-    
-    const result = await surfaceBackendError(testRequest);
-    if (result?.errorType === 'V3_UNAVAILABLE' || result?.errorType === 'V3_UNAVAILABLE_FOR_EXACT_TEXT') {
-      return { success: false, error: 'V3 endpoint currently unavailable' };
-    }
-    return { success: true };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    if (errorMessage.includes('404') || errorMessage.includes('V3')) {
-      return { success: false, error: 'V3 endpoint unavailable' };
-    }
-    return { success: false, error: errorMessage };
-  }
-}
-
-export async function testIdeogramBackend(): Promise<{ success: boolean; error?: string; latency?: number }> {
-  const startTime = Date.now();
-  
-  try {
-    const testRequest: IdeogramGenerateRequest = {
-      prompt: 'Test connectivity',
-      aspect_ratio: 'ASPECT_1_1',
-      model: 'V_2A_TURBO',
-      magic_prompt_option: 'OFF'
-    };
-    
-    const { error } = await supabase.functions.invoke('ideogram-generate', {
-      body: testRequest
-    });
-    
-    const latency = Date.now() - startTime;
-    
-    if (error) {
-      // Try to get more specific error details
-      const detailedError = await surfaceBackendError(testRequest);
-      return { 
-        success: false, 
-        error: detailedError?.message || error.message,
-        latency 
-      };
-    }
-    
-    return { success: true, latency };
-  } catch (error) {
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      latency: Date.now() - startTime
-    };
-  }
 }

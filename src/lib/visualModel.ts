@@ -1,5 +1,5 @@
 import { openAIService } from './openai';
-import { SYSTEM_PROMPTS, buildVisualGeneratorMessages, getStyleKeywords, getEffectiveConfig, isTemperatureSupported, getSmartFallbackChain, MODEL_DISPLAY_NAMES, BACKGROUND_PRESETS, getRuntimeOverrides } from '../vibe-ai.config';
+import { SYSTEM_PROMPTS, buildVisualGeneratorMessages, getStyleKeywords, getEffectiveConfig, isTemperatureSupported, getSmartFallbackChain, MODEL_DISPLAY_NAMES, BACKGROUND_PRESETS } from '../vibe-ai.config';
 
 export interface VisualInputs {
   category: string;
@@ -14,7 +14,6 @@ export interface VisualInputs {
   dimensions?: string; // square, 4:5, 9:16, etc.
   targetSlot?: string; // background-only, subject+background, object, singing
   backgroundPreset?: string; // minimal, urban, nature, etc.
-  _seasonalBoost?: string; // Internal seasonal enhancement indicator
 }
 
 export interface VisualOption {
@@ -29,10 +28,8 @@ export interface VisualResult {
   options: VisualOption[];
   model: string;
   modelDisplayName?: string;
-  errorCode?: 'timeout' | 'unauthorized' | 'network' | 'parse_error' | 'FAST_TIMEOUT' | 'STRICT_MODE_FAILED';
+  errorCode?: 'timeout' | 'unauthorized' | 'network' | 'parse_error';
   fallbackReason?: string;
-  _debug?: any;
-  _seasonalBoost?: string; // Seasonal enhancement indicator for UI
 }
 
 const VISUAL_OPTIONS_COUNT = 4;
@@ -43,18 +40,10 @@ const VISUAL_OPTIONS_COUNT = 4;
 function autoEnrichInputs(inputs: VisualInputs): VisualInputs {
   const enriched = { ...inputs };
   
-  // Seasonal detection and enhancement
-  const seasonalBoost = detectSeasonalTheme(inputs);
-  if (seasonalBoost.isChristmas) {
-    console.log('🎄 Christmas theme detected - applying seasonal boost');
-    enriched.tags = [...inputs.tags, ...seasonalBoost.tags].slice(0, 8);
-    enriched._seasonalBoost = 'Christmas';
-  }
-  
   // Auto-extract nouns from finalLine if provided
   if (inputs.finalLine && inputs.tags.length < 5) {
     const extractedNouns = extractNounsFromText(inputs.finalLine);
-    enriched.tags = [...enriched.tags, ...extractedNouns].slice(0, 8); // Max 8 tags
+    enriched.tags = [...inputs.tags, ...extractedNouns].slice(0, 8); // Max 8 tags
   }
   
   // Auto-seed category-specific tags if not provided
@@ -94,126 +83,10 @@ function extractNounsFromText(text: string): string[] {
     .slice(0, 3); // Max 3 extracted nouns
 }
 
-// Add seasonal detection function
-function detectSeasonalTheme(inputs: VisualInputs): { isChristmas: boolean; tags: string[] } {
-  const christmasKeywords = ['christmas', 'holiday', 'santa', 'reindeer', 'tree', 'gifts', 'ornament', 'snow', 'winter', 'festive', 'sleigh', 'elf', 'carol', 'wreath', 'mistletoe'];
-  const lowerText = [
-    inputs.subcategory?.toLowerCase() || '',
-    inputs.tone.toLowerCase(),
-    inputs.finalLine?.toLowerCase() || '',
-    ...inputs.tags.map(tag => tag.toLowerCase())
-  ].join(' ');
-  
-  const isChristmas = christmasKeywords.some(keyword => lowerText.includes(keyword)) || 
-                     inputs.subcategory === 'christmas-day' || 
-                     inputs.subcategory === 'christmas-eve';
-  
-  if (isChristmas) {
-    return {
-      isChristmas: true,
-      tags: ['Christmas tree', 'red and green', 'ornaments', 'festive lights', 'holiday spirit', 'winter wonderland']
-    };
-  }
-  
-  return { isChristmas: false, tags: [] };
-}
-
-// Christmas enhancement enforcement
-function enforceChristmasElements(options: VisualOption[], inputs: VisualInputs): VisualOption[] {
-  console.log('🎄 Enforcing Christmas elements in visual concepts...');
-  
-  let christmasEnforcedCount = 0;
-  const targetChristmasCount = 3; // At least 3 of 4 should have Christmas elements
-  
-  const enhancedOptions = options.map((option, index) => {
-    const hasChristmasAlready = hasChristmasElements(option);
-    
-    if (!hasChristmasAlready && christmasEnforcedCount < targetChristmasCount) {
-      console.log(`🎄 Adding Christmas elements to concept ${index + 1}`);
-      christmasEnforcedCount++;
-      
-      return {
-        ...option,
-        subject: addChristmasToSubject(option.subject),
-        background: addChristmasToBackground(option.background),
-        prompt: addChristmasToPrompt(option.prompt, inputs.tags)
-      };
-    }
-    
-    if (hasChristmasAlready) {
-      christmasEnforcedCount++;
-    }
-    
-    return option;
-  });
-  
-  console.log(`🎄 Christmas enforcement complete: ${christmasEnforcedCount}/${options.length} concepts have Christmas elements`);
-  return enhancedOptions;
-}
-
-function hasChristmasElements(option: VisualOption): boolean {
-  const christmasKeywords = ['christmas', 'tree', 'ornament', 'festive', 'holiday', 'red and green', 'lights', 'santa', 'winter', 'snow'];
-  const fullText = `${option.subject} ${option.background} ${option.prompt}`.toLowerCase();
-  return christmasKeywords.some(keyword => fullText.includes(keyword));
-}
-
-function addChristmasToSubject(subject: string): string {
-  if (!subject || hasChristmasElements({ subject, background: '', prompt: '' })) return subject;
-  
-  const christmasEnhancements = [
-    'with Christmas tree backdrop',
-    'featuring festive red and green accents',
-    'with holiday ornaments',
-    'surrounded by Christmas lights',
-    'with winter holiday atmosphere'
-  ];
-  
-  const enhancement = christmasEnhancements[Math.floor(Math.random() * christmasEnhancements.length)];
-  return `${subject} ${enhancement}`;
-}
-
-function addChristmasToBackground(background: string): string {
-  if (!background || hasChristmasElements({ subject: '', background, prompt: '' })) return background;
-  
-  const christmasBackgrounds = [
-    'with Christmas tree and festive lighting',
-    'featuring red and green holiday colors',
-    'with Christmas ornaments and winter atmosphere',
-    'decorated with holiday lights and festive elements',
-    'showcasing Christmas spirit and winter wonderland'
-  ];
-  
-  const enhancement = christmasBackgrounds[Math.floor(Math.random() * christmasBackgrounds.length)];
-  return `${background} ${enhancement}`;
-}
-
-function addChristmasToPrompt(prompt: string, tags: string[]): string {
-  if (!prompt || hasChristmasElements({ subject: '', background: '', prompt })) return prompt;
-  
-  const christmasPromptAdditions = [
-    ', Christmas tree visible in background, festive red and green color scheme',
-    ', holiday ornaments and Christmas lights creating warm festive atmosphere',
-    ', Christmas decorations and winter holiday spirit throughout',
-    ', festive Christmas elements with red and green accents and holiday lighting',
-    ', Christmas theme with tree, ornaments, and warm holiday atmosphere'
-  ];
-  
-  const addition = christmasPromptAdditions[Math.floor(Math.random() * christmasPromptAdditions.length)];
-  
-  // Insert before any technical instructions like [TAGS:...]
-  const technicalStart = prompt.indexOf('[');
-  if (technicalStart !== -1) {
-    return prompt.slice(0, technicalStart) + addition + ' ' + prompt.slice(technicalStart);
-  } else {
-    return prompt + addition;
-  }
-}
-
 function getCategorySpecificTags(category: string, subcategory: string): string[] {
   const celebrationMap: Record<string, string[]> = {
     'birthday': ['cake', 'candles', 'balloons'],
-    'christmas-day': ['Christmas tree', 'red and green', 'ornaments', 'festive lights', 'holiday spirit'],
-    'christmas-eve': ['Christmas tree', 'red and green', 'ornaments', 'festive lights', 'holiday spirit'],
+    'christmas-day': ['tree', 'gifts', 'ornaments'],
     'halloween': ['pumpkin', 'costume', 'spooky'],
     'wedding': ['rings', 'flowers', 'celebration'],
     'default': ['party', 'festive', 'celebration']
@@ -614,96 +487,30 @@ export async function generateVisualRecommendations(
   const enrichedInputs = autoEnrichInputs(inputs);
   const { category, subcategory, tone, tags, visualStyle, finalLine, specificEntity, subjectOption, dimensions } = enrichedInputs;
   
-  // Use effective config (respecting user AI settings)
-  const effectiveConfig = getEffectiveConfig();
-  const { fastVisualsEnabled, strictModelEnabled } = getRuntimeOverrides();
-  const targetModel = effectiveConfig.visual_generation.model;
-  const targetTemperature = isTemperatureSupported(targetModel) ? effectiveConfig.generation.temperature : undefined;
-  
+    // Use centralized message builder
+    const messages = buildVisualGeneratorMessages(enrichedInputs);
+
   try {
     const startTime = Date.now();
-    
-    if (fastVisualsEnabled) {
-      console.log('⚡ Fast visuals mode enabled - targeting 3-6s generation...');
-      
-      // Ultra-compact prompt for fast mode
-      const fastPrompt = `${category}>${subcategory}, ${tone}. 4 visual JSON.`;
-      const fastMessages = [
-        { role: 'system', content: SYSTEM_PROMPTS.visual_generator_fast },
-        { role: 'user', content: fastPrompt }
-      ];
-      
-      // Strict timeout for fast mode
-      const fastTimeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('FAST_TIMEOUT')), 6000); // 6s max
-      });
-      
-      const fastRequestOptions: any = {
-        max_completion_tokens: effectiveConfig.visual_generation.max_tokens, // 180 in fast mode
-        model: targetModel
-      };
-      
-      // Only add temperature for supported models
-      if (isTemperatureSupported(targetModel)) {
-        fastRequestOptions.temperature = targetTemperature || 0.7;
-      }
-      
-      try {
-        const result = await Promise.race([
-          openAIService.chatJSON(fastMessages, fastRequestOptions),
-          fastTimeoutPromise
-        ]);
-        
-        console.log(`⚡ Fast visual generation completed in ${Date.now() - startTime}ms`);
-        
-        if (result?.options && Array.isArray(result.options)) {
-          const visualOptions = result.options.slice(0, n);
-          const validatedOptions = validateVisualOptions(visualOptions, enrichedInputs);
-          
-          // Merge fallbacks if we need more options
-          if (validatedOptions.length < n) {
-            const fallbacks = getSlotBasedFallbacks(enrichedInputs).slice(0, n - validatedOptions.length);
-            validatedOptions.push(...fallbacks);
-          }
-          
-          return {
-            options: validatedOptions,
-            model: targetModel,
-            modelDisplayName: MODEL_DISPLAY_NAMES[targetModel] || targetModel,
-            errorCode: undefined,
-            _debug: { fastMode: true, responseTime: Date.now() - startTime }
-          };
-        }
-      } catch (fastError) {
-        console.log(`⚡ Fast mode failed in ${Date.now() - startTime}ms, using fallbacks`);
-        const fallbacks = getSlotBasedFallbacks(enrichedInputs).slice(0, n);
-        return {
-          options: fallbacks,
-          model: targetModel, // Show actual selected model, not "fallback"
-          modelDisplayName: MODEL_DISPLAY_NAMES[targetModel] || targetModel,
-          errorCode: 'FAST_TIMEOUT',
-          fallbackReason: `${MODEL_DISPLAY_NAMES[targetModel] || targetModel} timed out - using local presets`,
-          _debug: { fastMode: true, fallbackUsed: true, fallbackReason: 'local fallback' }
-        };
-      }
-    }
-    
     console.log('🚀 Starting visual generation with optimized settings...');
+    
+    // Use effective config (respecting user AI settings)
+    const effectiveConfig = getEffectiveConfig();
+    const targetModel = effectiveConfig.visual_generation.model;
+    const targetTemperature = isTemperatureSupported(targetModel) ? effectiveConfig.generation.temperature : undefined;
+    
     console.log(`🎨 Visual generation using model: ${targetModel}`);
     
-    // Use centralized message builder for normal mode
-    const messages = buildVisualGeneratorMessages(enrichedInputs);
-    
-    // Create a timeout promise
+    // Create a timeout promise with increased primary timeout
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('TIMEOUT')), strictModelEnabled ? 10000 : 15000);
+      setTimeout(() => reject(new Error('TIMEOUT')), 15000); // Increased to 15s
     });
 
     // Primary attempt - use model from AI settings
     let result;
     const requestOptions: any = {
-      max_completion_tokens: effectiveConfig.visual_generation.max_tokens,
-      model: targetModel
+      max_completion_tokens: 450, // Reduced tokens for faster generation
+      model: targetModel // Use model from AI settings
     };
     
     // Only add temperature for supported models
@@ -711,45 +518,76 @@ export async function generateVisualRecommendations(
       requestOptions.temperature = targetTemperature || 0.7;
     }
     
-    // Check if strict mode is enabled - only use the user's selected model  
-    if (strictModelEnabled) {
-      console.log(`🔒 Strict mode enabled - using only selected model: ${MODEL_DISPLAY_NAMES[targetModel] || targetModel}`);
-      try {
+    try {
         result = await Promise.race([
           openAIService.chatJSON(messages, requestOptions),
           timeoutPromise
         ]);
         console.log(`✅ Visual generation successful with ${MODEL_DISPLAY_NAMES[targetModel] || targetModel}`);
-      } catch (strictError) {
-        console.log(`🔒 Strict mode failed with ${MODEL_DISPLAY_NAMES[targetModel] || targetModel}, using fallbacks`);
-        const fallbacks = getSlotBasedFallbacks(enrichedInputs).slice(0, n);
-        return {
-          options: fallbacks,
-          model: targetModel, // Show the user's selected model, not "fallback"
-          modelDisplayName: MODEL_DISPLAY_NAMES[targetModel] || targetModel,
-          errorCode: 'STRICT_MODE_FAILED',
-          _debug: { strictMode: true, fallbackUsed: true, failedModel: targetModel }
-        };
-      }
-    } else {
-      // Normal mode - still use only the user's selected model (strict mode is now default)
-      try {
-        result = await Promise.race([
-          openAIService.chatJSON(messages, requestOptions),
-          timeoutPromise
-        ]);
-        console.log(`✅ Visual generation successful with ${MODEL_DISPLAY_NAMES[targetModel] || targetModel}`);
-      } catch (primaryError) {
-        console.log(`❌ Visual generation failed with ${MODEL_DISPLAY_NAMES[targetModel] || targetModel}, using local fallbacks`);
-        const fallbacks = getSlotBasedFallbacks(enrichedInputs).slice(0, n);
-        return {
-          options: fallbacks,
-          model: targetModel, // Show the user's selected model
-          modelDisplayName: MODEL_DISPLAY_NAMES[targetModel] || targetModel,
-          errorCode: primaryError instanceof Error && primaryError.message.includes('TIMEOUT') ? 'timeout' : 'network',
-          fallbackReason: `${MODEL_DISPLAY_NAMES[targetModel] || targetModel} failed - using local presets`,
-          _debug: { failedModel: targetModel, error: primaryError instanceof Error ? primaryError.message : 'Unknown error' }
-        };
+    } catch (firstError) {
+      // Get smart fallback chain based on user's selected model
+      const fallbackChain = getSmartFallbackChain(targetModel, 'visual');
+      const nextModel = fallbackChain[1]; // Get next model after user's choice
+      
+      if (firstError instanceof Error && (firstError.message.includes('JSON') || firstError.message.includes('parse') || firstError.message.includes('TIMEOUT'))) {
+        console.log(`🔄 Retrying with ${MODEL_DISPLAY_NAMES[nextModel] || nextModel}...`);
+        const compactUserPrompt = `${category}>${subcategory}, ${tone}. 4 visual JSON concepts.`;
+        
+        const compactMessages = [
+          { role: 'system', content: SYSTEM_PROMPTS.visual_generator },
+          { role: 'user', content: compactUserPrompt }
+        ];
+        
+        // Use compact timeout for retry
+        const retryTimeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('RETRY_TIMEOUT')), 10000); // Increased to 10s
+        });
+        
+        try {
+          // Use next model in smart fallback chain
+          const retryRequestOptions: any = {
+            max_completion_tokens: 450,
+            model: nextModel || 'o4-mini-2025-04-16' // Fallback to o4-mini if chain exhausted
+          };
+          
+          // Only add temperature for supported models
+          if (isTemperatureSupported(nextModel || 'o4-mini-2025-04-16')) {
+            retryRequestOptions.temperature = 0.7;
+          }
+          
+          result = await Promise.race([
+            openAIService.chatJSON(compactMessages, retryRequestOptions),
+            retryTimeoutPromise
+          ]);
+          console.log(`✅ Visual generation retry successful with ${MODEL_DISPLAY_NAMES[nextModel] || nextModel}`);
+        } catch (secondError) {
+          // Final attempt with ultra-compact prompt and last fallback model
+          const finalModel = fallbackChain[2] || 'o4-mini-2025-04-16';
+          if (secondError instanceof Error && secondError.message.includes('RETRY_TIMEOUT')) {
+            console.log(`🔄 Final attempt with ${MODEL_DISPLAY_NAMES[finalModel] || finalModel}...`);
+            const ultraCompactMessages = [
+              { role: 'system', content: 'Generate 4 visual concepts as JSON array.' },
+              { role: 'user', content: `${tone} ${category} visuals. JSON only.` }
+            ];
+            
+            const finalTimeoutPromise = new Promise((_, reject) => {
+              setTimeout(() => reject(new Error('FINAL_TIMEOUT')), 6000); // 6s final attempt
+            });
+            
+            result = await Promise.race([
+              openAIService.chatJSON(ultraCompactMessages, {
+                temperature: 0.7,
+                max_tokens: 300,
+                model: finalModel
+              }),
+              finalTimeoutPromise
+            ]);
+          } else {
+            throw secondError;
+          }
+        }
+      } else {
+        throw firstError;
       }
     }
     
@@ -803,16 +641,10 @@ export async function generateVisualRecommendations(
       localStorage.setItem('last_visual_model', actualModel);
     }
     
-    // Apply Christmas enforcement if seasonal boost is active
-    if (enrichedInputs._seasonalBoost === 'Christmas') {
-      validOptions = enforceChristmasElements(validOptions, enrichedInputs);
-    }
-
     return {
       options: validOptions,
       model: actualModel,
-      modelDisplayName: MODEL_DISPLAY_NAMES[actualModel] || actualModel,
-      _seasonalBoost: enrichedInputs._seasonalBoost
+      modelDisplayName: MODEL_DISPLAY_NAMES[actualModel] || actualModel
     };
   } catch (error) {
     console.error('Error generating visual recommendations:', error);
@@ -854,11 +686,9 @@ export async function generateVisualRecommendations(
     
     return {
       options: fallbackOptions,
-      model: targetModel, // Show the user's selected model that failed
-      modelDisplayName: MODEL_DISPLAY_NAMES[targetModel] || targetModel,
+      model: 'fallback-gpt-4o-mini',
       errorCode,
-      fallbackReason: `${MODEL_DISPLAY_NAMES[targetModel] || targetModel} failed - using local presets`,
-      _seasonalBoost: enrichedInputs._seasonalBoost
+      fallbackReason
     };
   }
 }

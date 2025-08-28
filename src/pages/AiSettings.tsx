@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, RotateCcw, Settings, AlertTriangle, ImageIcon, Zap, TestTube } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { ArrowLeft, RotateCcw, Settings, AlertTriangle, Info, ImageIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -16,30 +18,23 @@ import {
   AI_CONFIG,
   AVAILABLE_MODELS,
   MODEL_DISPLAY_NAMES,
-  type AIRuntimeOverrides
+  VISUAL_STYLES, 
+  TONES,
+  isTemperatureSupported,
+  type AIRuntimeOverrides,
+  type VisualStyle,
+  type Tone
 } from "@/vibe-ai.config";
-import { testIdeogramBackend } from "@/lib/ideogramApi";
 
 export default function AiSettings() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [overrides, setOverrides] = useState<AIRuntimeOverrides>({});
   const [hasChanges, setHasChanges] = useState(false);
-  const [showLegacyWarning, setShowLegacyWarning] = useState(false);
-  const [testingBackend, setTestingBackend] = useState(false);
-  const [backendStatus, setBackendStatus] = useState<{
-    success: boolean;
-    error?: string;
-    latency?: number;
-  } | null>(null);
 
   useEffect(() => {
     const current = getRuntimeOverrides();
     setOverrides(current);
-    
-    // Check if user is in legacy mode (non-strict)
-    const isLegacyMode = current.strictModelEnabled === false;
-    setShowLegacyWarning(isLegacyMode);
   }, []);
 
   // Get effective configuration with runtime overrides applied
@@ -50,9 +45,14 @@ export default function AiSettings() {
         ...AI_CONFIG.spellcheck,
         enabled: overrides.spellcheckEnabled ?? AI_CONFIG.spellcheck.enabled
       },
+      visual_defaults: {
+        ...AI_CONFIG.visual_defaults,
+        style: overrides.defaultVisualStyle ?? AI_CONFIG.visual_defaults.style
+      },
       generation: {
         ...AI_CONFIG.generation,
-        model: overrides.model ?? AI_CONFIG.generation.model
+        model: overrides.model ?? AI_CONFIG.generation.model,
+        temperature: overrides.temperature ?? AI_CONFIG.generation.temperature
       }
     };
   };
@@ -63,6 +63,18 @@ export default function AiSettings() {
     const newOverrides = { ...overrides, [key]: value };
     setOverrides(newOverrides);
     setHasChanges(true);
+  };
+
+  // Use centralized temperature support check
+
+  const currentModel = overrides.model || AI_CONFIG.generation.model;
+  const temperatureSupported = isTemperatureSupported(currentModel);
+
+  // Clamp temperature to valid range
+  const handleTemperatureChange = (value: number | number[]) => {
+    const temp = Array.isArray(value) ? value[0] : value;
+    const clampedTemp = Math.max(0, Math.min(2, temp));
+    updateOverride('temperature', clampedTemp);
   };
 
   const saveChanges = () => {
@@ -88,74 +100,6 @@ export default function AiSettings() {
     const current = getRuntimeOverrides();
     setOverrides(current);
     setHasChanges(false);
-  };
-
-  const enableStrictMode = () => {
-    const newOverrides = { 
-      ...overrides, 
-      strictModelEnabled: true,
-      fastVisualsEnabled: true,
-      model: 'gpt-4.1-2025-04-14' // Ensure GPT-4.1 is selected
-    };
-    setOverrides(newOverrides);
-    setRuntimeOverrides(newOverrides);
-    setShowLegacyWarning(false);
-    setHasChanges(false);
-    toast({
-      title: "Strict Mode Enabled",
-      description: "Now using GPT-4.1 directly without slow retry chains."
-    });
-  };
-
-  const testBackendConnection = async () => {
-    setTestingBackend(true);
-    setBackendStatus(null);
-    
-    try {
-      const result = await testIdeogramBackend();
-      setBackendStatus(result);
-      
-      if (result.success) {
-        toast({
-          title: "Backend Test Successful",
-          description: `Connection OK (${result.latency}ms)`
-        });
-      } else {
-        // Provide more specific error messaging based on the actual backend response
-        let errorMessage = result.error || 'Backend test failed';
-        let toastDescription = result.error || 'Unknown error';
-        
-        if (errorMessage.includes('IDEOGRAM_API_KEY not configured')) {
-          toastDescription = 'Ideogram API key is not configured in the backend. Please contact support or use frontend API key mode.';
-        } else if (errorMessage.includes('V_3 failed') || errorMessage.includes('404')) {
-          toastDescription = 'Ideogram V3 endpoint is currently unavailable. This is a temporary Ideogram service issue.';
-        } else if (errorMessage.includes('rate limit')) {
-          toastDescription = 'Rate limit exceeded. Please wait before testing again.';
-        } else if (errorMessage.includes('Backend error:')) {
-          // Keep the original backend error message if it's already formatted
-          toastDescription = errorMessage;
-        }
-        
-        toast({
-          title: "Backend Test Failed",
-          description: toastDescription,
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      setBackendStatus({
-        success: false,
-        error: errorMessage
-      });
-      toast({
-        title: "Backend Test Failed",
-        description: errorMessage,
-        variant: "destructive"
-      });
-    } finally {
-      setTestingBackend(false);
-    }
   };
 
   return (
@@ -196,31 +140,6 @@ export default function AiSettings() {
 
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="grid gap-6">
-          {/* Legacy Mode Warning */}
-          {showLegacyWarning && (
-            <Card className="border-orange-500 bg-orange-50 dark:bg-orange-950/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-400">
-                  <AlertTriangle className="h-5 w-5" />
-                  Legacy Settings Detected
-                </CardTitle>
-                <CardDescription className="text-orange-600 dark:text-orange-300">
-                  You're using legacy mode with slow retry chains. For faster, more reliable results, enable strict mode.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-3">
-                  <Button onClick={enableStrictMode} className="gap-2">
-                    <Settings className="h-4 w-4" />
-                    Enable Strict Mode (Recommended)
-                  </Button>
-                  <p className="text-sm text-orange-600 dark:text-orange-300">
-                    Uses GPT-4.1 directly without fallbacks
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
           {/* Overview */}
           <Card>
             <CardHeader>
@@ -250,32 +169,20 @@ export default function AiSettings() {
                     {overrides.model ? "Override" : "Default"}
                   </Badge>
                 </div>
-                {/* Model Usage Telemetry */}
+                {/* Last Used Models (Read-only) */}
                 <div className="space-y-2">
-                  <p className="text-sm font-medium text-muted-foreground">Model Usage Telemetry</p>
-                  <div className="grid grid-cols-1 gap-2">
+                  <p className="text-sm font-medium text-muted-foreground">Last Used Models</p>
+                  <div className="grid grid-cols-2 gap-2">
                     <div className="flex items-center justify-between p-2 bg-muted/50 rounded">
-                      <span className="text-xs font-medium">Requested:</span>
+                      <span className="text-xs font-medium">Text:</span>
                       <Badge variant="outline" className="text-xs">
-                        {MODEL_DISPLAY_NAMES[localStorage.getItem('last_requested_model') || effectiveConfig.generation.model] || 'Not set'}
+                        {MODEL_DISPLAY_NAMES[localStorage.getItem('last_text_model') || effectiveConfig.generation.model] || 'Not set'}
                       </Badge>
                     </div>
                     <div className="flex items-center justify-between p-2 bg-muted/50 rounded">
-                      <span className="text-xs font-medium">Actually Used:</span>
-                      <Badge 
-                        variant={
-                          localStorage.getItem('last_text_model')?.startsWith('fallback') ? "destructive" : 
-                          localStorage.getItem('last_text_model') === localStorage.getItem('last_requested_model') ? "default" : "secondary"
-                        } 
-                        className="text-xs"
-                      >
-                        {(() => {
-                          const lastUsed = localStorage.getItem('last_text_model');
-                          if (!lastUsed) return 'Not set';
-                          if (lastUsed === 'failed') return 'Failed';
-                          if (lastUsed.startsWith('fallback')) return 'Fallback (local presets)';
-                          return MODEL_DISPLAY_NAMES[lastUsed] || lastUsed;
-                        })()}
+                      <span className="text-xs font-medium">Visuals:</span>
+                      <Badge variant="outline" className="text-xs">
+                        {MODEL_DISPLAY_NAMES[localStorage.getItem('last_visual_model') || effectiveConfig.visual_generation.model] || 'Not set'}
                       </Badge>
                     </div>
                   </div>
@@ -317,41 +224,69 @@ export default function AiSettings() {
                 </Select>
               </div>
 
-              <Separator />
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label>Strict Model Enforcement</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Use only your selected model without slow retry chains (recommended)
-                  </p>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="temperature">
+                    Temperature: {(overrides.temperature ?? AI_CONFIG.generation.temperature).toFixed(1)}
+                  </Label>
+                  {!temperatureSupported && (
+                    <Badge variant="secondary" className="gap-1">
+                      <Info className="h-3 w-3" />
+                      Ignored by {currentModel.includes('gpt-5') ? 'GPT-5' : 'O3'}
+                    </Badge>
+                  )}
                 </div>
-                <Switch
-                  checked={overrides.strictModelEnabled ?? true}
-                  onCheckedChange={(checked) => {
-                    updateOverride('strictModelEnabled', checked);
-                    if (!checked) {
-                      setShowLegacyWarning(true);
-                    } else {
-                      setShowLegacyWarning(false);
-                    }
+                
+                {!temperatureSupported && (
+                  <div className="flex items-start gap-2 p-3 bg-muted rounded-lg">
+                    <AlertTriangle className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-muted-foreground">
+                      <p className="font-medium">Temperature Not Supported</p>
+                      <p>The selected model ({currentModel.includes('gpt-5') ? 'GPT-5' : 'O3'}) automatically optimizes creativity and ignores the temperature parameter.</p>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="space-y-3">
+                  <Slider
+                    value={[overrides.temperature ?? AI_CONFIG.generation.temperature]}
+                    onValueChange={handleTemperatureChange}
+                    max={2}
+                    min={0}
+                    step={0.1}
+                    className={`w-full ${!temperatureSupported ? 'opacity-50' : ''}`}
+                    disabled={!temperatureSupported}
+                  />
+                  
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>0.0 (Focused)</span>
+                    <span>1.0 (Balanced)</span>
+                    <span>2.0 (Creative)</span>
+                  </div>
+                </div>
+                
+                <Input
+                  id="temperature"
+                  type="number"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  value={overrides.temperature ?? AI_CONFIG.generation.temperature}
+                  onChange={(e) => {
+                    const value = parseFloat(e.target.value);
+                    if (!isNaN(value)) handleTemperatureChange(value);
                   }}
+                  className={!temperatureSupported ? 'opacity-50' : ''}
+                  disabled={!temperatureSupported}
+                  placeholder="0.0 - 2.0"
                 />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label>Fast Visuals</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Use optimized settings for faster visual concept generation
-                  </p>
+                
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p><strong>Range:</strong> 0.0 to 2.0</p>
+                  <p><strong>Recommended:</strong> 0.3-0.7 for factual content, 0.7-1.2 for creative writing, 1.2-2.0 for experimental/artistic content</p>
+                  <p><strong>Note:</strong> GPT-5 and O3 models automatically optimize creativity and ignore this setting.</p>
                 </div>
-                <Switch
-                  checked={overrides.fastVisualsEnabled ?? true}
-                  onCheckedChange={(checked) => updateOverride('fastVisualsEnabled', checked)}
-                />
               </div>
-
             </CardContent>
           </Card>
 
@@ -417,10 +352,58 @@ export default function AiSettings() {
                   onCheckedChange={(checked) => updateOverride('magicPromptEnabled', checked)}
                 />
               </div>
-
             </CardContent>
           </Card>
 
+          {/* Default Values */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Default Preferences</CardTitle>
+              <CardDescription>
+                Set default values for visual style and tone selections.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label>Default Visual Style</Label>
+                <Select
+                  value={overrides.defaultVisualStyle || AI_CONFIG.visual_defaults.style}
+                  onValueChange={(value) => updateOverride('defaultVisualStyle', value as VisualStyle)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select default style" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {VISUAL_STYLES.map(style => (
+                      <SelectItem key={style.id} value={style.id}>
+                        {style.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Default Tone</Label>
+                <Select
+                  value={overrides.defaultTone || "none"}
+                  onValueChange={(value) => updateOverride('defaultTone', value === "none" ? undefined : value as Tone)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="No default (user selects)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No default</SelectItem>
+                    {TONES.map(tone => (
+                      <SelectItem key={tone.id} value={tone.id}>
+                        {tone.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Image Generation */}
           <Card>
@@ -461,45 +444,13 @@ export default function AiSettings() {
                 <p className="text-sm text-muted-foreground">
                   V3 provides higher quality but may cost more and occasionally fallback to Turbo.
                 </p>
-                
-                <div className="flex items-center gap-2 pt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={testBackendConnection}
-                    disabled={testingBackend}
-                    className="gap-2"
-                  >
-                    {testingBackend ? (
-                      <>
-                        <TestTube className="h-4 w-4 animate-spin" />
-                        Testing...
-                      </>
-                    ) : (
-                      <>
-                        <TestTube className="h-4 w-4" />
-                        Test Backend
-                      </>
-                    )}
-                  </Button>
-                  
-                  {backendStatus && (
-                    <div className={`text-sm ${backendStatus.success ? 'text-green-600' : 'text-red-600'}`}>
-                      {backendStatus.success ? (
-                        `✓ OK (${backendStatus.latency}ms)`
-                      ) : (
-                        `✗ ${backendStatus.error}`
-                      )}
-                    </div>
-                  )}
-                </div>
               </div>
 
               <div className="space-y-2">
                 <Label>Typography Style</Label>
                 <Select
                   value={overrides.typographyStyle || 'poster'}
-                  onValueChange={(value) => updateOverride('typographyStyle', value as 'poster' | 'negative_space' | 'subtle_caption')}
+                  onValueChange={(value) => updateOverride('typographyStyle', value as 'poster' | 'negative_space')}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -515,12 +466,6 @@ export default function AiSettings() {
                       <div className="space-y-1">
                         <div className="font-medium">Negative Space</div>
                         <div className="text-sm text-muted-foreground">Text in empty areas</div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="subtle_caption">
-                      <div className="space-y-1">
-                        <div className="font-medium">Subtle Caption (Small)</div>
-                        <div className="text-sm text-muted-foreground">Small, unobtrusive text with flexible placement</div>
                       </div>
                     </SelectItem>
                   </SelectContent>

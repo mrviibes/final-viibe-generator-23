@@ -8,7 +8,6 @@ import {
   MODEL_DISPLAY_NAMES,
   SYSTEM_PROMPTS,
   buildVibeGeneratorMessages,
-  getRuntimeOverrides,
   type VibeInputs,
   type VibeCandidate,
   type VibeResult
@@ -46,11 +45,8 @@ async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: st
     // Use centralized message builder
     const messages = buildVibeGeneratorMessages(inputs);
     
-    // Use fast token budget (120) for all models in fast mode
-    const maxTokens = 120;
-    
     const result = await openAIService.chatJSON(messages, {
-      max_completion_tokens: maxTokens,
+      max_tokens: config.generation.max_tokens,
       temperature: config.generation.temperature,
       model: targetModel
     });
@@ -58,23 +54,18 @@ async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: st
     // Store the API metadata for later use
     const apiMeta = result._apiMeta;
     
-    // Extract lines from JSON response - be tolerant of different formats
-    const lines = result.lines || result.options || result.candidates || result.texts || [];
+    // Extract lines from JSON response
+    const lines = result.lines || [];
     if (!Array.isArray(lines) || lines.length === 0) {
-      console.error('API format mismatch - no valid lines array found in:', result);
-      throw new Error('Local placeholder (API format mismatch)');
+      throw new Error('Invalid response format - no lines array');
     }
     
     // Check if this is knock-knock format
     const isKnockKnock = inputs.subcategory?.toLowerCase().includes("knock");
     const postProcessOptions = isKnockKnock ? { allowNewlines: true, format: 'knockknock' as const } : undefined;
     
-    // Post-process each line with tag validation and exact words requirement
-    const postProcessOptionsWithExactWords = {
-      ...postProcessOptions,
-      exactWords: inputs.exactWords
-    };
-    const candidates = lines.map((line: string) => postProcessLine(line, inputs.tone, inputs.tags, postProcessOptionsWithExactWords));
+    // Post-process each line with tag validation
+    const candidates = lines.map((line: string) => postProcessLine(line, inputs.tone, inputs.tags, postProcessOptions));
     
     // Add API metadata to candidates for later extraction
     if (apiMeta && candidates.length > 0) {
@@ -84,39 +75,14 @@ async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: st
     return candidates;
   } catch (error) {
     console.error('Failed to generate multiple candidates:', error);
-    // Blend first tag into fallback variants if available
+    // Return fallback variants instead of duplicates
     const fallbackVariants = getFallbackVariants(inputs.tone, inputs.category, inputs.subcategory);
-    const firstTag = inputs.tags && inputs.tags.length > 0 ? inputs.tags[0] : null;
-    
-    return fallbackVariants.map((line, index) => {
-      let finalLine = line;
-      // Blend first tag into the first two fallbacks
-      if (firstTag && index < 2) {
-        finalLine = `${line} ${firstTag}`;
-      }
-      return {
-        line: finalLine,
-        blocked: true,
-        reason: index === 0 ? `Local placeholder (${error instanceof Error ? error.message : 'API failure'})` : 'Local fallback variant'
-      };
-    });
+    return fallbackVariants.map((line, index) => ({
+      line,
+      blocked: true,
+      reason: index === 0 ? `API Error: ${error instanceof Error ? error.message : 'Unknown error'}` : 'Fallback variant'
+    }));
   }
-}
-
-// Import the enhanced phrase candidates from config
-import {
-  phraseCandidates as configPhraseCandidates,
-  QUALITY_BANNED_SUFFIXES,
-  QUALITY_BANNED_PHRASES
-} from '../vibe-ai.config';
-
-// Quality utility function
-function isGood(line: string): boolean {
-  const wordCount = line.split(/\s+/).filter(Boolean).length;
-  return line.length >= 28 && 
-         wordCount >= 5 && 
-         !QUALITY_BANNED_SUFFIXES.test(line) && 
-         !QUALITY_BANNED_PHRASES.test(line);
 }
 
 export async function generateCandidates(inputs: VibeInputs, n: number = 4): Promise<VibeResult> {
@@ -141,17 +107,14 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
   let reason: string | undefined;
   let retryAttempt = 0;
   let originalModel: string | undefined;
-  let topUpUsed = false;
+  let modelUsed = apiMeta?.modelUsed || 'gpt-5-mini-2025-08-07';
   
-  // Get the effective config to check if strict mode is enabled
-  const config = getEffectiveConfig();
-  let modelUsed = apiMeta?.modelUsed || config.generation.model;
-  const strictModeEnabled = getRuntimeOverrides().strictModelEnabled ?? true; // Default to true for speed
-  
-  // Quality retry: if we have < 4 valid lines, spelling issues, and strict mode is disabled
-  if (uniqueValidLines.length < 4 && spellingFiltered > 0 && !strictModeEnabled) {
+  // Quality retry: if we have < 4 valid lines and spelling issues, try with next model in chain
+  if (uniqueValidLines.length < 4 && spellingFiltered > 0) {
     console.log(`🔄 Quality retry: only ${uniqueValidLines.length} valid lines, ${spellingFiltered} spelling filtered.`);
     
+    // Get the effective config to know user's preferred model
+    const config = getEffectiveConfig();
     const userModel = config.generation.model;
     
     // Get fallback chain starting with user's model
@@ -191,28 +154,6 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
     finalCandidates = [...uniqueValidLines];
   }
   
-  // Fast top-up retry if we still don't have 4 unique valid options
-  if (finalCandidates.length < 4 && !topUpUsed) {
-    console.log(`🔄 Fast top-up: only ${finalCandidates.length} valid lines, attempting quick retry...`);
-    
-    try {
-      const config = getEffectiveConfig();
-      const topUpResults = await generateMultipleCandidates(inputs, config.generation.model);
-      const topUpValidCandidates = topUpResults.filter(c => !c.blocked);
-      const newUniqueLines = topUpValidCandidates
-        .map(c => c.line)
-        .filter(line => !finalCandidates.includes(line));
-      
-      if (newUniqueLines.length > 0) {
-        finalCandidates.push(...newUniqueLines);
-        topUpUsed = true;
-        console.log(`✅ Fast top-up added ${newUniqueLines.length} new options`);
-      }
-    } catch (error) {
-      console.warn('Fast top-up failed:', error);
-    }
-  }
-  
   if (finalCandidates.length > 0) {
     // Check if we have any lines that were blocked only for tag coverage
     const tagOnlyBlocked = candidateResults.filter(c => 
@@ -225,76 +166,14 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
       finalCandidates.push(...tagBlockedLines);
     }
     
-    // Re-rank to prioritize tag inclusion - ensure at least 2 of 4 include tags
-    if (inputs.tags && inputs.tags.length > 0) {
-      const taggedCandidates: string[] = [];
-      const untaggedCandidates: string[] = [];
-      
-      finalCandidates.forEach(candidate => {
-        const hasTag = inputs.tags!.some(tag => 
-          candidate.toLowerCase().includes(tag.toLowerCase()) ||
-          // Check for close paraphrases
-          candidate.toLowerCase().includes(tag.toLowerCase().slice(0, 4))
-        );
-        if (hasTag) {
-          taggedCandidates.push(candidate);
-        } else {
-          untaggedCandidates.push(candidate);
-        }
-      });
-      
-      // Ensure we have at least 2 tagged options out of 4
-      finalCandidates = [...taggedCandidates.slice(0, 2), ...untaggedCandidates.slice(0, 2)];
-    }
-    
-    // Filter final candidates by quality
-    finalCandidates = finalCandidates.filter(isGood);
-    
-    // If we still don't have 4 after quality filtering, try one more quick top-up
-    if (finalCandidates.length < 4) {
-      console.log(`🔄 Quality top-up: only ${finalCandidates.length} passed quality gates, attempting additional retry...`);
-      
-      try {
-        const config = getEffectiveConfig();
-        const qualityTopUpResults = await generateMultipleCandidates(inputs, config.generation.model);
-        const qualityValidCandidates = qualityTopUpResults.filter(c => !c.blocked && isGood(c.line));
-        const newQualityLines = qualityValidCandidates
-          .map(c => c.line)
-          .filter(line => !finalCandidates.includes(line));
-        
-        if (newQualityLines.length > 0) {
-          finalCandidates.push(...newQualityLines);
-          console.log(`✅ Quality top-up added ${newQualityLines.length} high-quality options`);
-        }
-      } catch (error) {
-        console.warn('Quality top-up failed:', error);
-      }
-    }
-    
-    // Ensure we have exactly 4 options - use enhanced phrase candidates as last resort
+    // Ensure we have exactly 4 options by adding fallbacks if needed
     while (finalCandidates.length < 4) {
-      const phraseCandidatesList = configPhraseCandidates(inputs as any);
-      const goodCandidates = phraseCandidatesList.filter(isGood);
-      
-      if (goodCandidates.length > 0) {
-        let nextCandidate = goodCandidates[finalCandidates.length % goodCandidates.length];
-        
-        if (!finalCandidates.includes(nextCandidate)) {
-          finalCandidates.push(nextCandidate);
-        } else {
-          // Create minor variation while maintaining quality
-          const variation = nextCandidate.replace(/\.$/, ' that catches everyone off guard.');
-          if (isGood(variation) && !finalCandidates.includes(variation)) {
-            finalCandidates.push(variation);
-          } else {
-            // Fallback - just take the candidate even if duplicate
-            finalCandidates.push(nextCandidate);
-          }
-        }
+      const fallbackVariants = getFallbackVariants(inputs.tone, inputs.category, inputs.subcategory);
+      const nextFallback = fallbackVariants[finalCandidates.length % fallbackVariants.length];
+      if (!finalCandidates.includes(nextFallback)) {
+        finalCandidates.push(nextFallback);
       } else {
-        // Last resort fallback - shouldn't happen with new system
-        finalCandidates.push("Sometimes the best moments happen when you least expect them");
-        break;
+        finalCandidates.push(`${nextFallback} ${finalCandidates.length}`);
       }
     }
     
@@ -311,7 +190,7 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
     picked = finalCandidates[0];
     usedFallback = false;
     if (!reason && tagOnlyBlocked.length > 0) {
-      reason = 'Partial tag coverage but good results';
+      reason = 'Used lines with partial tag coverage';
     }
   } else {
     // Check if all were blocked only for tag coverage
@@ -331,14 +210,11 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
       usedFallback = false;
       reason = 'Used model output with partial tag coverage';
     } else {
-      // Genuine blocks (banned words, etc.) - use enhanced phrase candidates instead of generic fallbacks
-      const phraseCandidatesList = configPhraseCandidates(inputs as any);
-      const goodCandidates = phraseCandidatesList.filter(isGood);
-      finalCandidates = goodCandidates.length >= 4 ? goodCandidates : phraseCandidatesList;
-      
+      // Genuine blocks (banned words, etc.) - use tone-based fallbacks
+      finalCandidates = getFallbackVariants(inputs.tone, inputs.category, inputs.subcategory);
       picked = finalCandidates[0];
       usedFallback = true;
-      reason = candidateResults.find(c => c.reason)?.reason || 'Local placeholder (content filtered)';
+      reason = candidateResults.find(c => c.reason)?.reason || 'All candidates blocked';
     }
   }
   
@@ -361,8 +237,7 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
       retryAttempt,
       originalModel,
       originalModelDisplayName: originalModel ? MODEL_DISPLAY_NAMES[originalModel] || originalModel : undefined,
-      spellingFiltered,
-      topUpUsed
+      spellingFiltered
     }
   };
 }

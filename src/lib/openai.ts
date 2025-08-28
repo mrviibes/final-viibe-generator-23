@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { buildPopCultureSearchPrompt, buildGenerateTextMessages, getEffectiveConfig, MODEL_DISPLAY_NAMES, getSmartFallbackChain, getRuntimeOverrides } from "../vibe-ai.config";
+import { buildPopCultureSearchPrompt, buildGenerateTextMessages, getEffectiveConfig, MODEL_DISPLAY_NAMES, getSmartFallbackChain } from "../vibe-ai.config";
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -89,14 +89,9 @@ export class OpenAIService {
     } = options;
 
     console.log(`Calling OpenAI backend API - Model: ${model}, Messages: ${messages.length}`);
-    const startTime = Date.now();
 
     try {
-      // Create AbortController for 5-second timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-      const invokePromise = supabase.functions.invoke('openai-chat', {
+      const { data, error } = await supabase.functions.invoke('openai-chat', {
         body: {
           messages,
           options: {
@@ -108,20 +103,6 @@ export class OpenAIService {
           }
         }
       });
-
-      // Race between the API call and timeout
-      const { data, error } = await Promise.race([
-        invokePromise,
-        new Promise<never>((_, reject) => {
-          controller.signal.addEventListener('abort', () => {
-            reject(new Error('Request timed out after 5 seconds'));
-          });
-        })
-      ]);
-
-      clearTimeout(timeoutId);
-      const elapsed = Date.now() - startTime;
-      console.log(`Backend API completed - Model: ${model}, Elapsed: ${elapsed}ms`);
 
       if (error) {
         console.error('Backend API error:', error);
@@ -148,18 +129,6 @@ export class OpenAIService {
       try {
         const parsed = JSON.parse(content);
         console.log('Successfully parsed backend JSON response');
-        
-        // Add metadata about the API call for proper audit tracking
-        if (parsed && typeof parsed === 'object') {
-          parsed._apiMeta = {
-            modelUsed: model,
-            retryAttempt: 0,
-            originalModel: model,
-            textSpeed: 'fast',
-            backendUsed: true
-          };
-        }
-        
         return parsed;
       } catch (parseError) {
         console.error('JSON parse error from backend:', parseError);
@@ -175,18 +144,6 @@ export class OpenAIService {
         try {
           const parsed = JSON.parse(cleanedContent);
           console.log('Successfully parsed cleaned backend JSON:', parsed);
-          
-          // Add metadata for cleaned parse
-          if (parsed && typeof parsed === 'object') {
-            parsed._apiMeta = {
-              modelUsed: model,
-              retryAttempt: 0,
-              originalModel: model,
-              textSpeed: 'fast',
-              backendUsed: true
-            };
-          }
-          
           return parsed;
         } catch (cleanError) {
           // Final attempt: extract largest JSON block
@@ -195,18 +152,6 @@ export class OpenAIService {
             try {
               const extracted = JSON.parse(jsonMatch[0]);
               console.log('Successfully extracted JSON from backend response:', extracted);
-              
-              // Add metadata for extracted parse
-              if (extracted && typeof extracted === 'object') {
-                extracted._apiMeta = {
-                  modelUsed: model,
-                  retryAttempt: 0,
-                  originalModel: model,
-                  textSpeed: 'fast',
-                  backendUsed: true
-                };
-              }
-              
               return extracted;
             } catch (e) {
               console.error('Failed to parse extracted JSON:', e);
@@ -233,176 +178,6 @@ export class OpenAIService {
     }
   }
 
-  private async callBackendAPIWithHedging(messages: Array<{role: string; content: string}>, options: any = {}): Promise<any> {
-    const runtimeOverrides = getRuntimeOverrides();
-    const isStrictMode = runtimeOverrides.strictModelEnabled ?? true;
-    const isVeryFastModel = ['gpt-4o-mini', 'gpt-5-mini-2025-08-07', 'o4-mini-2025-04-16'].includes(options.model || 'gpt-4o-mini');
-    const userModel = options.model || 'gpt-4o-mini';
-    
-    console.log(`🏃‍♂️ Backend generation: User model ${MODEL_DISPLAY_NAMES[userModel] || userModel} ${isVeryFastModel ? '(Very Fast)' : '(Standard)'} ${isStrictMode ? '[STRICT]' : '[LEGACY]'}`);
-    
-    // In strict mode, only use the user's selected model
-    if (isStrictMode) {
-      console.log('🔒 Strict mode enabled - using only selected model');
-      const primaryCall = this.callBackendAPI(messages, options);
-      
-      // Reduce timeout to 18 seconds for non-strict fallback
-      const maxTimeout = 18000;
-      const totalTimeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error(`Strict mode timeout (${maxTimeout/1000}s)`)), maxTimeout)
-      );
-      
-      try {
-        const result = await Promise.race([primaryCall, totalTimeout]);
-        
-        // Store telemetry
-        localStorage.setItem('last_text_model', userModel);
-        localStorage.setItem('last_requested_model', userModel);
-        
-        // Add metadata about strict mode usage
-        if (result && typeof result === 'object') {
-          result._apiMeta = {
-            ...result._apiMeta,
-            strictMode: true,
-            requestedModel: userModel,
-            usedModel: userModel
-          };
-        }
-        
-        return result;
-      } catch (error) {
-        console.warn(`Strict mode model ${MODEL_DISPLAY_NAMES[userModel] || userModel} failed:`, error);
-        
-        // Store failed attempt telemetry
-        localStorage.setItem('last_requested_model', userModel);
-        localStorage.setItem('last_text_model', 'failed');
-        
-        // In strict mode, don't hedge - respect user choice
-        if (this.apiKey) {
-          console.log('Falling back to frontend API in strict mode');
-          return this.chatJSON(messages, options);
-        }
-        throw error;
-      }
-    }
-    
-    // Legacy non-strict mode with hedging
-    console.log('⚡ Legacy mode - using hedging strategy');
-    
-    // Create a primary call with user's selected model
-    const primaryCall = this.callBackendAPI(messages, options);
-    
-    // Cap non-strict slow paths at 18 seconds
-    const totalTimeout = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Legacy mode timeout (18s)')), 18000)
-    );
-    
-    if (isVeryFastModel) {
-      // For fast models, just use them directly with timeout
-      try {
-        const result = await Promise.race([primaryCall, totalTimeout]);
-        localStorage.setItem('last_text_model', userModel);
-        localStorage.setItem('last_requested_model', userModel);
-        return result;
-      } catch (error) {
-        console.warn(`Fast model ${MODEL_DISPLAY_NAMES[userModel] || userModel} failed, falling back to frontend API if available`);
-        localStorage.setItem('last_requested_model', userModel);
-        localStorage.setItem('last_text_model', 'fallback-frontend');
-        if (this.apiKey) {
-          return this.chatJSON(messages, options);
-        }
-        throw error;
-      }
-    }
-    
-    // For slower models, implement hedging but prioritize user's model choice
-    const hedgingDelay = new Promise(resolve => setTimeout(resolve, 700));
-    
-    try {
-      // Race the primary call against the hedging delay
-      const primaryResult = await Promise.race([primaryCall, hedgingDelay]);
-      
-      // If primary resolved, return it
-      if (primaryResult !== undefined) {
-        console.log(`✅ User model ${MODEL_DISPLAY_NAMES[userModel] || userModel} completed in <700ms`);
-        localStorage.setItem('last_text_model', userModel);
-        localStorage.setItem('last_requested_model', userModel);
-        return primaryResult;
-      }
-    } catch (error) {
-      // Primary failed quickly, continue to hedging
-      console.warn(`User model ${MODEL_DISPLAY_NAMES[userModel] || userModel} failed:`, error);
-    }
-    
-    // Only hedge if user didn't select GPT-4.1 - respect their choice
-    if (userModel === 'gpt-4.1-2025-04-14') {
-      console.log('🔒 User selected GPT-4.1 - respecting choice, no hedging');
-      try {
-        const result = await Promise.race([primaryCall, totalTimeout]);
-        localStorage.setItem('last_text_model', userModel);
-        localStorage.setItem('last_requested_model', userModel);
-        return result;
-      } catch (error) {
-        console.warn('GPT-4.1 failed, falling back to frontend API if available');
-        localStorage.setItem('last_requested_model', userModel);
-        localStorage.setItem('last_text_model', 'fallback-frontend');
-        if (this.apiKey) {
-          return this.chatJSON(messages, options);
-        }
-        throw error;
-      }
-    }
-    
-    // Start hedging call with O4 Mini (fastest) for other models
-    console.log('🏃‍♂️ Starting hedged call with O4 Mini after 700ms delay');
-    const hedgingCall = this.callBackendAPI(messages, {
-      ...options,
-      model: 'o4-mini-2025-04-16'
-    });
-    
-    try {
-      // Race the (potentially still running) primary call, hedging call, and total timeout
-      const result = await Promise.race([
-        primaryCall,
-        hedgingCall,
-        totalTimeout
-      ]);
-      
-      console.log(`✅ Backend generation completed`);
-      
-      // Store telemetry - track which model actually responded first
-      const actualModel = result?._apiMeta?.modelUsed || 'unknown';
-      localStorage.setItem('last_text_model', actualModel);
-      localStorage.setItem('last_requested_model', userModel);
-      
-      // Add clearer metadata about hedging
-      if (result && typeof result === 'object') {
-        result._apiMeta = {
-          ...result._apiMeta,
-          strictMode: false,
-          requestedModel: userModel,
-          usedModel: actualModel,
-          hedgingUsed: actualModel !== userModel
-        };
-      }
-      
-      return result;
-      
-    } catch (error) {
-      console.warn('Both primary and hedging calls failed, falling back to frontend API if available');
-      
-      localStorage.setItem('last_requested_model', userModel);
-      localStorage.setItem('last_text_model', 'fallback-frontend');
-      
-      // Final fallback to frontend API if available
-      if (this.apiKey) {
-        return this.chatJSON(messages, options);
-      }
-      
-      throw error;
-    }
-  }
-
   async chatJSON(messages: Array<{role: string; content: string}>, options: {
     temperature?: number;
     max_tokens?: number;
@@ -411,7 +186,7 @@ export class OpenAIService {
   } = {}): Promise<any> {
     // Use backend API if available, fallback to frontend
     if (this.useBackendAPI) {
-      return this.callBackendAPIWithHedging(messages, options);
+      return this.callBackendAPI(messages, options);
     }
     
     if (!this.apiKey) {
@@ -582,23 +357,11 @@ export class OpenAIService {
     const prompt = buildPopCultureSearchPrompt(category, searchTerm);
 
     try {
-      // Use effective model from settings if strict mode is enabled
-      const { strictModelEnabled } = getRuntimeOverrides();
-      const effectiveConfig = getEffectiveConfig();
-      const searchModel = strictModelEnabled ? effectiveConfig.generation.model : 'gpt-4.1-2025-04-14';
-      
-      // Use shorter prompt and token limit for GPT-4.1 fast path
-      const isGPT41 = searchModel.includes('gpt-4.1');
-      const maxTokens = isGPT41 ? 220 : 500;
-      const fastPrompt = isGPT41 ? 
-        `Find 5 ${category} items related to "${searchTerm}". JSON format: {"suggestions":[{"title":"","description":""}]}` : 
-        prompt;
-
       const result = await this.chatJSON([
-        { role: 'user', content: fastPrompt }
+        { role: 'user', content: prompt }
       ], {
-        max_completion_tokens: maxTokens,
-        model: searchModel
+        max_completion_tokens: 500,
+        model: 'gpt-4.1-2025-04-14' // More reliable model
       });
 
       // Post-process to ensure we have exactly 5 valid items

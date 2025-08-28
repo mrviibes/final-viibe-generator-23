@@ -22,10 +22,7 @@ export interface AIRuntimeOverrides {
   defaultTone?: Tone;
   magicPromptEnabled?: boolean;
   ideogramModel?: 'V_2A_TURBO' | 'V_3';
-  typographyStyle?: 'poster' | 'negative_space' | 'subtle_caption';
-  exactTextOverlayMode?: boolean;
-  strictModelEnabled?: boolean;
-  fastVisualsEnabled?: boolean;
+  typographyStyle?: 'poster' | 'negative_space';
 }
 
 // Get runtime overrides from localStorage
@@ -43,30 +40,10 @@ export function getRuntimeOverrides(): AIRuntimeOverrides {
         localStorage.removeItem('ideogram_selected_model');
       }
     }
-
-    // Set fast defaults if not explicitly set
-    if (overrides.strictModelEnabled === undefined) {
-      overrides.strictModelEnabled = true;
-    }
-    if (overrides.fastVisualsEnabled === undefined) {
-      overrides.fastVisualsEnabled = true;
-    }
-    if (overrides.ideogramModel === undefined) {
-      overrides.ideogramModel = 'V_3';
-    }
-    if (overrides.typographyStyle === undefined) {
-      overrides.typographyStyle = 'subtle_caption';
-    }
     
     return overrides;
   } catch {
-    // Set fast defaults as fallback
-    const defaults = {
-      strictModelEnabled: true,
-      fastVisualsEnabled: true
-    };
-    setRuntimeOverrides(defaults);
-    return defaults;
+    return {};
   }
 }
 
@@ -166,7 +143,6 @@ export interface OutputSchema {
 // Legacy types for backward compatibility
 export interface VibeInputs extends Partial<UserInputs> {
   // Backward compatibility mappings
-  exactWords?: string; // Specific words that must appear in generated text
 }
 
 export interface VibeCandidate {
@@ -190,7 +166,6 @@ export interface VibeResult {
     originalModel?: string;
     originalModelDisplayName?: string;
     spellingFiltered?: number;
-    topUpUsed?: boolean;
   };
 }
 
@@ -214,26 +189,25 @@ export interface IdeogramHandoff {
 
 // Fixed negative prompt applied to all image generations
 export const DEFAULT_NEGATIVE_PROMPT = "misspellings, distorted letters, extra characters, typos, random symbols, unreadable fonts, cartoon style, flat colors, empty background, isolated subject, small text, hidden text";
-// Model fallback chains for retry strategy - prioritize GPT-4.1 for quality
+// Model fallback chains for retry strategy
 export const MODEL_FALLBACK_CHAINS = {
   text: [
-    'gpt-4.1-2025-04-14',      // High quality, reliable
-    'o4-mini-2025-04-16',      // Fast reasoning model
-    'gpt-5-mini-2025-08-07'    // Fast and efficient
+    'gpt-5-mini-2025-08-07',
+    'gpt-4.1-2025-04-14', 
+    'o4-mini-2025-04-16'
   ],
   visual: [
-    'gpt-4.1-2025-04-14',      // High quality for visuals
-    'o4-mini-2025-04-16',      // Fast reasoning model
-    'gpt-5-mini-2025-08-07'    // Fast and efficient
+    'gpt-5-mini-2025-08-07',
+    'gpt-4.1-2025-04-14',
+    'o4-mini-2025-04-16'
   ]
 };
 
 // Available models for UI
 export const AVAILABLE_MODELS = [
-  { value: 'gpt-4.1-2025-04-14', label: 'GPT-4.1 (Recommended)', isRecommended: true },
-  { value: 'gpt-4o-mini', label: 'GPT-4o Mini (Fast)', isRecommended: false },
-  { value: 'gpt-5-mini-2025-08-07', label: 'GPT-5 Mini', isRecommended: false },
   { value: 'gpt-5-2025-08-07', label: 'GPT-5 (Flagship)', isRecommended: false },
+  { value: 'gpt-5-mini-2025-08-07', label: 'GPT-5 Mini', isRecommended: true },
+  { value: 'gpt-4.1-2025-04-14', label: 'GPT-4.1', isRecommended: false },
   { value: 'o4-mini-2025-04-16', label: 'O4 Mini (Fast Reasoning)', isRecommended: false },
   { value: 'o3-2025-04-16', label: 'O3 (Powerful Reasoning)', isRecommended: false },
 ];
@@ -278,15 +252,14 @@ export const AI_CONFIG = {
     popCultureAllowsSecondary: (cat: Category) => cat === "Pop Culture"
   },
   generation: {
-    max_candidates: 4, // Reduced from 6 to 4 for faster generation
+    max_candidates: 6,
     temperature: 0.7,
-    max_tokens: 120, // Kept at 120 for quality
-    model: 'gpt-4.1-2025-04-14' // GPT-4.1 as default for quality
+    max_tokens: 150,
+    model: 'gpt-5-mini-2025-08-07' // High-quality model for better spelling accuracy
   },
   visual_generation: {
     max_tokens: 450, // Reduced for faster concepts
-    fast_max_tokens: 160, // For ultra-fast 3-4.5s generation
-    model: 'gpt-4.1-2025-04-14' // GPT-4.1 as default for quality
+    model: 'gpt-5-mini-2025-08-07' // Use selected model from settings
   }
 };
 
@@ -323,8 +296,7 @@ export function getEffectiveConfig() {
     },
     visual_generation: {
       ...AI_CONFIG.visual_generation,
-      model: overrides.model ?? AI_CONFIG.visual_generation.model,
-      max_tokens: overrides.fastVisualsEnabled ? AI_CONFIG.visual_generation.fast_max_tokens : AI_CONFIG.visual_generation.max_tokens
+      model: overrides.model ?? AI_CONFIG.visual_generation.model
     }
   };
 }
@@ -349,15 +321,8 @@ RULES:
 - CRITICAL: Visual concepts MUST relate to the provided text/joke content and tone
 - Provide exactly one background-only concept and 3 distinct subject+background concepts
 - For Pride themes: Include rainbow, drag queens, parades, celebrations, fabulous elements
-- For Christmas themes: MANDATORY - Include Christmas trees, red and green colors, ornaments, festive lighting, holiday spirit, winter atmosphere
 - For jokes: Match the humor and subject matter exactly
 - EXCLUDE music/singing content unless tags explicitly include music, singing, concert, or performance
-
-CHRISTMAS CRITICAL INSTRUCTIONS:
-- When Christmas/holiday themes detected, at least 3 of 4 concepts MUST include explicit Christmas elements
-- Use rich Christmas color palette: deep reds, forest greens, golden accents, warm whites
-- Include traditional elements: Christmas trees, ornaments, lights, garlands, wreaths, snow
-- Create warm, festive atmosphere with holiday spirit and winter wonderland vibes
 
 Format:
 {
@@ -368,132 +333,33 @@ Format:
       "prompt": "concise prompt (40-60 words)"
     }
   ]
-}`,
-
-  visual_generator_fast: `4 visual concepts, JSON only, 30 words max each:
-{"options":[{"subject":"brief","background":"brief","prompt":"30 words max"}]}`
+}`
 };
 
 // =========================
 // 4) Validation and Banned Content
 // =========================
 export const BANNED_PATTERNS = [
-  /here are .*:?$/i,
-  /here's .*:?$/i,
-  /\bhere are some\b/i,
-  /\bhere's some\b/i,
-  /\bhere are a few\b/i,
-  /\bhere's a few\b/i,
-  /^1\./,
-  /^•/,
-  /^\*/,
-  /^-\s/,
-  /\bfor example\b/i,
-  /\balternatively\b/i,
-  /\banother option\b/i,
-  /\bhow about\b/i,
-  /\byou could also say\b/i,
-  /\btry this\b/i,
-  /\bhave fun with\b/i,
-  /\bmake it fun\b/i,
-  /\bgood luck\b/i,
-  /\bhope this helps\b/i,
-  /let me know if/i,
-  /\bsuggestion\b/i,
-  /\brecommendation\b/i,
-  /\boption\b.*\d/i,
-  /version \d/i,
-  /variation \d/i,
-  /:$/,
-  /^Note:/i,
-  /^Remember:/i,
-  /^Keep in mind/i,
-  /^Feel free/i,
-  /^Don't forget/i,
-  /^Make sure/i,
-  /^You can/i,
-  /^Consider/i,
-  /^Think about/i,
-  /\bassistant\b/i,
-  /\bAI\b/,
-  /\bgenerat/i,
-  /\bcreat/i,
-  /\bsuggestion/i,
-  /\bmeta/i,
-  /\binstead\b/i,
-  /\bother\b.*\boption/i,
-  /\banother\b.*\bidea/i,
-  /\balternat/i,
-  /\bvariation/i,
-  /^\d+[\.\)]/,
-  /\bchoose\b/i,
-  /\bselect\b/i,
-  /\bpick\b/i,
-  /\bdecide\b/i,
-  /\bupdate\b.*\bwith\b/i,
-  /\breplace\b.*\bwith\b/i,
-  /\bswap\b.*\bfor\b/i,
-  /\bchange\b.*\bto\b/i,
-  /feel free to/i,
-  /\btip\b:/i,
-  /\bbonus\b:/i,
-  /\bpro tip\b/i,
   /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]/gu, // emojis
   /#\w+/g, // hashtags
   /["'""`]/g, // quotes
   /\n|\r/g // newlines
 ];
 
-// Additional patterns for meta/filler phrases that should never appear
-export const META_BANNED_PHRASES = [
-  /short and witty like you asked/i,
-  /witty like you asked/i,
-  /as requested/i,
-  /per your request/i,
-  /like you wanted/i,
-  /as you asked/i,
-  /here you go/i,
-  /there you have it/i,
-  /voila/i,
-  /ta-da/i,
-  /perfect for you/i,
-  /just for you/i,
-  /custom.*for you/i,
-  /tailored.*for you/i,
-  /made.*for you/i
-];
-
-// Quality-specific banned patterns for short/templated content
-export const QUALITY_BANNED_SUFFIXES = /(activated|ready|mode(?: on| engaged)?|incoming|engaged|vibes only|energy)\.?$/i;
-export const QUALITY_BANNED_PHRASES = /(laugh track|punchline ready|comedy mode|funny bone)/i;
-
 export const BANNED_WORDS = [
-  'assistant',
-  'ai',
-  'generate',
-  'generator',
-  'create',
-  'creating',
-  'suggestion',
-  'recommend',
-  'option',
-  'alternative',
-  'variation',
-  'example',
-  'sample',
   'shit', 'fuck', 'damn', 'bitch', 'ass', 'hell',
   'stupid', 'idiot', 'moron', 'loser', 'ugly', 'fat'
 ];
 
 export const TONE_FALLBACKS: Record<string, string> = {
-  humorous: "Life's too short not to laugh at this situation",
-  savage: "Sometimes the truth hits differently than expected",
-  sentimental: "These moments remind us what really matters most",
-  nostalgic: "Taking you back to when things felt simpler somehow",
-  romantic: "When words capture feelings the heart already knows",
-  inspirational: "Every step forward counts more than you realize",
-  playful: "Bringing out the fun side that's been hiding lately",
-  serious: "Worth considering from every possible angle before deciding"
+  humorous: "Short and witty like you asked",
+  savage: "Bold and direct as requested",
+  sentimental: "Heartfelt message coming right up",
+  nostalgic: "Memory lane vibes activated",
+  romantic: "Sweet words in progress",
+  inspirational: "Motivational mode engaged",
+  playful: "Fun and light as ordered",
+  serious: "Thoughtful message loading"
 };
 
 // =========================
@@ -627,148 +493,164 @@ function spellcheck(s: string): string[] {
   return issues;
 }
 
-export function postProcessLine(
-  line: string, 
-  tone: string, 
-  tags?: string[], 
-  options?: { allowNewlines?: boolean; format?: 'knockknock'; exactWords?: string }
-): VibeCandidate {
-  // Clean up the line
-  let cleaned = line.trim()
-    .replace(/^["']|["']$/g, '')  // Remove quotes
-    .replace(/^\d+[\.\)\-]\s*/, '') // Remove numbering
-    .replace(/^[•\-\*]\s*/, '')     // Remove bullet points
-    .trim();
-
-  // Handle knock-knock format preservation
-  if (options?.format === 'knockknock' && options?.allowNewlines) {
-    // For knock-knock jokes, preserve the structure but clean excess whitespace
-    cleaned = cleaned.replace(/\n\s*\n/g, '\n'); // Remove excessive line breaks
+export function postProcessLine(line: string, tone: string, requiredTags?: string[], options?: { allowNewlines?: boolean; format?: 'knockknock' }): VibeCandidate {
+  // Trim spaces
+  let cleaned = line.trim();
+  
+  // Handle knock-knock format
+  const isKnockKnock = options?.format === 'knockknock';
+  
+  if (isKnockKnock) {
+    // For knock-knock jokes, validate the 5-line structure
+    const lines = cleaned.split('\n');
+    if (lines.length !== 5) {
+      return {
+        line: TONE_FALLBACKS[tone.toLowerCase()] || TONE_FALLBACKS.humorous,
+        blocked: true,
+        reason: 'Invalid knock-knock structure - needs exactly 5 lines'
+      };
+    }
+    
+    // Validate basic knock-knock pattern (tolerant)
+    const knockKnockPattern = /knock[,\s]*knock/i;
+    const whoTherePattern = /who'?s\s+there/i;
+    const whoPattern = /who\?/i;
+    
+    if (!knockKnockPattern.test(lines[0]) || 
+        !whoTherePattern.test(lines[1]) || 
+        !whoPattern.test(lines[3])) {
+      return {
+        line: TONE_FALLBACKS[tone.toLowerCase()] || TONE_FALLBACKS.humorous,
+        blocked: true,
+        reason: 'Invalid knock-knock pattern'
+      };
+    }
+    
+    // Use higher length cap for knock-knock (180 chars total, ~60 per line max)
+    if (cleaned.length > 180) {
+      cleaned = cleaned.slice(0, 180);
+    }
+    
+    // Skip savage tone block for knock-knock format and don't remove newlines
+    // Still check for banned words but allow the structure
   } else {
-    // For other formats, remove newlines as before
-    cleaned = cleaned.replace(/\s*\n\s*/g, ' ');
-  }
-
-  // Check for banned patterns (meta-responses, instructional content)
-  const isBannedPattern = BANNED_PATTERNS.some(pattern => pattern.test(cleaned));
-  if (isBannedPattern) {
-    return {
-      line: cleaned,
-      blocked: true,
-      reason: 'Content contains banned patterns (meta-response or instructional)'
-    };
-  }
-
-  // Check for meta/filler phrases that should never appear
-  const isMetaBannedPhrase = META_BANNED_PHRASES.some(pattern => pattern.test(cleaned));
-  if (isMetaBannedPhrase) {
-    return {
-      line: cleaned,
-      blocked: true,
-      reason: 'Content contains meta/filler phrases'
-    };
-  }
-
-  // Check for banned words in isolation
-  const words = cleaned.toLowerCase().split(/\s+/);
-  const hasBannedWord = words.some(word => 
-    BANNED_WORDS.some(banned => word.includes(banned.toLowerCase()))
-  );
-  if (hasBannedWord) {
-    return {
-      line: cleaned,
-      blocked: true,
-      reason: 'Content contains banned words (meta or instructional language)'
-    };
-  }
-
-  // Quality gates - check length and word count
-  const wordCount = cleaned.split(/\s+/).filter(Boolean).length;
-  if (cleaned.length < 28 || wordCount < 5) {
-    return {
-      line: cleaned,
-      blocked: true,
-      reason: 'Content too short - must be at least 28 characters and 5 words'
-    };
-  }
-
-  // Check for quality-banned suffixes (templated endings)
-  if (QUALITY_BANNED_SUFFIXES.test(cleaned)) {
-    return {
-      line: cleaned,
-      blocked: true,
-      reason: 'Content contains templated/generic endings'
-    };
-  }
-
-  // Check for quality-banned phrases (low-effort phrases)
-  if (QUALITY_BANNED_PHRASES.test(cleaned)) {
-    return {
-      line: cleaned,
-      blocked: true,
-      reason: 'Content contains low-quality templated phrases'
-    };
-  }
-
-  // Spelling and quality checks
-  const commonMisspellings = [
-    { wrong: /\brecieve\b/gi, right: 'receive' },
-    { wrong: /\bdefinate\b/gi, right: 'definite' },
-    { wrong: /\boccured\b/gi, right: 'occurred' },
-    { wrong: /\bexercizes\b/gi, right: 'exercises' },
-    { wrong: /\benvironement\b/gi, right: 'environment' },
-    { wrong: /\bmaintainence\b/gi, right: 'maintenance' },
-    { wrong: /\binconvienient\b/gi, right: 'inconvenient' },
-    { wrong: /\bprefer\b(?!red|ence|able)\w*/gi, right: 'prefer' }
-  ];
-
-  let hasSpellingIssues = false;
-  for (const { wrong } of commonMisspellings) {
-    if (wrong.test(cleaned)) {
-      hasSpellingIssues = true;
-      break;
+    // Remove banned patterns (emojis, hashtags, quotes, newlines) for non-knock-knock
+    for (const pattern of BANNED_PATTERNS) {
+      cleaned = cleaned.replace(pattern, '');
     }
   }
-
-  if (hasSpellingIssues) {
-    return {
-      line: cleaned,
-      blocked: true,
-      reason: 'Spelling issues detected'
-    };
+  
+  // Apply text normalization and fixes
+  cleaned = normalizeTypography(cleaned);
+  cleaned = applyIdiomsAndContractions(cleaned);
+  
+  // Fix common text generation errors
+  // Remove duplicate words (e.g., "to beance to become" -> "to become")
+  cleaned = cleaned.replace(/\b(\w+)\s+\w*\1/gi, '$1');
+  
+  // Fix repeated "to" patterns specifically
+  cleaned = cleaned.replace(/\bto\s+\w*to\b/gi, 'to');
+  
+  // Fix common spelling errors specific to generation
+  cleaned = cleaned.replace(/\basement\b/gi, 'basement')
+    .replace(/\bcarrer\b/gi, 'career')
+    .replace(/\bskils\b/gi, 'skills');
+  
+  // Remove double spaces and clean up
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  
+  // Hard truncate to 100 characters (or 180 for knock-knock)
+  const maxLength = isKnockKnock ? 180 : 100;
+  if (cleaned.length > maxLength) {
+    cleaned = cleaned.slice(0, maxLength);
   }
-
-  // Exact words requirement check (highest priority)
-  if (options?.exactWords && options.exactWords.trim()) {
-    const requiredWords = options.exactWords.trim().toLowerCase();
-    const lineText = cleaned.toLowerCase();
-    
-    if (!lineText.includes(requiredWords)) {
+  
+  // Check for banned words
+  const lowerCleaned = cleaned.toLowerCase();
+  for (const word of BANNED_WORDS) {
+    if (lowerCleaned.includes(word)) {
       return {
-        line: cleaned,
+        line: TONE_FALLBACKS[tone.toLowerCase()] || TONE_FALLBACKS.humorous,
         blocked: true,
-        reason: `Missing required exact words: "${options.exactWords.trim()}"`
+        reason: `Contains banned word: ${word}`
       };
     }
   }
-
-  // Tag coverage check
-  if (tags && tags.length > 0) {
-    const hasTagCoverage = tags.some(tag => 
-      cleaned.toLowerCase().includes(tag.toLowerCase()) ||
-      // Allow partial word matches for short tags
-      (tag.length > 3 && cleaned.toLowerCase().includes(tag.toLowerCase().slice(0, -1)))
-    );
-    
-    if (!hasTagCoverage) {
+  
+  // Check if empty after cleaning
+  if (!cleaned || cleaned.length === 0) {
+    return {
+      line: TONE_FALLBACKS[tone.toLowerCase()] || TONE_FALLBACKS.humorous,
+      blocked: true,
+      reason: 'Empty after cleaning'
+    };
+  }
+  
+  // Enforce savage tone quality - block joke-like content for savage (skip for knock-knock)
+  if (tone.toLowerCase() === 'savage' && !isKnockKnock) {
+    // Block obvious joke patterns that don't fit savage tone
+    if (cleaned.match(/^(why did|what do you call|knock knock)/i) || 
+        cleaned.match(/\?\!*$/i) ||
+        cleaned.match(/\bhaha\b|\blol\b|\bmeh\b/i)) {
       return {
-        line: cleaned,
+        line: TONE_FALLBACKS.savage,
         blocked: true,
-        reason: 'No tag coverage - missing required tags'
+        reason: 'Not savage enough - too joke-like'
       };
     }
   }
-
+  
+  // Check tag coverage for important tags (skip visual-only tags) - relaxed approach
+  if (requiredTags && requiredTags.length > 0) {
+    const visualOnlyTags = ['person', 'people', 'group', 'man', 'woman', 'male', 'female'];
+    const contentTags = requiredTags.filter(tag => !visualOnlyTags.includes(tag.toLowerCase()));
+    
+    if (contentTags.length > 0) {
+      // Create a simple synonyms map for common terms
+      const synonymsMap: Record<string, string[]> = {
+        'work': ['job', 'career', 'office', 'workplace', 'employment'],
+        'job': ['work', 'career', 'employment', 'position'],
+        'career': ['work', 'job', 'profession', 'employment'],
+        'birthday': ['bday', 'birth', 'celebration', 'party'],
+        'party': ['celebration', 'bash', 'gathering', 'event'],
+        'funny': ['hilarious', 'comedy', 'humor', 'joke', 'laughter'],
+        'movie': ['film', 'cinema', 'flick'],
+        'music': ['song', 'album', 'band', 'artist'],
+        'love': ['romance', 'relationship', 'dating', 'crush'],
+        'food': ['eat', 'meal', 'cooking', 'restaurant', 'dining']
+      };
+      
+      // Extract keywords from tags and check for matches with synonyms
+      const hasTagCoverage = contentTags.some(tag => {
+        const lowerTag = tag.toLowerCase();
+        
+        // Direct match
+        if (lowerCleaned.includes(lowerTag)) return true;
+        
+        // Check for synonyms
+        const synonyms = synonymsMap[lowerTag] || [];
+        if (synonyms.some(synonym => lowerCleaned.includes(synonym))) return true;
+        
+        // Check for partial word matches (e.g., "birthday" matches "birth")
+        if (lowerTag.length > 4) {
+          const rootWord = lowerTag.slice(0, -2); // Remove last 2 chars for partial match
+          if (lowerCleaned.includes(rootWord)) return true;
+        }
+        
+        return false;
+      });
+      
+      if (!hasTagCoverage) {
+        // Don't block for tag issues - just mark it
+        return {
+          line: cleaned,
+          blocked: false,
+          reason: `Partial tag coverage: ${contentTags.join(', ')}`
+        };
+      }
+    }
+  }
+  
   return {
     line: cleaned,
     blocked: false
@@ -792,71 +674,69 @@ function getFallbackVariants(tone: string, category: string, subcategory: string
   return variations;
 }
 
-export function phraseCandidates(u: UserInputs): string[] {
-  // Richer, contextual templates per tone - no generic templated endings
+function phraseCandidates(u: UserInputs): string[] {
+  // minimal, deterministic templates per tone
   const base: Record<Tone, string[]> = {
     Humorous: [
-      "Another year closer to becoming that person who tells cashiers about coupons",
-      "Celebrating another successful orbit around the sun without major incident",
-      "Age happens when you're busy making other questionable decisions",
-      "Growing older but definitely not growing up anytime soon"
+      "Adding years, not wisdom, apparently.",
+      "Proof you survived another lap around the sun.",
+      "Cake first, decisions later.",
+      "Aging like a meme from 2016."
     ],
     Savage: [
-      "Still waiting for that character development arc to kick in",
-      "Another year of perfecting the art of disappointment",
-      "Age brings wisdom, but apparently not to everyone",
-      "Time keeps moving but some people clearly don't"
+      "Another year, same excuses.",
+      "You call those goals? Cute.",
+      "Age is a number, discipline is not.",
+      "Legends train, tourists post."
     ],
     Sentimental: [
-      "Every moment matters when you're creating memories this special",
-      "Time moves fast but these feelings stay with us forever",
-      "Some days remind you exactly why life is worth celebrating",
-      "Building a collection of moments that money can't buy"
+      "Your story keeps getting better.",
+      "Grateful for your light.",
+      "Small moments, big meaning.",
+      "Today, you matter most."
     ],
     Nostalgic: [
-      "Remember when everything felt possible and nothing hurt this much",
-      "Taking you back to when music had real lyrics and phones had buttons",
-      "Those were the days when problems were smaller and dreams were bigger",
-      "Vintage vibes from a time when life felt more genuine"
+      "Back when plans were simple.",
+      "Save the playlist, keep the memories.",
+      "Old jokes, new laughs.",
+      "Yesterday called, it misses you."
     ],
     Romantic: [
-      "When someone makes your heart skip beats you didn't know existed",
-      "Finding home in someone else's smile and staying there forever",
-      "Love letters written in shared glances and stolen moments",
-      "Two hearts discovering they speak the same secret language"
+      "Meet me where the sparks are.",
+      "Your smile reroutes the day.",
+      "Hands, heartbeat, home.",
+      "Two tickets to always."
     ],
     Inspirational: [
-      "Every small step forward counts more than you realize today",
-      "Building dreams one determined decision at a time",
-      "Progress isn't always pretty but it's always worth pursuing",
-      "Champions are made during the moments nobody's watching"
+      "Small steps, loud results.",
+      "Progress loves consistency.",
+      "Start now, fix fast.",
+      "Do the boring reps."
     ],
     Playful: [
-      "Bringing chaos to perfectly organized situations since day one",
-      "Turning ordinary moments into adventures worth remembering",
-      "Life's too short for serious faces and sensible decisions",
-      "Adding sparkle and mischief wherever the day takes us"
+      "Chaos with extra sprinkles.",
+      "Try it, then brag.",
+      "Snack now, plan later.",
+      "Vibes set to mischievous."
     ],
     Serious: [
-      "Actions speak louder than words and results speak loudest",
-      "Focus on what matters and let everything else fade away",
-      "Building something meaningful requires patience and dedication",
-      "Quality decisions lead to quality outcomes every single time"
+      "Decide, then execute.",
+      "Remove noise, keep signal.",
+      "Respect the process.",
+      "Outcomes beat opinions."
     ]
   };
 
   let candidates = [...base[u.tone]];
 
-  // Context-aware customization
+  // Light context seasoning
   if (u.category === "Pop Culture" && u.search_term) {
-    candidates[0] = `${u.search_term} brings out the kind of ${u.tone.toLowerCase()} energy we all need right now`;
+    candidates = [...candidates];
+    candidates[0] = `${u.search_term}: scene-stealer energy.`;
   }
-  if (u.tags && u.tags.length && u.recipient_name) {
-    const firstTag = u.tags[0];
-    candidates[1] = `When ${u.recipient_name} gets into ${firstTag}, things get interesting fast`;
-  } else if (u.tags && u.tags.length) {
-    const firstTag = u.tags[0];
-    candidates[1] = `${firstTag} moments that remind you why life gets exciting`;
+  if (u.tags && u.tags.length) {
+    candidates = [...candidates];
+    candidates[1] = `${base[u.tone][1]} #${u.tags[0].replace(/\s+/g, "-")}`;
   }
 
   return candidates.slice(0, AI_CONFIG.limits.max_phrases);
@@ -992,10 +872,8 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   
   // TYPOGRAPHY STYLE PLACEMENT (if present)
   if (handoff.key_line && handoff.key_line.trim()) {
-    if (typographyStyle === 'negative_space') {
+    if (typographyStyle !== 'poster') {
       parts.push("Place text in natural negative space areas like sky, walls, or empty backgrounds. Use TOP, BOTTOM, LEFT, or RIGHT zones rather than always centering. Ensure high contrast and avoid overlapping with faces or main subjects.");
-    } else if (typographyStyle === 'subtle_caption') {
-      parts.push("Render text as small caption: 8-12% of image width, positioned in corners/edges or clear negative space. Strong contrast required. Never cover faces or key subjects. Use corner placement, edge margins, or unobtrusive clear zones.");
     }
   }
   
@@ -1196,7 +1074,7 @@ export function buildVibeGeneratorMessages(inputs: VibeInputs): Array<{role: str
       ? `\n• Incorporate "${inputs.recipient_name}" naturally into the setup or punchline (PG-rated, no slurs)`
       : '';
     
-    const corePrompt = `Generate 4 knock-knock joke options. Each joke must be exactly 5 lines with newlines between them:
+    const corePrompt = `Generate 6 knock-knock joke options. Each joke must be exactly 5 lines with newlines between them:
 
 Line 1: "Knock, knock."
 Line 2: "Who's there?"
@@ -1211,7 +1089,7 @@ ${inputs.recipient_name && inputs.recipient_name !== "-" ? `Target: ${inputs.rec
 Each joke should be a single string with actual newline characters (\\n) between the 5 lines.
 Keep total length under 180 characters including newlines.
 
-Return only: {"lines":["joke1\\nwith\\nnewlines","joke2\\nwith\\nnewlines","joke3\\nwith\\nnewlines","joke4\\nwith\\nnewlines"]}`;
+Return only: {"lines":["joke1\\nwith\\nnewlines","joke2\\nwith\\nnewlines","joke3\\nwith\\nnewlines","joke4\\nwith\\nnewlines","joke5\\nwith\\nnewlines","joke6\\nwith\\nnewlines"]}`;
 
     return [
       { role: 'system', content: 'Generate proper 5-line knock-knock jokes with newlines. JSON array only. No explanations.' },
@@ -1241,33 +1119,22 @@ Return only: {"lines":["joke1\\nwith\\nnewlines","joke2\\nwith\\nnewlines","joke
   }
 
   const tagRequirement = inputs.tags && inputs.tags.length > 0 
-    ? `\n• CRITICAL: Each option must include at least one of these tags (or a clear paraphrase): ${inputs.tags.join(', ')}`
+    ? `\n• Aim to include or reference these tags naturally (paraphrasing is fine): ${inputs.tags.join(', ')}`
     : '';
 
-  const exactWordsRequirement = inputs.exactWords && inputs.exactWords.trim() 
-    ? `\n• MANDATORY: Every option must include these exact words: "${inputs.exactWords.trim()}"`
-    : '';
-
-  const corePrompt = `Generate 4 distinct options, each 8-16 words (28-100 characters) for:
+  const corePrompt = `Generate 6 concise options under 100 chars each for:
 Category: ${inputs.category} > ${inputs.subcategory}
 Tone: ${inputs.tone}
 Tags: ${inputs.tags?.join(', ') || 'none'}
 ${inputs.recipient_name && inputs.recipient_name !== "-" ? `Target: ${inputs.recipient_name}` : ''}
 
-QUALITY REQUIREMENTS:
-• Each option must be 8-16 words and 28-100 characters
-• Make each option distinctly different in structure and wording
-• Use concrete, specific imagery - avoid generic templates
-• NEVER use: "activated", "ready", "mode on/engaged", "incoming", "vibes only", "energy", "laugh track", "funny bone", "punchline ready", "comedy mode"
-${tagRequirement}${exactWordsRequirement}${specialInstructions}
+${tagRequirement}${specialInstructions}
 
-IMPORTANT: Never generate meta phrases like "Short and witty like you asked", "As requested", "Here you go", or any commentary about the request. Only generate direct, usable content lines.
-
-Return only: {"lines":["option1","option2","option3","option4"]}`;
+Return only: {"lines":["option1","option2","option3","option4","option5","option6"]}`;
 
   const systemMessage = inputs.tone === 'Savage' 
-    ? 'Generate short, savage roasts/burns. Make them cutting and direct, NOT joke-like. JSON array only. Never include meta commentary.'
-    : 'Generate short, witty text. JSON array only. No explanations or meta commentary.';
+    ? 'Generate short, savage roasts/burns. Make them cutting and direct, NOT joke-like. JSON array only.'
+    : 'Generate short, witty text. JSON array only. No explanations.';
   
   return [
     { role: 'system', content: systemMessage },

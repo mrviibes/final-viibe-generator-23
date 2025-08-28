@@ -53,13 +53,7 @@ serve(async (req) => {
     let endpointUsed = '';
 
     const count = request.count || 1;
-    
-    // Detect exact text requests and apply enhanced processing
-    const isExactTextRequest = /EXACT TEXT:/i.test(request.prompt);
-    const normalizedPrompt = normalizePromptForIdeogram(request.prompt);
-    const finalPrompt = isExactTextRequest ? normalizedPrompt : request.prompt;
-    
-    console.log(`Ideogram API call - Model: ${modelToUse}, Count: ${count}, ExactText: ${isExactTextRequest}, Prompt: "${finalPrompt.substring(0, 80)}..."`);
+    console.log(`Ideogram API call - Model: ${modelToUse}, Count: ${count}, Prompt: EXACT TEXT: "${request.prompt.substring(0, 80)}..."`);
 
     if (count === 1) {
       // Single image generation with V3 endpoint support
@@ -74,7 +68,7 @@ serve(async (req) => {
         endpointUsed = 'v3-primary';
         
         const formData = new FormData();
-        formData.append('prompt', enhancePromptForV3ExactText(finalPrompt, isExactTextRequest));
+        formData.append('prompt', request.prompt);
         formData.append('resolution', mapAspectRatioToResolution(request.aspect_ratio));
         
         if (request.seed !== undefined) {
@@ -115,7 +109,7 @@ serve(async (req) => {
         endpointUsed = 'legacy';
         
         payload = {
-          prompt: finalPrompt,
+          prompt: request.prompt,
           aspect_ratio: request.aspect_ratio,
           model: modelToUse,
           magic_prompt_option: request.magic_prompt_option,
@@ -146,30 +140,7 @@ serve(async (req) => {
         const errorText = await response.text();
         console.error(`Ideogram API error (${response.status}) from ${endpointUsed}:`, errorText);
         
-        // For exact text requests, fail V3-only instead of falling back to V2
-        if (isExactTextRequest && modelToUse === 'V_3') {
-          console.log(`❌ V_3 failed for exact text request with ${response.status}. Refusing V2 fallback to preserve text quality.`);
-          
-          return new Response(JSON.stringify({ 
-            error: 'V3 model required for exact text rendering but is currently unavailable',
-            errorType: 'V3_UNAVAILABLE_FOR_EXACT_TEXT',
-            status: response.status,
-            endpoint_used: endpointUsed,
-            v3_attempts: v3Attempts,
-            suggestion: 'V3 model is temporarily unavailable. You can try again later or use client-side caption overlay for guaranteed text accuracy.',
-            userActions: {
-              canRetryWithTurbo: true,
-              canUseCaption: true,
-              retryMessage: 'Try Turbo model (may have lower text quality)',
-              captionMessage: 'Use Caption Overlay (perfect text, different style)'
-            }
-          }), {
-            status: 503,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-        
-        // Enhanced fallback conditions for V_3 (non-exact text)
+        // Enhanced fallback conditions for V_3
         if (modelToUse === 'V_3' && (
           response.status === 404 || 
           response.status === 400 || 
@@ -179,26 +150,6 @@ serve(async (req) => {
         )) {
           console.log(`⚠️ V_3 failed with ${response.status} after ${v3Attempts} attempt(s), attempting fallback to V_2A_TURBO`);
           shouldRetryWithTurbo = true;
-          
-          // For non-exact text, provide V3_UNAVAILABLE error type
-          if (!shouldRetryWithTurbo) {
-            return new Response(JSON.stringify({ 
-              error: 'V3 model is temporarily unavailable',
-              errorType: 'V3_UNAVAILABLE',
-              status: response.status,
-              endpoint_used: endpointUsed,
-              v3_attempts: v3Attempts,
-              suggestion: 'V3 model is temporarily unavailable. Try the Turbo model for reliable generation.',
-              userActions: {
-                canRetryWithTurbo: true,
-                canUseCaption: false,
-                retryMessage: 'Try Turbo model for reliable generation'
-              }
-            }), {
-              status: 503,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            });
-          }
         } else {
           let errorMessage = `HTTP ${response.status}`;
           try {
@@ -246,7 +197,7 @@ serve(async (req) => {
         modelToUse = 'V_2A_TURBO';
         
         const fallbackPayload: any = {
-          prompt: finalPrompt,
+          prompt: request.prompt,
           aspect_ratio: request.aspect_ratio,
           model: modelToUse,
           magic_prompt_option: request.magic_prompt_option,
@@ -298,9 +249,7 @@ serve(async (req) => {
         // Add a note about the fallback
         return new Response(JSON.stringify({
           ...fallbackData,
-          _fallback_note: 'V3 had an issue; used Turbo instead',
-          _model_used: 'V_2A_TURBO',
-          _original_model_requested: 'V_3'
+          _fallback_note: 'V3 had an issue; used Turbo instead'
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -317,7 +266,7 @@ serve(async (req) => {
         }
         
         const payload: any = {
-          prompt: finalPrompt,
+          prompt: request.prompt,
           aspect_ratio: request.aspect_ratio,
           model: effectiveModel,
           magic_prompt_option: request.magic_prompt_option,
@@ -416,60 +365,4 @@ function mapAspectRatioToResolution(aspectRatio: string): string {
   };
   
   return resolutionMap[aspectRatio] || '1024x1024';
-}
-
-// Text normalization function for better Ideogram rendering
-function normalizePromptForIdeogram(prompt: string): string {
-  return prompt
-    // Convert curly quotes to straight quotes
-    .replace(/[""]/g, '"')
-    .replace(/['']/g, "'")
-    // Convert em/en dashes to regular hyphens
-    .replace(/[—–]/g, '-')
-    // Normalize ellipsis
-    .replace(/…/g, '...')
-    // Fix common spacing issues around punctuation
-    .replace(/\s+([,.!?;:])/g, '$1')
-    .replace(/([.!?])\s*([A-Z])/g, '$1 $2')
-    // Apply common contraction fixes
-    .replace(/\byoud\b/gi, "you'd")
-    .replace(/\byoure\b/gi, "you're")
-    .replace(/\byoull\b/gi, "you'll")
-    .replace(/\byouve\b/gi, "you've")
-    .replace(/\btheyre\b/gi, "they're")
-    .replace(/\btheyll\b/gi, "they'll")
-    .replace(/\btheyve\b/gi, "they've")
-    .replace(/\bwere\b/gi, "we're")
-    .replace(/\bwell\b/gi, "we'll")
-    .replace(/\bweve\b/gi, "we've")
-    .replace(/\bits\b/gi, "it's")
-    .replace(/\bim\b/gi, "I'm")
-    .replace(/\bive\b/gi, "I've")
-    .replace(/\bill\b/gi, "I'll")
-    .replace(/\bid\b/gi, "I'd")
-    .replace(/\bwont\b/gi, "won't")
-    .replace(/\bcant\b/gi, "can't")
-    .replace(/\bdont\b/gi, "don't")
-    .replace(/\bdidnt\b/gi, "didn't")
-    .replace(/\bwasnt\b/gi, "wasn't")
-    .replace(/\bwerent\b/gi, "weren't")
-    .replace(/\bisnt\b/gi, "isn't")
-    .replace(/\barent\b/gi, "aren't")
-    .replace(/\bhasnt\b/gi, "hasn't")
-    .replace(/\bhavent\b/gi, "haven't")
-    .replace(/\bhadnt\b/gi, "hadn't")
-    .replace(/\bshouldnt\b/gi, "shouldn't")
-    .replace(/\bwouldnt\b/gi, "wouldn't")
-    .replace(/\bcouldnt\b/gi, "couldn't")
-    .trim();
-}
-
-// Enhanced V3 prompt for exact text requests
-function enhancePromptForV3ExactText(prompt: string, isExactText: boolean): string {
-  if (!isExactText) return prompt;
-  
-  // For exact text requests, emphasize typography and clarity
-  const basePrompt = prompt.replace(/EXACT TEXT:\s*/i, '');
-  
-  return `${basePrompt}. Typography-focused render with clean, readable text placement. High contrast text against background. Professional text rendering quality.`;
 }
