@@ -24,10 +24,15 @@ export default function AiSettings() {
   const { toast } = useToast();
   const [overrides, setOverrides] = useState<AIRuntimeOverrides>({});
   const [hasChanges, setHasChanges] = useState(false);
+  const [showLegacyWarning, setShowLegacyWarning] = useState(false);
 
   useEffect(() => {
     const current = getRuntimeOverrides();
     setOverrides(current);
+    
+    // Check if user is in legacy mode (non-strict)
+    const isLegacyMode = current.strictModelEnabled === false;
+    setShowLegacyWarning(isLegacyMode);
   }, []);
 
   // Get effective configuration with runtime overrides applied
@@ -78,6 +83,23 @@ export default function AiSettings() {
     setHasChanges(false);
   };
 
+  const enableStrictMode = () => {
+    const newOverrides = { 
+      ...overrides, 
+      strictModelEnabled: true,
+      fastVisualsEnabled: true,
+      model: 'gpt-4.1-2025-04-14' // Ensure GPT-4.1 is selected
+    };
+    setOverrides(newOverrides);
+    setRuntimeOverrides(newOverrides);
+    setShowLegacyWarning(false);
+    setHasChanges(false);
+    toast({
+      title: "Strict Mode Enabled",
+      description: "Now using GPT-4.1 directly without slow retry chains."
+    });
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -116,6 +138,31 @@ export default function AiSettings() {
 
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="grid gap-6">
+          {/* Legacy Mode Warning */}
+          {showLegacyWarning && (
+            <Card className="border-orange-500 bg-orange-50 dark:bg-orange-950/20">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-400">
+                  <AlertTriangle className="h-5 w-5" />
+                  Legacy Settings Detected
+                </CardTitle>
+                <CardDescription className="text-orange-600 dark:text-orange-300">
+                  You're using legacy mode with slow retry chains. For faster, more reliable results, enable strict mode.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-3">
+                  <Button onClick={enableStrictMode} className="gap-2">
+                    <Settings className="h-4 w-4" />
+                    Enable Strict Mode (Recommended)
+                  </Button>
+                  <p className="text-sm text-orange-600 dark:text-orange-300">
+                    Uses GPT-4.1 directly without fallbacks
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
           {/* Overview */}
           <Card>
             <CardHeader>
@@ -145,20 +192,32 @@ export default function AiSettings() {
                     {overrides.model ? "Override" : "Default"}
                   </Badge>
                 </div>
-                {/* Last Used Models (Read-only) */}
+                {/* Model Usage Telemetry */}
                 <div className="space-y-2">
-                  <p className="text-sm font-medium text-muted-foreground">Last Used Models</p>
-                  <div className="grid grid-cols-2 gap-2">
+                  <p className="text-sm font-medium text-muted-foreground">Model Usage Telemetry</p>
+                  <div className="grid grid-cols-1 gap-2">
                     <div className="flex items-center justify-between p-2 bg-muted/50 rounded">
-                      <span className="text-xs font-medium">Text:</span>
+                      <span className="text-xs font-medium">Requested:</span>
                       <Badge variant="outline" className="text-xs">
-                        {MODEL_DISPLAY_NAMES[localStorage.getItem('last_text_model') || effectiveConfig.generation.model] || 'Not set'}
+                        {MODEL_DISPLAY_NAMES[localStorage.getItem('last_requested_model') || effectiveConfig.generation.model] || 'Not set'}
                       </Badge>
                     </div>
                     <div className="flex items-center justify-between p-2 bg-muted/50 rounded">
-                      <span className="text-xs font-medium">Visuals:</span>
-                      <Badge variant="outline" className="text-xs">
-                        {MODEL_DISPLAY_NAMES[localStorage.getItem('last_visual_model') || effectiveConfig.visual_generation.model] || 'Not set'}
+                      <span className="text-xs font-medium">Actually Used:</span>
+                      <Badge 
+                        variant={
+                          localStorage.getItem('last_text_model')?.startsWith('fallback') ? "destructive" : 
+                          localStorage.getItem('last_text_model') === localStorage.getItem('last_requested_model') ? "default" : "secondary"
+                        } 
+                        className="text-xs"
+                      >
+                        {(() => {
+                          const lastUsed = localStorage.getItem('last_text_model');
+                          if (!lastUsed) return 'Not set';
+                          if (lastUsed === 'failed') return 'Failed';
+                          if (lastUsed.startsWith('fallback')) return 'Fallback (local presets)';
+                          return MODEL_DISPLAY_NAMES[lastUsed] || lastUsed;
+                        })()}
                       </Badge>
                     </div>
                   </div>
@@ -198,6 +257,41 @@ export default function AiSettings() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <Separator />
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label>Strict Model Enforcement</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Use only your selected model without slow retry chains (recommended)
+                  </p>
+                </div>
+                <Switch
+                  checked={overrides.strictModelEnabled ?? true}
+                  onCheckedChange={(checked) => {
+                    updateOverride('strictModelEnabled', checked);
+                    if (!checked) {
+                      setShowLegacyWarning(true);
+                    } else {
+                      setShowLegacyWarning(false);
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label>Fast Visuals</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Use optimized settings for faster visual concept generation
+                  </p>
+                </div>
+                <Switch
+                  checked={overrides.fastVisualsEnabled ?? true}
+                  onCheckedChange={(checked) => updateOverride('fastVisualsEnabled', checked)}
+                />
               </div>
 
             </CardContent>

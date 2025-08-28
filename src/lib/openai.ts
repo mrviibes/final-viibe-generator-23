@@ -234,25 +234,80 @@ export class OpenAIService {
   }
 
   private async callBackendAPIWithHedging(messages: Array<{role: string; content: string}>, options: any = {}): Promise<any> {
+    const runtimeOverrides = getRuntimeOverrides();
+    const isStrictMode = runtimeOverrides.strictModelEnabled ?? true;
     const isVeryFastModel = ['gpt-4o-mini', 'gpt-5-mini-2025-08-07', 'o4-mini-2025-04-16'].includes(options.model || 'gpt-4o-mini');
     const userModel = options.model || 'gpt-4o-mini';
     
-    console.log(`🏃‍♂️ Backend generation: User model ${MODEL_DISPLAY_NAMES[userModel] || userModel} ${isVeryFastModel ? '(Very Fast)' : '(Standard)'}`);
+    console.log(`🏃‍♂️ Backend generation: User model ${MODEL_DISPLAY_NAMES[userModel] || userModel} ${isVeryFastModel ? '(Very Fast)' : '(Standard)'} ${isStrictMode ? '[STRICT]' : '[LEGACY]'}`);
+    
+    // In strict mode, only use the user's selected model
+    if (isStrictMode) {
+      console.log('🔒 Strict mode enabled - using only selected model');
+      const primaryCall = this.callBackendAPI(messages, options);
+      
+      // Reduce timeout to 18 seconds for non-strict fallback
+      const maxTimeout = 18000;
+      const totalTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error(`Strict mode timeout (${maxTimeout/1000}s)`)), maxTimeout)
+      );
+      
+      try {
+        const result = await Promise.race([primaryCall, totalTimeout]);
+        
+        // Store telemetry
+        localStorage.setItem('last_text_model', userModel);
+        localStorage.setItem('last_requested_model', userModel);
+        
+        // Add metadata about strict mode usage
+        if (result && typeof result === 'object') {
+          result._apiMeta = {
+            ...result._apiMeta,
+            strictMode: true,
+            requestedModel: userModel,
+            usedModel: userModel
+          };
+        }
+        
+        return result;
+      } catch (error) {
+        console.warn(`Strict mode model ${MODEL_DISPLAY_NAMES[userModel] || userModel} failed:`, error);
+        
+        // Store failed attempt telemetry
+        localStorage.setItem('last_requested_model', userModel);
+        localStorage.setItem('last_text_model', 'failed');
+        
+        // In strict mode, don't hedge - respect user choice
+        if (this.apiKey) {
+          console.log('Falling back to frontend API in strict mode');
+          return this.chatJSON(messages, options);
+        }
+        throw error;
+      }
+    }
+    
+    // Legacy non-strict mode with hedging
+    console.log('⚡ Legacy mode - using hedging strategy');
     
     // Create a primary call with user's selected model
     const primaryCall = this.callBackendAPI(messages, options);
     
-    // Start the timeout timer
+    // Cap non-strict slow paths at 18 seconds
     const totalTimeout = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Total API timeout (8s)')), 8000)
+      setTimeout(() => reject(new Error('Legacy mode timeout (18s)')), 18000)
     );
     
     if (isVeryFastModel) {
       // For fast models, just use them directly with timeout
       try {
-        return await Promise.race([primaryCall, totalTimeout]);
+        const result = await Promise.race([primaryCall, totalTimeout]);
+        localStorage.setItem('last_text_model', userModel);
+        localStorage.setItem('last_requested_model', userModel);
+        return result;
       } catch (error) {
         console.warn(`Fast model ${MODEL_DISPLAY_NAMES[userModel] || userModel} failed, falling back to frontend API if available`);
+        localStorage.setItem('last_requested_model', userModel);
+        localStorage.setItem('last_text_model', 'fallback-frontend');
         if (this.apiKey) {
           return this.chatJSON(messages, options);
         }
@@ -270,6 +325,8 @@ export class OpenAIService {
       // If primary resolved, return it
       if (primaryResult !== undefined) {
         console.log(`✅ User model ${MODEL_DISPLAY_NAMES[userModel] || userModel} completed in <700ms`);
+        localStorage.setItem('last_text_model', userModel);
+        localStorage.setItem('last_requested_model', userModel);
         return primaryResult;
       }
     } catch (error) {
@@ -281,9 +338,14 @@ export class OpenAIService {
     if (userModel === 'gpt-4.1-2025-04-14') {
       console.log('🔒 User selected GPT-4.1 - respecting choice, no hedging');
       try {
-        return await Promise.race([primaryCall, totalTimeout]);
+        const result = await Promise.race([primaryCall, totalTimeout]);
+        localStorage.setItem('last_text_model', userModel);
+        localStorage.setItem('last_requested_model', userModel);
+        return result;
       } catch (error) {
         console.warn('GPT-4.1 failed, falling back to frontend API if available');
+        localStorage.setItem('last_requested_model', userModel);
+        localStorage.setItem('last_text_model', 'fallback-frontend');
         if (this.apiKey) {
           return this.chatJSON(messages, options);
         }
@@ -307,10 +369,30 @@ export class OpenAIService {
       ]);
       
       console.log(`✅ Backend generation completed`);
+      
+      // Store telemetry - track which model actually responded first
+      const actualModel = result?._apiMeta?.modelUsed || 'unknown';
+      localStorage.setItem('last_text_model', actualModel);
+      localStorage.setItem('last_requested_model', userModel);
+      
+      // Add clearer metadata about hedging
+      if (result && typeof result === 'object') {
+        result._apiMeta = {
+          ...result._apiMeta,
+          strictMode: false,
+          requestedModel: userModel,
+          usedModel: actualModel,
+          hedgingUsed: actualModel !== userModel
+        };
+      }
+      
       return result;
       
     } catch (error) {
       console.warn('Both primary and hedging calls failed, falling back to frontend API if available');
+      
+      localStorage.setItem('last_requested_model', userModel);
+      localStorage.setItem('last_text_model', 'fallback-frontend');
       
       // Final fallback to frontend API if available
       if (this.apiKey) {
