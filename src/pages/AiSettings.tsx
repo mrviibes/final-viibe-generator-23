@@ -327,14 +327,14 @@ export default function AiSettings() {
               <div className="space-y-2">
                 <Label>Default Tone</Label>
                 <Select
-                  value={overrides.defaultTone || ""}
-                  onValueChange={(value) => updateOverride('defaultTone', value as Tone)}
+                  value={overrides.defaultTone || "none"}
+                  onValueChange={(value) => updateOverride('defaultTone', value === "none" ? undefined : value as Tone)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="No default (user selects)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No default</SelectItem>
+                    <SelectItem value="none">No default</SelectItem>
                     {TONES.map(tone => (
                       <SelectItem key={tone.id} value={tone.id}>
                         {tone.name}
