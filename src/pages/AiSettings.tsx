@@ -192,10 +192,12 @@ export default function AiSettings() {
                   </SelectTrigger>
                   <SelectContent>
                     {AVAILABLE_MODELS.map(model => (
-                      <SelectItem key={model.id} value={model.id}>
+                      <SelectItem key={model.value} value={model.value}>
                         <div>
-                          <div className="font-medium">{model.name}</div>
-                          <div className="text-xs text-muted-foreground">{model.description}</div>
+                          <div className="font-medium">{model.label}</div>
+                          {model.isRecommended && (
+                            <div className="text-xs text-muted-foreground">Recommended</div>
+                          )}
                         </div>
                       </SelectItem>
                     ))}

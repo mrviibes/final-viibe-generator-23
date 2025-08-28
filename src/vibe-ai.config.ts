@@ -149,6 +149,7 @@ export interface VibeResult {
     reason?: string;
     retryAttempt?: number;
     originalModel?: string;
+    spellingFiltered?: number;
   };
 }
 
@@ -199,7 +200,7 @@ export const AI_CONFIG = {
     max_candidates: 6,
     temperature: 0.7,
     max_tokens: 150,
-    model: 'gpt-4o-mini' // Faster, more reliable for concept generation
+    model: 'gpt-5-mini-2025-08-07' // High-quality model for better spelling accuracy
   },
   visual_generation: {
     max_tokens: 450, // Reduced for faster concepts
@@ -919,11 +920,11 @@ export const bannedWords = BANNED_WORDS;
 
 // Available Models for dropdown selection
 export const AVAILABLE_MODELS = [
-  { id: "gpt-5-2025-08-07", name: "GPT-5 (Flagship)", description: "Best performance" },
-  { id: "gpt-5-mini-2025-08-07", name: "GPT-5 Mini", description: "Faster, cost-efficient" },
-  { id: "gpt-4.1-2025-04-14", name: "GPT-4.1", description: "Reliable results" },
-  { id: "gpt-4o-mini", name: "GPT-4o Mini (Default)", description: "Fast, optimized for concepts" },
-  { id: "o4-mini-2025-04-16", name: "O4 Mini", description: "Fast reasoning" }
+  { value: 'gpt-5-2025-08-07', label: 'GPT-5 (Flagship)', isRecommended: false },
+  { value: 'gpt-5-mini-2025-08-07', label: 'GPT-5 Mini (Default)', isRecommended: true },
+  { value: 'gpt-4.1-2025-04-14', label: 'GPT-4.1', isRecommended: false },
+  { value: 'gpt-4o-mini', label: 'GPT-4o Mini (Fast)', isRecommended: false },
+  { value: 'o4-mini-2025-04-16', label: 'O4 Mini', isRecommended: false }
 ];
 
 export const VISUAL_STYLES = [

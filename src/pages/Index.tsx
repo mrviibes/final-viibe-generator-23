@@ -4691,6 +4691,11 @@ const Index = () => {
           description: "The AI created content that may not exactly match all your keywords but fits the tone and context."
         });
       }
+      
+      // Show spelling filter notification if options were filtered for quality
+      if (vibeResult.audit.spellingFiltered && vibeResult.audit.spellingFiltered > 0) {
+        console.log(`📝 Filtered ${vibeResult.audit.spellingFiltered} options for spelling quality`);
+      }
       console.log('Vibe generation audit:', vibeResult.audit);
       console.log('✅ Generated text options:', vibeResult.candidates);
 
@@ -5784,9 +5789,12 @@ const Index = () => {
               // Add generated options available notice (when options generated but none selected)
               if (selectedCompletionOption === "ai-assist" && generatedOptions.length > 0 && !selectedGeneratedOption) {
                 const tagDisplay = tags.length > 0 ? `, tags: ${tags.join(", ")}` : " (no tags added)";
+                const qualityNote = generationAudit?.spellingFiltered && generationAudit.spellingFiltered > 0 
+                  ? ` • Filtered ${generationAudit.spellingFiltered} for quality`
+                  : "";
                 selections.push({
                   title: "Text options generated",
-                  subtitle: `100 characters max${tagDisplay}`,
+                  subtitle: `100 characters max${tagDisplay}${qualityNote}`,
                   onChangeSelection: () => {
                     setGeneratedOptions([]);
                     setSelectedGeneratedOption(null);
