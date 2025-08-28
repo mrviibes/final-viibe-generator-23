@@ -1,5 +1,5 @@
 import { openAIService } from './openai';
-import { SYSTEM_PROMPTS, buildVisualGeneratorMessages, getStyleKeywords } from '../vibe-ai.config';
+import { SYSTEM_PROMPTS, buildVisualGeneratorMessages, getStyleKeywords, getEffectiveConfig, isTemperatureSupported } from '../vibe-ai.config';
 
 export interface VisualInputs {
   category: string;
@@ -10,6 +10,7 @@ export interface VisualInputs {
   finalLine?: string;
   specificEntity?: string; // For personas like "Teresa Giudice"
   subjectOption?: string; // single-person, multiple-people, no-subject
+  subjectDescription?: string; // custom description for manual entry
   dimensions?: string; // square, 4:5, 9:16, etc.
 }
 
@@ -122,6 +123,9 @@ function hasVagueFillers(text: string): boolean {
 }
 
 function validateVisualOptions(options: VisualOption[], inputs: VisualInputs): VisualOption[] {
+  const validOptions: VisualOption[] = [];
+  const seenCompositions = new Set<string>();
+  
   return options.filter(option => {
     // Reject options with vague fillers
     if (hasVagueFillers(option.subject) || hasVagueFillers(option.background)) {
@@ -134,6 +138,26 @@ function validateVisualOptions(options: VisualOption[], inputs: VisualInputs): V
       console.warn('🚫 Rejected short prompt:', option.prompt.substring(0, 50));
       return false;
     }
+    
+    // Check for required objects based on subcategory
+    if (inputs.subcategory === 'Ice Hockey') {
+      const hasRequiredObjects = option.subject.toLowerCase().includes('hockey stick') || 
+                                option.subject.toLowerCase().includes('puck') ||
+                                option.prompt.toLowerCase().includes('hockey stick') ||
+                                option.prompt.toLowerCase().includes('puck');
+      if (!hasRequiredObjects) {
+        console.warn('🚫 Rejected hockey option missing required objects:', option.subject);
+        return false;
+      }
+    }
+    
+    // Check for composition variety (avoid duplicates)
+    const compositionKey = `${option.subject.substring(0, 20)}-${option.background.substring(0, 20)}`;
+    if (seenCompositions.has(compositionKey)) {
+      console.warn('🚫 Rejected duplicate composition:', option.subject);
+      return false;
+    }
+    seenCompositions.add(compositionKey);
     
     // Pride/theme relevance check - reject if completely off-topic
     if (inputs.finalLine) {
@@ -168,6 +192,36 @@ function getSlotBasedFallbacks(inputs: VisualInputs): VisualOption[] {
   const { category, subcategory, tone, tags, visualStyle, finalLine, specificEntity, subjectOption, dimensions } = inputs;
   const primaryTags = tags.slice(0, 3).join(', ') || 'dynamic energy';
   const occasion = subcategory || 'general';
+  
+  // Special handling for Ice Hockey with required objects
+  if (subcategory === 'Ice Hockey') {
+    return [
+      {
+        subject: "Professional hockey player with stick in action pose",
+        background: "ice rink arena with dramatic lighting and crowd in background",
+        prompt: `Professional hockey player mid-swing with hockey stick, puck visible in frame, ${tone} energy, ice rink arena with dramatic stadium lighting, cheering crowd in blurred background, action sports photography style, dynamic composition with negative space in upper area for text placement, high contrast lighting`,
+        slot: "action-sports"
+      },
+      {
+        subject: "Close-up of hockey stick and puck on ice surface",
+        background: "ice rink with goal net and arena lights",
+        prompt: `Detailed close-up of professional hockey stick and black puck on pristine ice surface, goal net visible in background, ice rink arena lighting creating dramatic shadows, ${tone} mood, sports equipment photography, clean composition with clear space at top for text, reflective ice surface`,
+        slot: "equipment-detail"
+      },
+      {
+        subject: "Hockey team celebration with sticks raised",
+        background: "ice rink with victory lighting and cheering fans",
+        prompt: `Hockey team players celebrating victory with sticks raised high, multiple hockey sticks visible, ice rink setting with bright victory lighting, cheering fans in background stands, ${tone} celebration energy, group sports photography, wide shot with space on sides for text placement`,
+        slot: "team-celebration"
+      },
+      {
+        subject: "Vintage hockey stick and puck with championship trophies",
+        background: "classic ice rink with warm nostalgic lighting",
+        prompt: `Vintage wooden hockey stick and classic puck displayed with championship trophies, classic ice rink environment with warm nostalgic lighting, ${tone} sentimental mood, still life sports photography, traditional composition with clear background space for text overlay`,
+        slot: "nostalgic-display"
+      }
+    ];
+  }
   const entity = specificEntity || 'subject';
   
   // Dynamic synonym pools to avoid repetitive fallbacks
@@ -263,20 +317,31 @@ export async function generateVisualRecommendations(
     const startTime = Date.now();
     console.log('🚀 Starting visual generation with optimized settings...');
     
+    // Use effective config (respecting user AI settings)
+    const effectiveConfig = getEffectiveConfig();
+    const targetModel = effectiveConfig.generation.model;
+    const targetTemperature = isTemperatureSupported(targetModel) ? effectiveConfig.generation.temperature : undefined;
+    
     // Create a timeout promise with reduced timeout
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error('TIMEOUT')), 18000);
     });
 
-    // Primary attempt with gpt-4o-mini for reliable JSON
+    // Primary attempt with user's preferred model settings
     let result;
+    const requestOptions: any = {
+      max_completion_tokens: 600,
+      model: targetModel
+    };
+    
+    // Only add temperature for supported models
+    if (targetTemperature !== undefined) {
+      requestOptions.temperature = targetTemperature;
+    }
+    
     try {
         result = await Promise.race([
-          openAIService.chatJSON(messages, {
-            temperature: 0.7,
-            max_tokens: 600,
-            model: 'gpt-4o-mini'
-          }),
+          openAIService.chatJSON(messages, requestOptions),
           timeoutPromise
         ]);
     } catch (firstError) {

@@ -718,9 +718,9 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     parts.push(`Format: ${handoff.aspect_ratio}.`);
   }
   
-  // TEXT PLACEMENT (if present)
+  // ADVANCED TEXT PLACEMENT (if present)
   if (handoff.key_line && handoff.key_line.trim()) {
-    parts.push("Place text clearly visible in available space, not blocking main subject.");
+    parts.push("Place text in natural negative space areas like sky, walls, or empty backgrounds. Use TOP, BOTTOM, LEFT, or RIGHT zones rather than always centering. Ensure high contrast and avoid overlapping with faces or main subjects.");
   }
   
   // AVOID LIST
@@ -977,13 +977,31 @@ Return only: {"lines":["option1","option2","option3","option4","option5","option
 export function buildVisualGeneratorMessages(inputs: any): Array<{role: string; content: string}> {
   const { category, subcategory, tone, tags, visualStyle, finalLine } = inputs;
 
+  // Add variety and creativity requirements
   const userPrompt = `${category}>${subcategory}, ${tone}, ${visualStyle || '3d-animated'}
 Tags: ${tags.slice(0, 4).join(', ')}
 ${finalLine ? `JOKE/TEXT: "${finalLine}" - VISUAL CONCEPTS MUST MATCH THIS CONTENT AND TONE` : ''}
 
+REQUIRED OBJECTS/SUBJECTS (must be visible in each concept):
+- ${subcategory === 'Ice Hockey' ? 'hockey stick and puck' : 'relevant category objects'}
+- Specific, tangible items matching the theme
+
+VARIETY RULES:
+- Each concept must be completely different in composition
+- Mix close-ups, wide shots, action scenes, and environmental shots
+- Vary camera angles: high angle, low angle, eye level, dramatic perspectives
+- Include at least one concept with multiple people
+- Create excitement and visual interest in every option
+
+TEXT PLACEMENT DIRECTIVES:
+- Find natural negative space areas for text (sky, walls, backgrounds)
+- Avoid placing text over faces, main subjects, or busy areas
+- Consider TOP, BOTTOM, LEFT, RIGHT zones - not just center
+- Leave clear areas for text that won't compete with visuals
+
 IMPORTANT: Visual concepts must directly relate to the joke/text content above. For Pride themes, include rainbow colors, drag queens, parades, celebration elements.
 
-4 concepts. Each 40-60 words. Include [TAGS: ${tags.slice(0, 3).join(', ')}] [TEXT_SAFE_ZONE: center 60x35]
+4 concepts. Each 40-60 words. Include [TAGS: ${tags.slice(0, 3).join(', ')}] [TEXT_SAFE_ZONE: varied - not just center]
 
 JSON only.`;
 

@@ -4518,6 +4518,7 @@ const Index = () => {
         visualStyle: selectedVisualStyle || undefined,
         finalLine,
         subjectOption: selectedSubjectOption || undefined,
+        subjectDescription: subjectDescription || undefined,
         dimensions: selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || undefined
       }, 4);
       console.log('🎨 Visual generation completed with result:', {
@@ -6667,16 +6668,17 @@ const Index = () => {
                  const tone = selectedTextStyleObj?.name || 'Humorous';
                  const finalLine = selectedGeneratedOption || (isCustomTextConfirmed ? stepTwoText : undefined);
                  
-                 const visualResult = await generateVisualRecommendations({
-                   category,
-                   subcategory,
-                   tone: tone.toLowerCase(),
-                   tags: finalTags,
-                   visualStyle: selectedVisualStyle || undefined,
-                   finalLine,
-                   subjectOption: selectedSubjectOption || undefined,
-                   dimensions: selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || undefined
-                 }, 4);
+                  const visualResult = await generateVisualRecommendations({
+                    category,
+                    subcategory,
+                    tone: tone.toLowerCase(),
+                    tags: finalTags,
+                    visualStyle: selectedVisualStyle || undefined,
+                    finalLine,
+                    subjectOption: selectedSubjectOption || undefined,
+                    subjectDescription: subjectDescription || undefined,
+                    dimensions: selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || undefined
+                  }, 4);
                  
                  setVisualRecommendations(visualResult);
                  setIsLoadingRecommendations(false);
