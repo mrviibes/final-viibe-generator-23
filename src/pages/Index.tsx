@@ -4582,7 +4582,7 @@ const Index = () => {
       // Clear previous selection and set new options
       setSelectedVisualIndex(null);
       setVisualOptions(visualResult.options);
-      setVisualModel(visualResult.model); // Track which model was used
+      setVisualModel(visualResult.modelDisplayName || visualResult.model); // Use display name for UI
 
       // Clear only the input, keep tags for the summary, and hide editor
       setSubjectTagInput("");
@@ -6196,14 +6196,14 @@ const Index = () => {
                                 </Button>
                               </div>
                              {visualOptions.length > 0 && visualModel && (
-                               <p className="text-xs text-muted-foreground mb-2">
-                                 Using {visualModel.includes('gpt-5-mini') ? 'gpt-5-mini' : visualModel} • Generated in {((Date.now() - visualGenerationStartTime) / 1000).toFixed(1)}s
-                                 {visualModel === 'fallback' && " • Used fallback"}
-                               </p>
-                             )}
-                            {visualModel === 'fallback' && <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 text-xs p-2 rounded-lg mb-3 max-w-md mx-auto">
-                                {getErrorMessage(visualRecommendations?.errorCode)}
-                              </div>}
+                                <p className="text-xs text-muted-foreground mb-2">
+                                  Using {visualModel} • Generated in {((Date.now() - visualGenerationStartTime) / 1000).toFixed(1)}s
+                                  {visualModel.includes('local presets') && " • Used fallback"}
+                                </p>
+                              )}
+                             {visualModel && visualModel.includes('local presets') && <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 text-xs p-2 rounded-lg mb-3 max-w-md mx-auto">
+                                 {getErrorMessage(visualRecommendations?.errorCode)}
+                               </div>}
                            <p className="text-sm text-muted-foreground">Choose one of these AI-generated concepts</p>
                          </div>
                         

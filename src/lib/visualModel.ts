@@ -543,6 +543,7 @@ export async function generateVisualRecommendations(
           return {
             options: validatedOptions,
             model: targetModel,
+            modelDisplayName: MODEL_DISPLAY_NAMES[targetModel] || targetModel,
             errorCode: undefined,
             _debug: { fastMode: true, responseTime: Date.now() - startTime }
           };
@@ -553,7 +554,9 @@ export async function generateVisualRecommendations(
         return {
           options: fallbacks,
           model: targetModel, // Show actual selected model, not "fallback"
+          modelDisplayName: MODEL_DISPLAY_NAMES[targetModel] || targetModel,
           errorCode: 'FAST_TIMEOUT',
+          fallbackReason: `${MODEL_DISPLAY_NAMES[targetModel] || targetModel} timed out - using local presets`,
           _debug: { fastMode: true, fallbackUsed: true, fallbackReason: 'local fallback' }
         };
       }
@@ -592,92 +595,35 @@ export async function generateVisualRecommendations(
         ]);
         console.log(`✅ Visual generation successful with ${MODEL_DISPLAY_NAMES[targetModel] || targetModel}`);
       } catch (strictError) {
-        console.log(`🔒 Strict mode failed, using fallbacks`);
+        console.log(`🔒 Strict mode failed with ${MODEL_DISPLAY_NAMES[targetModel] || targetModel}, using fallbacks`);
         const fallbacks = getSlotBasedFallbacks(enrichedInputs).slice(0, n);
         return {
           options: fallbacks,
-          model: 'fallback',
+          model: targetModel, // Show the user's selected model, not "fallback"
+          modelDisplayName: MODEL_DISPLAY_NAMES[targetModel] || targetModel,
           errorCode: 'STRICT_MODE_FAILED',
-          _debug: { strictMode: true, fallbackUsed: true }
+          _debug: { strictMode: true, fallbackUsed: true, failedModel: targetModel }
         };
       }
     } else {
-      // Normal mode with fallback chain
+      // Normal mode - still use only the user's selected model (strict mode is now default)
       try {
         result = await Promise.race([
           openAIService.chatJSON(messages, requestOptions),
           timeoutPromise
         ]);
         console.log(`✅ Visual generation successful with ${MODEL_DISPLAY_NAMES[targetModel] || targetModel}`);
-      } catch (firstError) {
-        // Get smart fallback chain based on user's selected model
-        const fallbackChain = getSmartFallbackChain(targetModel, 'visual');
-        const nextModel = fallbackChain[1]; // Get next model after user's choice
-        
-        if (firstError instanceof Error && (firstError.message.includes('JSON') || firstError.message.includes('parse') || firstError.message.includes('TIMEOUT'))) {
-          console.log(`🔄 Retrying with ${MODEL_DISPLAY_NAMES[nextModel] || nextModel}...`);
-          const compactUserPrompt = `${category}>${subcategory}, ${tone}. 4 visual JSON concepts.`;
-          
-          const compactMessages = [
-            { role: 'system', content: SYSTEM_PROMPTS.visual_generator },
-            { role: 'user', content: compactUserPrompt }
-          ];
-          
-          // Use compact timeout for retry
-          const retryTimeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('RETRY_TIMEOUT')), 10000);
-          });
-          
-            try {
-              // Use next model in smart fallback chain
-              const retryRequestOptions: any = {
-                max_completion_tokens: 450,
-                model: nextModel || 'o4-mini-2025-04-16' // Fallback to o4-mini if chain exhausted
-              };
-              
-              // Only add temperature for supported models
-              if (isTemperatureSupported(nextModel || 'o4-mini-2025-04-16')) {
-                retryRequestOptions.temperature = 0.7;
-              }
-              
-              result = await Promise.race([
-                openAIService.chatJSON(compactMessages, retryRequestOptions),
-                retryTimeoutPromise
-              ]);
-              console.log(`✅ Visual generation retry successful with ${MODEL_DISPLAY_NAMES[nextModel] || nextModel}`);
-            } catch (secondError) {
-              // Final attempt with ultra-compact prompt and last fallback model
-              const finalModel = fallbackChain[2] || 'o4-mini-2025-04-16';
-              if (secondError instanceof Error && secondError.message.includes('RETRY_TIMEOUT')) {
-                console.log(`🔄 Final attempt with ${MODEL_DISPLAY_NAMES[finalModel] || finalModel}...`);
-                const ultraCompactMessages = [
-                  { role: 'system', content: 'Generate 4 visual concepts as JSON array.' },
-                  { role: 'user', content: `${tone} ${category} visuals. JSON only.` }
-                ];
-                
-                const finalTimeoutPromise = new Promise((_, reject) => {
-                  setTimeout(() => reject(new Error('FINAL_TIMEOUT')), 6000); // 6s final attempt
-                });
-                
-                try {
-                  result = await Promise.race([
-                    openAIService.chatJSON(ultraCompactMessages, {
-                      temperature: 0.7,
-                      max_tokens: 300,
-                      model: finalModel
-                    }),
-                    finalTimeoutPromise
-                  ]);
-                } catch (thirdError) {
-                  throw thirdError;
-                }
-              } else {
-                throw secondError;
-              }
-            }
-        } else {
-          throw firstError;
-        }
+      } catch (primaryError) {
+        console.log(`❌ Visual generation failed with ${MODEL_DISPLAY_NAMES[targetModel] || targetModel}, using local fallbacks`);
+        const fallbacks = getSlotBasedFallbacks(enrichedInputs).slice(0, n);
+        return {
+          options: fallbacks,
+          model: targetModel, // Show the user's selected model
+          modelDisplayName: MODEL_DISPLAY_NAMES[targetModel] || targetModel,
+          errorCode: primaryError instanceof Error && primaryError.message.includes('TIMEOUT') ? 'timeout' : 'network',
+          fallbackReason: `${MODEL_DISPLAY_NAMES[targetModel] || targetModel} failed - using local presets`,
+          _debug: { failedModel: targetModel, error: primaryError instanceof Error ? primaryError.message : 'Unknown error' }
+        };
       }
     }
     
@@ -776,9 +722,10 @@ export async function generateVisualRecommendations(
     
     return {
       options: fallbackOptions,
-      model: 'fallback-gpt-4o-mini',
+      model: targetModel, // Show the user's selected model that failed
+      modelDisplayName: MODEL_DISPLAY_NAMES[targetModel] || targetModel,
       errorCode,
-      fallbackReason
+      fallbackReason: `${MODEL_DISPLAY_NAMES[targetModel] || targetModel} failed - using local presets`
     };
   }
 }
