@@ -215,6 +215,7 @@ Return valid JSON array of 4 objects.
 - Over character limit: Truncate to 100 chars
 - Banned content: Filter and regenerate or use fallback
 - API failure: Use predetermined fallback by tone
+- Text Processing: Enhanced normalization with idiom fixes and contraction cleanup
 
 ### 5.2 Visual Generation Fallbacks
 - API timeout: Use slot-based contextual fallbacks

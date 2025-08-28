@@ -326,10 +326,74 @@ export function validateInputs(u: Partial<UserInputs>): { ok: boolean; errors: s
 // =========================
 function normalizeTypography(text: string): string {
   return text
+    // Convert curly quotes to straight quotes
     .replace(/[""]/g, '"')
     .replace(/['']/g, "'")
+    // Convert em/en dashes to regular hyphens
     .replace(/[—–]/g, '-')
+    // Normalize ellipsis
+    .replace(/…/g, '...')
     .trim();
+}
+
+function applyIdiomsAndContractions(text: string): string {
+  return text
+    // Fix common hyphenated compounds
+    .replace(/\bas-been\b/gi, 'has-been')
+    .replace(/\ball-time\b/gi, 'all-time')
+    .replace(/\bwell-known\b/gi, 'well-known')
+    .replace(/\bhand-made\b/gi, 'handmade')
+    .replace(/\bon-line\b/gi, 'online')
+    .replace(/\boff-line\b/gi, 'offline')
+    .replace(/\bre-do\b/gi, 'redo')
+    .replace(/\bre-make\b/gi, 'remake')
+    .replace(/\bto-do\b/gi, 'to-do')
+    .replace(/\bup-to-date\b/gi, 'up-to-date')
+    .replace(/\bstate-of-the-art\b/gi, 'state-of-the-art')
+    .replace(/\bself-made\b/gi, 'self-made')
+    .replace(/\bworld-class\b/gi, 'world-class')
+    
+    // Fix common missing apostrophes in contractions
+    .replace(/\byoud\b/gi, "you'd")
+    .replace(/\byoure\b/gi, "you're")
+    .replace(/\byoull\b/gi, "you'll")
+    .replace(/\byouve\b/gi, "you've")
+    .replace(/\btheyre\b/gi, "they're")
+    .replace(/\btheyll\b/gi, "they'll")
+    .replace(/\btheyve\b/gi, "they've")
+    .replace(/\bwere\b/gi, "we're")
+    .replace(/\bwell\b/gi, "we'll")
+    .replace(/\bweve\b/gi, "we've")
+    .replace(/\bits\b/gi, "it's")
+    .replace(/\bim\b/gi, "I'm")
+    .replace(/\bive\b/gi, "I've")
+    .replace(/\bill\b/gi, "I'll")
+    .replace(/\bid\b/gi, "I'd")
+    .replace(/\bwont\b/gi, "won't")
+    .replace(/\bcant\b/gi, "can't")
+    .replace(/\bdont\b/gi, "don't")
+    .replace(/\bdidnt\b/gi, "didn't")
+    .replace(/\bwasnt\b/gi, "wasn't")
+    .replace(/\bwerent\b/gi, "weren't")
+    .replace(/\bisnt\b/gi, "isn't")
+    .replace(/\barent\b/gi, "aren't")
+    .replace(/\bhasnt\b/gi, "hasn't")
+    .replace(/\bhavent\b/gi, "haven't")
+    .replace(/\bhadnt\b/gi, "hadn't")
+    .replace(/\bshouldnt\b/gi, "shouldn't")
+    .replace(/\bwouldnt\b/gi, "wouldn't")
+    .replace(/\bcouldnt\b/gi, "couldn't")
+    
+    // Fix common idiom errors
+    .replace(/\bfor all intensive purposes\b/gi, 'for all intents and purposes')
+    .replace(/\bcould care less\b/gi, 'couldn\'t care less')
+    .replace(/\bone in the same\b/gi, 'one and the same')
+    .replace(/\bmake due\b/gi, 'make do')
+    .replace(/\bnip it in the butt\b/gi, 'nip it in the bud')
+    .replace(/\bI could of\b/gi, 'I could have')
+    .replace(/\bshould of\b/gi, 'should have')
+    .replace(/\bwould of\b/gi, 'would have')
+    .replace(/\bmight of\b/gi, 'might have');
 }
 
 function truncateIfNeeded(s: string, limit = AI_CONFIG.limits.phrase_char_limit): GeneratedPhrase {
@@ -360,8 +424,9 @@ export function postProcessLine(line: string, tone: string, requiredTags?: strin
     cleaned = cleaned.replace(pattern, '');
   }
   
-  // Apply text normalization
+  // Apply text normalization and fixes
   cleaned = normalizeTypography(cleaned);
+  cleaned = applyIdiomsAndContractions(cleaned);
   
   // Fix common text generation errors
   // Remove duplicate words (e.g., "to beance to become" -> "to become")
