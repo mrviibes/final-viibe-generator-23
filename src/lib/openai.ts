@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { buildPopCultureSearchPrompt, buildGenerateTextMessages, getEffectiveConfig, MODEL_DISPLAY_NAMES, getSmartFallbackChain } from "../vibe-ai.config";
+import { buildPopCultureSearchPrompt, buildGenerateTextMessages, getEffectiveConfig, MODEL_DISPLAY_NAMES, getSmartFallbackChain, getRuntimeOverrides } from "../vibe-ai.config";
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -200,41 +200,65 @@ export class OpenAIService {
       model = 'gpt-5-mini-2025-08-07'
     } = options;
 
-    // Use smart fallback chain based on the requested model
-    const retryModels = getSmartFallbackChain(model, 'text');
-    console.log(`📋 Text generation retry chain: ${retryModels.map(m => MODEL_DISPLAY_NAMES[m] || m).join(' → ')}`);
+    // Check if user wants strict mode (no fallbacks)
+    const overrides = getRuntimeOverrides();
+    const isStrictMode = overrides.strictModel === true;
+    const shouldUseMyKey = overrides.apiSource === 'my_key';
+    
+    // Use smart fallback chain based on the requested model, but respect strict mode
+    const retryModels = isStrictMode ? [model] : getSmartFallbackChain(model, 'text');
+    console.log(`📋 Text generation ${isStrictMode ? '(strict mode)' : ''} retry chain: ${retryModels.map(m => MODEL_DISPLAY_NAMES[m] || m).join(' → ')}`);
+    
+    // Force backend/frontend based on user preference
+    if (shouldUseMyKey && !this.apiKey) {
+      throw new Error('My OpenAI key selected but no API key provided. Please add your API key in settings.');
+    }
 
     let lastError: Error | null = null;
     let retryAttempt = 0;
 
     for (const tryModel of retryModels) {
+      console.log(`🎯 Attempting text generation with ${MODEL_DISPLAY_NAMES[tryModel] || tryModel} (attempt ${retryAttempt + 1}/${retryModels.length})`);
+      
       try {
-        const result = await this.attemptChatJSON(messages, {
-          temperature,
-          max_tokens,
-          max_completion_tokens,
-          model: tryModel
-        });
+        // For my_key mode, always use frontend; for server mode, always use backend
+        const result = shouldUseMyKey 
+          ? await this.attemptChatJSON(messages, { temperature, max_tokens, max_completion_tokens, model: tryModel })
+          : await this.callBackendAPI(messages, { temperature, max_tokens, max_completion_tokens, model: tryModel });
         
-        // Add metadata about the API call
+        // Store API metadata including the actual model used and fallback reason
+        const fallbackReason = retryAttempt > 0 
+          ? (shouldUseMyKey ? 'API key lacks model access' : 'Server retry') 
+          : undefined;
+        
         if (result && typeof result === 'object') {
           result._apiMeta = {
             modelUsed: tryModel,
+            textSpeed: this.textSpeed,
             retryAttempt,
-            originalModel: model,
-            textSpeed: this.textSpeed
+            originalModel: model !== tryModel ? model : undefined,
+            fallbackReason,
+            apiSource: shouldUseMyKey ? 'my_key' : 'server',
+            strictMode: isStrictMode
           };
         }
         
+        console.log(`✅ Text generation successful with ${MODEL_DISPLAY_NAMES[tryModel] || tryModel}${fallbackReason ? ` (${fallbackReason})` : ''}`);
         return result;
       } catch (error) {
-        console.warn(`Model ${tryModel} failed:`, error);
+        console.error(`❌ Text generation failed with ${MODEL_DISPLAY_NAMES[tryModel] || tryModel}:`, error);
         lastError = error as Error;
         retryAttempt++;
         
         // Don't retry if it's an auth error
         if (error instanceof Error && error.message.includes('401')) {
           throw error;
+        }
+        
+        // If in strict mode, don't retry with other models
+        if (isStrictMode) {
+          console.log(`🚫 Strict mode enabled - not falling back to other models`);
+          break;
         }
       }
     }

@@ -233,7 +233,11 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
       retryAttempt,
       originalModel,
       originalModelDisplayName: originalModel ? MODEL_DISPLAY_NAMES[originalModel] || originalModel : undefined,
-      spellingFiltered
+      spellingFiltered,
+      // Enhanced audit information
+      apiSource: apiMeta?.apiSource || 'unknown',
+      strictMode: apiMeta?.strictMode || false,
+      fallbackReason: apiMeta?.fallbackReason
     }
   };
 }
