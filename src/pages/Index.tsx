@@ -4898,19 +4898,30 @@ const Index = () => {
     } catch (error) {
       console.error('Image generation failed:', error);
       if (error instanceof IdeogramAPIError) {
+        console.log('[handleGenerateImage] Processing IdeogramAPIError:', {
+          errorType: error.errorType,
+          shouldRetryWithTurbo: error.shouldRetryWithTurbo,
+          shouldShowExactTextOverlay: error.shouldShowExactTextOverlay,
+          message: error.message
+        });
+        
         // Handle specific errors with enhanced UX
-        if (error.errorType === 'V3_UNAVAILABLE_FOR_EXACT_TEXT' && error.shouldShowExactTextOverlay) {
-          // Auto-trigger exact text overlay for V3 unavailable with exact text
+        if (error.errorType === 'V3_UNAVAILABLE_FOR_EXACT_TEXT') {
+          if (error.shouldShowExactTextOverlay) {
+            // Auto-trigger exact text overlay for V3 unavailable with exact text
+            setOriginalTextRequest(selectedGeneratedOption || stepTwoText || "");
+            setShowExactTextOverlay(true);
+            sonnerToast.info(
+              "V3 temporarily unavailable. Opening caption overlay for perfect text.",
+              { duration: 4000 }
+            );
+          }
+          // Always show error dialog with options for V3_UNAVAILABLE_FOR_EXACT_TEXT
           setIdeogramError(error);
-          setShowExactTextOverlay(true);
-          setOriginalTextRequest(selectedGeneratedOption || stepTwoText || "");
-          sonnerToast.info(
-            "V3 temporarily unavailable. Switching to caption overlay for perfect text.",
-            { duration: 4000 }
-          );
-          return; // Exit early, don't show error dialog
-        } else if (error.errorType === 'V3_UNAVAILABLE' && error.shouldRetryWithTurbo) {
-          // V3 unavailable without exact text - offer turbo retry
+          setShowIdeogramErrorDialog(true);
+          setImageGenerationError('V3 model temporarily unavailable. See options below.');
+        } else if (error.errorType === 'V3_UNAVAILABLE') {
+          // V3 unavailable without exact text - show error dialog with turbo retry
           setIdeogramError(error);
           setShowIdeogramErrorDialog(true);
           setImageGenerationError('V3 model temporarily unavailable. Try Turbo model for reliable generation.');

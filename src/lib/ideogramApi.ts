@@ -501,16 +501,35 @@ async function surfaceBackendError(request: IdeogramGenerateRequest): Promise<Id
 function mapBackendErrorToUserError(status: number, errorData: any, request: IdeogramGenerateRequest): IdeogramAPIError {
   const isExactTextRequest = /EXACT TEXT:/i.test(request.prompt);
   
-  // Handle specific V3 unavailable scenarios
-  if (errorData.errorType === 'V3_UNAVAILABLE' || (status === 404 && request.model === 'V_3')) {
+  console.log('[mapBackendErrorToUserError] Processing error:', { 
+    status, 
+    errorType: errorData.errorType, 
+    isExactTextRequest, 
+    model: request.model 
+  });
+  
+  // Handle specific V3 unavailable scenarios with correct error types
+  if (errorData.errorType === 'V3_UNAVAILABLE_FOR_EXACT_TEXT' || 
+      (errorData.errorType === 'V3_UNAVAILABLE' && isExactTextRequest) ||
+      (status === 404 && request.model === 'V_3' && isExactTextRequest)) {
+    console.log('[mapBackendErrorToUserError] Mapping to V3_UNAVAILABLE_FOR_EXACT_TEXT');
     return new IdeogramAPIError(
-      isExactTextRequest 
-        ? 'V3 model is temporarily unavailable. Use Caption Overlay for guaranteed text accuracy or try Turbo model.'
-        : 'V3 model is temporarily unavailable. Try the Turbo model for reliable generation.',
+      'V3 model is temporarily unavailable. Use Caption Overlay for guaranteed text accuracy or try Turbo model.',
       status,
       'V3_UNAVAILABLE_FOR_EXACT_TEXT',
       true, // shouldRetryWithTurbo
-      isExactTextRequest // shouldShowExactTextOverlay
+      true  // shouldShowExactTextOverlay
+    );
+  }
+  
+  if (errorData.errorType === 'V3_UNAVAILABLE' || (status === 404 && request.model === 'V_3')) {
+    console.log('[mapBackendErrorToUserError] Mapping to V3_UNAVAILABLE');
+    return new IdeogramAPIError(
+      'V3 model is temporarily unavailable. Try the Turbo model for reliable generation.',
+      status,
+      'V3_UNAVAILABLE',
+      true, // shouldRetryWithTurbo
+      false // shouldShowExactTextOverlay
     );
   }
   
