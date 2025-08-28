@@ -4922,7 +4922,12 @@ const Index = () => {
           // Show the enhanced error dialog for all other IdeogramAPIErrors
           setIdeogramError(error);
           setShowIdeogramErrorDialog(true);
-          setImageGenerationError(error.message); // Keep for legacy UI components
+          // For V3_UNAVAILABLE errors, show a more user-friendly message in the card
+          if (error.errorType === 'V3_UNAVAILABLE') {
+            setImageGenerationError('V3 model temporarily unavailable. Click "Show Details" for options.');
+          } else {
+            setImageGenerationError(error.message);
+          }
         }
       } else {
         const genericError = new IdeogramAPIError('An unexpected error occurred while generating the image.');
@@ -6535,21 +6540,30 @@ const Index = () => {
                           ))}
                         </div>
                       </div>}
-                    </div> : imageGenerationError ? <div className="flex flex-col items-center gap-4 text-center max-w-md">
-                      <AlertCircle className="h-8 w-8 text-destructive" />
-                      <div>
-                        <p className="text-destructive text-lg font-medium">Generation Failed</p>
-                        <p className="text-muted-foreground text-sm mt-1">{imageGenerationError}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button onClick={() => handleGenerateImage(1)} variant="outline" size="sm">
-                          Try Again
-                        </Button>
-                        {imageGenerationError.includes('CORS proxy needs activation') && <Button variant="brand" size="sm" onClick={() => setShowCorsRetryDialog(true)}>
-                            Enable CORS Proxy
-                          </Button>}
-                      </div>
-                    </div> : <p className="text-muted-foreground text-lg">Preparing your vibe...</p>}
+                     </div> : imageGenerationError ? <div className="flex flex-col items-center gap-4 text-center max-w-md">
+                       <AlertCircle className="h-8 w-8 text-destructive" />
+                       <div>
+                         <p className="text-destructive text-lg font-medium">Generation Failed</p>
+                         <p className="text-muted-foreground text-sm mt-1">{imageGenerationError}</p>
+                       </div>
+                       <div className="flex gap-2">
+                         <Button onClick={() => handleGenerateImage(1)} variant="outline" size="sm">
+                           Try Again
+                         </Button>
+                         {imageGenerationError.includes('CORS proxy needs activation') && <Button variant="brand" size="sm" onClick={() => setShowCorsRetryDialog(true)}>
+                             Enable CORS Proxy
+                           </Button>}
+                         {ideogramError && (
+                           <Button 
+                             onClick={() => setShowIdeogramErrorDialog(true)} 
+                             variant="secondary" 
+                             size="sm"
+                           >
+                             Show Details
+                           </Button>
+                         )}
+                       </div>
+                     </div> : <p className="text-muted-foreground text-lg">Preparing your vibe...</p>}
                 </div>
                 
                  {/* Text Misspelling Detection */}

@@ -465,8 +465,20 @@ async function surfaceBackendError(request: IdeogramGenerateRequest): Promise<Id
         try {
           errorData = JSON.parse(errorText);
         } catch {
-          // If not JSON, treat as plain text
-          errorData = { error: errorText };
+          // Check for specific 404 V3 unavailable pattern based on edge function logs
+          if (response.status === 404 && errorText.includes('Not Found')) {
+            // This is the V3 unavailable scenario we see in logs
+            errorData = {
+              errorType: 'V3_UNAVAILABLE',
+              message: 'V3 model temporarily unavailable',
+              status: 404,
+              shouldRetryWithTurbo: true,
+              shouldShowExactTextOverlay: request.prompt?.includes('EXACT TEXT:') || false
+            };
+          } else {
+            // If not JSON, treat as plain text
+            errorData = { error: errorText };
+          }
         }
         
         return mapBackendErrorToUserError(response.status, errorData, request);
@@ -494,7 +506,19 @@ function mapBackendErrorToUserError(
   const isExactTextRequest = /EXACT TEXT:/i.test(request.prompt);
   const errorMessage = errorData.message || errorData.error || 'Unknown error';
   
-  console.log('Mapping backend error:', { status, errorMessage, isExactTextRequest });
+  console.log('Mapping backend error:', { status, errorMessage, isExactTextRequest, errorData });
+  
+  // Handle pre-constructed errorType from surfaceBackendError
+  if (errorData.errorType === 'V3_UNAVAILABLE') {
+    const error = new IdeogramAPIError(
+      'Ideogram V3 is temporarily unavailable. You can retry with Turbo model or use the caption overlay for perfect text.',
+      404,
+      'V3_UNAVAILABLE'
+    );
+    error.shouldRetryWithTurbo = true;
+    error.shouldShowExactTextOverlay = isExactTextRequest;
+    return error;
+  }
   
   // Check for specific error patterns - handle both backend formats
   if (errorMessage.includes('Ideogram API key not configured') || errorMessage.includes('IDEOGRAM_API_KEY not configured')) {
