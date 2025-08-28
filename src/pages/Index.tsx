@@ -4017,6 +4017,8 @@ const Index = () => {
   const [customHeight, setCustomHeight] = useState<string>("");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState<string>("");
+  const [exactWordingTags, setExactWordingTags] = useState<string[]>([]);
+  const [exactWordingTagInput, setExactWordingTagInput] = useState<string>("");
   const [textGenerationStartTime, setTextGenerationStartTime] = useState<number>(0);
   const [visualGenerationStartTime, setVisualGenerationStartTime] = useState<number>(0);
   const [generatedOptions, setGeneratedOptions] = useState<string[]>([]);
@@ -4457,6 +4459,24 @@ const Index = () => {
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
 
+  // Handle exact wording tags
+  const handleAddExactWordingTag = (tag: string) => {
+    const trimmedTag = tag.trim();
+    if (trimmedTag && !exactWordingTags.includes(trimmedTag)) {
+      setExactWordingTags([...exactWordingTags, trimmedTag]);
+    }
+    setExactWordingTagInput("");
+  };
+  const handleExactWordingTagInputKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      handleAddExactWordingTag(exactWordingTagInput);
+    }
+  };
+  const removeExactWordingTag = (tagToRemove: string) => {
+    setExactWordingTags(exactWordingTags.filter(tag => tag !== tagToRemove));
+  };
+
   // Handle adding subject tags
   const handleAddSubjectTag = (tag: string) => {
     const trimmedTag = tag.trim();
@@ -4485,7 +4505,15 @@ const Index = () => {
       }
     }
 
-    // Auto-commit pending tag input before generating
+    // Auto-commit pending tag inputs before generating
+    if (tagInput.trim()) {
+      setTags([...tags, tagInput.trim()]);
+      setTagInput("");
+    }
+    if (exactWordingTagInput.trim()) {
+      setExactWordingTags([...exactWordingTags, exactWordingTagInput.trim()]);
+      setExactWordingTagInput("");
+    }
     if (subjectTagInput.trim()) {
       setSubjectTags([...subjectTags, subjectTagInput.trim()]);
       setSubjectTagInput("");
@@ -4496,7 +4524,7 @@ const Index = () => {
       // Build inputs using the same mapping logic as text generation
       let category = '';
       let subcategory = '';
-      let finalTags = [...tags, ...subjectTags];
+      let finalTags = [...tags, ...exactWordingTags, ...subjectTags];
       console.log('🎨 Visual generation started with tags:', {
         tags,
         subjectTags,
@@ -4610,11 +4638,23 @@ const Index = () => {
       // Map UI selections to vibe model inputs
       let category = '';
       let subcategory = '';
-      let finalTags = [...tags];
-      console.log('🏷️ Text generation started with tags:', tags);
+      // Auto-commit pending tag inputs before generating
+      if (tagInput.trim()) {
+        setTags([...tags, tagInput.trim()]);
+        setTagInput("");
+      }
+      if (exactWordingTagInput.trim()) {
+        setExactWordingTags([...exactWordingTags, exactWordingTagInput.trim()]);
+        setExactWordingTagInput("");
+      }
+
+      let finalTags = [...tags, ...exactWordingTags];
+      console.log('🏷️ Text generation started with tags:', tags, 'exact wording:', exactWordingTags);
       console.log('🏷️ Current tags state:', {
         tags,
-        tagsLength: tags.length
+        exactWordingTags,
+        tagsLength: tags.length,
+        exactWordingLength: exactWordingTags.length
       });
       console.log('🏷️ Final tags for processing:', finalTags);
 
@@ -4672,8 +4712,10 @@ const Index = () => {
         subcategory,
         tone: tone.toLowerCase(),
         tags: finalTagsForGeneration,
+        exactWordingTags: exactWordingTags,
         originalTags: tags,
-        tagCount: finalTagsForGeneration.length
+        tagCount: finalTagsForGeneration.length,
+        exactWordingCount: exactWordingTags.length
       });
 
       // Ensure we have at least the basic tags
@@ -4686,6 +4728,7 @@ const Index = () => {
         subcategory,
         tone: tone as any,
         tags: finalTagsForGeneration,
+        exactWordingTags: exactWordingTags,
         recipient_name: selectedPick || "-"
       }, 4);
 
@@ -5841,15 +5884,25 @@ const Index = () => {
                 {/* Show AI Assist form when selected and no options generated yet */}
                 {selectedCompletionOption === "ai-assist" && generatedOptions.length === 0 && <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div className="text-center mb-6">
-                      <p className="text-xl text-muted-foreground">Add relevant tags for content generation</p>
+                      <p className="text-xl text-muted-foreground">Add tags for content generation</p>
                     </div>
 
-                    <div className="max-w-md mx-auto space-y-6">
-                      {/* Tags Input */}
-                      <div className="space-y-3">
-                        <Input value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={handleTagInputKeyDown} placeholder="Enter tags (press Enter or comma to add)" className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
+                    <div className="max-w-lg mx-auto space-y-6">
+                      {/* General Tags Input */}
+                      <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
+                        <div className="text-center">
+                          <label className="text-sm font-medium text-foreground">General Tags</label>
+                          <p className="text-xs text-muted-foreground mt-1">Theme, vibe, direction (movie quotes, birthday, funny)</p>
+                        </div>
+                        <Input 
+                          value={tagInput} 
+                          onChange={e => setTagInput(e.target.value)} 
+                          onKeyDown={handleTagInputKeyDown} 
+                          placeholder="Enter general tags (press Enter or comma to add)" 
+                          className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" 
+                        />
                         
-                        {/* Display Tags */}
+                        {/* Display General Tags */}
                         {tags.length > 0 && <div className="flex flex-wrap gap-2 justify-center">
                             {tags.map((tag, index) => <Badge key={index} variant="secondary" className="px-3 py-1 text-sm flex items-center gap-1">
                                 {tag}
@@ -5858,8 +5911,31 @@ const Index = () => {
                           </div>}
                       </div>
 
+                      {/* Exact Wording Tags Input */}
+                      <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-200">
+                        <div className="text-center">
+                          <label className="text-sm font-medium text-foreground">Exact Wording Tags</label>
+                          <p className="text-xs text-muted-foreground mt-1">Words that MUST appear in the text (happy birthday, congratulations)</p>
+                        </div>
+                        <Input 
+                          value={exactWordingTagInput} 
+                          onChange={e => setExactWordingTagInput(e.target.value)} 
+                          onKeyDown={handleExactWordingTagInputKeyDown} 
+                          placeholder="Enter exact wording tags (press Enter or comma to add)" 
+                          className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" 
+                        />
+                        
+                        {/* Display Exact Wording Tags */}
+                        {exactWordingTags.length > 0 && <div className="flex flex-wrap gap-2 justify-center">
+                            {exactWordingTags.map((tag, index) => <Badge key={index} variant="outline" className="px-3 py-1 text-sm flex items-center gap-1 border-primary/50 text-primary">
+                                "{tag}"
+                                <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => removeExactWordingTag(tag)} />
+                              </Badge>)}
+                          </div>}
+                      </div>
+
                       {/* Generate Button */}
-                      <div className="text-center space-y-3">
+                      <div className="text-center space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-300">
                         {!canGenerateText() && (
                           <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
                             <p className="font-medium mb-1">To generate text, please select:</p>

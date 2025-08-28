@@ -107,6 +107,7 @@ export interface UserInputs {
   search_term?: string | null; // optional
   tone: Tone; // required
   tags?: string[]; // optional
+  exactWordingTags?: string[]; // optional - words that must appear in text
   visual_style?: VisualStyle; // required if visuals used
   visual_generation_option: VisualGenOption; // required
   aspect_ratio: AspectRatioSpec; // required
@@ -143,6 +144,7 @@ export interface OutputSchema {
 // Legacy types for backward compatibility
 export interface VibeInputs extends Partial<UserInputs> {
   // Backward compatibility mappings
+  exactWordingTags?: string[]; // Support exact wording tags
 }
 
 export interface VibeCandidate {
@@ -493,7 +495,7 @@ function spellcheck(s: string): string[] {
   return issues;
 }
 
-export function postProcessLine(line: string, tone: string, requiredTags?: string[], options?: { allowNewlines?: boolean; format?: 'knockknock' }): VibeCandidate {
+export function postProcessLine(line: string, tone: string, requiredTags?: string[], options?: { allowNewlines?: boolean; format?: 'knockknock'; exactWordingTags?: string[] }): VibeCandidate {
   // Trim spaces
   let cleaned = line.trim();
   
@@ -600,6 +602,25 @@ export function postProcessLine(line: string, tone: string, requiredTags?: strin
     }
   }
   
+  // Check exact wording requirements FIRST (strict enforcement)
+  if (options?.exactWordingTags && options.exactWordingTags.length > 0) {
+    const missingExactWords = options.exactWordingTags.filter(exactTag => {
+      const lowerTag = exactTag.toLowerCase().trim();
+      const lowerCleaned = cleaned.toLowerCase();
+      
+      // Must be exact match (whole word or phrase)
+      return !lowerCleaned.includes(lowerTag);
+    });
+    
+    if (missingExactWords.length > 0) {
+      return {
+        line: TONE_FALLBACKS[tone.toLowerCase()] || TONE_FALLBACKS.humorous,
+        blocked: true,
+        reason: `Missing required exact words: ${missingExactWords.join(', ')}`
+      };
+    }
+  }
+
   // Check tag coverage for important tags (skip visual-only tags) - relaxed approach
   if (requiredTags && requiredTags.length > 0) {
     const visualOnlyTags = ['person', 'people', 'group', 'man', 'woman', 'male', 'female'];
@@ -1122,13 +1143,18 @@ Return only: {"lines":["joke1\\nwith\\nnewlines","joke2\\nwith\\nnewlines","joke
     ? `\n• Aim to include or reference these tags naturally (paraphrasing is fine): ${inputs.tags.join(', ')}`
     : '';
 
+  const exactWordingRequirement = inputs.exactWordingTags && inputs.exactWordingTags.length > 0
+    ? `\n• CRITICAL: MUST include these EXACT words/phrases in the text: ${inputs.exactWordingTags.map(tag => `"${tag}"`).join(', ')}`
+    : '';
+
   const corePrompt = `Generate 6 concise options under 100 chars each for:
 Category: ${inputs.category} > ${inputs.subcategory}
 Tone: ${inputs.tone}
 Tags: ${inputs.tags?.join(', ') || 'none'}
+${inputs.exactWordingTags && inputs.exactWordingTags.length > 0 ? `Exact Words Required: ${inputs.exactWordingTags.join(', ')}` : ''}
 ${inputs.recipient_name && inputs.recipient_name !== "-" ? `Target: ${inputs.recipient_name}` : ''}
 
-${tagRequirement}${specialInstructions}
+${tagRequirement}${exactWordingRequirement}${specialInstructions}
 
 Return only: {"lines":["option1","option2","option3","option4","option5","option6"]}`;
 

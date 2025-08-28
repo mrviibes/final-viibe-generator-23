@@ -62,7 +62,9 @@ async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: st
     
     // Check if this is knock-knock format
     const isKnockKnock = inputs.subcategory?.toLowerCase().includes("knock");
-    const postProcessOptions = isKnockKnock ? { allowNewlines: true, format: 'knockknock' as const } : undefined;
+    const postProcessOptions = isKnockKnock ? 
+      { allowNewlines: true, format: 'knockknock' as const, exactWordingTags: inputs.exactWordingTags } : 
+      { exactWordingTags: inputs.exactWordingTags };
     
     // Post-process each line with tag validation
     const candidates = lines.map((line: string) => postProcessLine(line, inputs.tone, inputs.tags, postProcessOptions));
