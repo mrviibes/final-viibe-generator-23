@@ -36,7 +36,7 @@ serve(async (req) => {
       temperature = 0.8,
       max_tokens = 2500,
       max_completion_tokens,
-      model = 'gpt-5-mini-2025-08-07',
+      model = 'gpt-4.1-2025-04-14',
       response_format
     } = options;
 

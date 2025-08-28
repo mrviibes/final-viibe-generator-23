@@ -547,11 +547,11 @@ export async function generateVisualRecommendations(
           // Use next model in smart fallback chain
           const retryRequestOptions: any = {
             max_completion_tokens: 450,
-            model: nextModel || 'o4-mini-2025-04-16' // Fallback to o4-mini if chain exhausted
+            model: nextModel || 'gpt-4.1-2025-04-14' // Fallback to gpt-4.1 if chain exhausted
           };
           
           // Only add temperature for supported models
-          if (isTemperatureSupported(nextModel || 'o4-mini-2025-04-16')) {
+          if (isTemperatureSupported(nextModel || 'gpt-4.1-2025-04-14')) {
             retryRequestOptions.temperature = 0.7;
           }
           
@@ -562,7 +562,7 @@ export async function generateVisualRecommendations(
           console.log(`✅ Visual generation retry successful with ${MODEL_DISPLAY_NAMES[nextModel] || nextModel}`);
         } catch (secondError) {
           // Final attempt with ultra-compact prompt and last fallback model
-          const finalModel = fallbackChain[2] || 'o4-mini-2025-04-16';
+          const finalModel = fallbackChain[2] || 'gpt-4.1-2025-04-14';
           if (secondError instanceof Error && secondError.message.includes('RETRY_TIMEOUT')) {
             console.log(`🔄 Final attempt with ${MODEL_DISPLAY_NAMES[finalModel] || finalModel}...`);
             const ultraCompactMessages = [

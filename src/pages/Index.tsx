@@ -4198,7 +4198,7 @@ const Index = () => {
     setIsTestingProxy(true);
     try {
       const overrides = getRuntimeOverrides();
-      const selectedModel = overrides.model || 'gpt-5-mini-2025-08-07';
+      const selectedModel = overrides.model || 'gpt-4.1-2025-04-14';
       console.log(`🧪 Testing AI connection with model: ${selectedModel}`);
       
       const testResult = await openAIService.chatJSON([{

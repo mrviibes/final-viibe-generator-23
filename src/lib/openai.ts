@@ -85,7 +85,7 @@ export class OpenAIService {
       temperature = 0.8,
       max_tokens = 2500,
       max_completion_tokens,
-      model = 'gpt-5-mini-2025-08-07'
+      model = 'gpt-4.1-2025-04-14'
     } = options;
 
     console.log(`Calling OpenAI backend API - Model: ${model}, Messages: ${messages.length}`);
@@ -197,7 +197,7 @@ export class OpenAIService {
       temperature = 0.8,
       max_tokens = 2500,
       max_completion_tokens,
-      model = 'gpt-5-mini-2025-08-07'
+      model = 'gpt-4.1-2025-04-14'
     } = options;
 
     // Use smart fallback chain based on the requested model
@@ -252,7 +252,7 @@ export class OpenAIService {
       temperature = 0.8,
       max_tokens = 2500,
       max_completion_tokens,
-      model = 'gpt-5-mini-2025-08-07'
+      model = 'gpt-4.1-2025-04-14'
     } = options;
 
     const isGPT5Model = model?.startsWith('gpt-5');

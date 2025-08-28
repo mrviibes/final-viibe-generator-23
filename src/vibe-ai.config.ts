@@ -194,14 +194,12 @@ export const DEFAULT_NEGATIVE_PROMPT = "misspellings, distorted letters, extra c
 // Model fallback chains for retry strategy
 export const MODEL_FALLBACK_CHAINS = {
   text: [
-    'gpt-5-mini-2025-08-07',
-    'gpt-4.1-2025-04-14', 
-    'o4-mini-2025-04-16'
+    'gpt-4.1-2025-04-14',
+    'gpt-4.1-mini-2025-04-14'
   ],
   visual: [
-    'gpt-5-mini-2025-08-07',
     'gpt-4.1-2025-04-14',
-    'o4-mini-2025-04-16'
+    'gpt-4.1-mini-2025-04-14'
   ]
 };
 
@@ -602,6 +600,22 @@ export function postProcessLine(line: string, tone: string, requiredTags?: strin
     }
   }
   
+  // Block if general tags appear verbatim in the text
+  const generalTags = requiredTags?.filter(tag => 
+    !options?.exactWordingTags?.includes(tag)
+  ) || [];
+  
+  for (const tag of generalTags) {
+    // Only enforce for tags with length >= 4 to avoid false positives
+    if (tag.length >= 4 && lowerCleaned.includes(tag.toLowerCase())) {
+      return {
+        line: TONE_FALLBACKS[tone.toLowerCase()] || TONE_FALLBACKS.humorous,
+        blocked: true,
+        reason: `Contains general tag verbatim: ${tag}`
+      };
+    }
+  }
+
   // Check exact wording requirements FIRST (strict enforcement)
   if (options?.exactWordingTags && options.exactWordingTags.length > 0) {
     const missingExactWords = options.exactWordingTags.filter(exactTag => {
@@ -622,9 +636,9 @@ export function postProcessLine(line: string, tone: string, requiredTags?: strin
   }
 
   // Check tag coverage for important tags (skip visual-only tags) - relaxed approach
-  if (requiredTags && requiredTags.length > 0) {
+  if (generalTags && generalTags.length > 0) {
     const visualOnlyTags = ['person', 'people', 'group', 'man', 'woman', 'male', 'female'];
-    const contentTags = requiredTags.filter(tag => !visualOnlyTags.includes(tag.toLowerCase()));
+    const contentTags = generalTags.filter(tag => !visualOnlyTags.includes(tag.toLowerCase()));
     
     if (contentTags.length > 0) {
       // Create a simple synonyms map for common terms
@@ -1140,7 +1154,7 @@ Return only: {"lines":["joke1\\nwith\\nnewlines","joke2\\nwith\\nnewlines","joke
   }
 
   const tagRequirement = inputs.tags && inputs.tags.length > 0 
-    ? `\n• Aim to include or reference these tags naturally (paraphrasing is fine): ${inputs.tags.join(', ')}`
+    ? `\n• General tags are themes/hints only - DO NOT include them verbatim. Paraphrase, allude to, or reference them creatively: ${inputs.tags.join(', ')}`
     : '';
 
   const exactWordingRequirement = inputs.exactWordingTags && inputs.exactWordingTags.length > 0
@@ -1275,7 +1289,7 @@ export function buildGenerateTextMessages(params: {
   let prompt = `Generate exactly 4 short ${tone.toLowerCase()} text options for: ${context}.`;
   
   if (tags.length > 0) {
-    prompt += ` IMPORTANT: Each option MUST include ALL of these exact words/tags: ${tags.join(', ')}.`;
+    prompt += ` General tags are hints. Do NOT include them verbatim: ${tags.join(', ')}.`;
   }
   
   prompt += ` Each option must be ${characterLimit} characters or fewer. Be creative and engaging.

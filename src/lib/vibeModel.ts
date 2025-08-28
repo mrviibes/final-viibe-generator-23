@@ -109,7 +109,7 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
   let reason: string | undefined;
   let retryAttempt = 0;
   let originalModel: string | undefined;
-  let modelUsed = apiMeta?.modelUsed || 'gpt-5-mini-2025-08-07';
+  let modelUsed = apiMeta?.modelUsed || 'gpt-4.1-2025-04-14';
   
   // Quality retry: if we have < 4 valid lines and spelling issues, try with next model in chain
   if (uniqueValidLines.length < 4 && spellingFiltered > 0) {

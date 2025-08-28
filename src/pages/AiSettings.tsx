@@ -284,7 +284,7 @@ export default function AiSettings() {
                 <div className="text-xs text-muted-foreground space-y-1">
                   <p><strong>Range:</strong> 0.0 to 2.0</p>
                   <p><strong>Recommended:</strong> 0.3-0.7 for factual content, 0.7-1.2 for creative writing, 1.2-2.0 for experimental/artistic content</p>
-                  <p><strong>Note:</strong> GPT-5 and O3 models automatically optimize creativity and ignore this setting.</p>
+                  <p><strong>Note:</strong> GPT-4.1 models automatically optimize creativity and ignore this setting.</p>
                 </div>
               </div>
             </CardContent>
