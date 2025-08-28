@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertTriangle, X, RefreshCw } from 'lucide-react';
+import { AlertTriangle, X, RefreshCw, Type } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { detectExactTextRequest, normalizeTypography, isTextMisspelled } from '@/lib/textUtils';
@@ -11,6 +11,8 @@ interface IdeogramSpellingOverlayProps {
   onDismiss: () => void;
   modelUsed: string;
   showSpellingGuarantee?: boolean;
+  isV3Unavailable?: boolean;
+  onUseExactTextOverlay?: () => void;
 }
 
 export function IdeogramSpellingOverlay({
@@ -19,7 +21,9 @@ export function IdeogramSpellingOverlay({
   onRegenerate,
   onDismiss,
   modelUsed,
-  showSpellingGuarantee = false
+  showSpellingGuarantee = false,
+  isV3Unavailable = false,
+  onUseExactTextOverlay
 }: IdeogramSpellingOverlayProps) {
   const [dismissed, setDismissed] = useState(false);
   
@@ -27,8 +31,8 @@ export function IdeogramSpellingOverlay({
 
   const { isExactText, extractedText } = detectExactTextRequest(originalPrompt);
   
-  // Only show for exact text requests or when spelling guarantee is enabled
-  if (!isExactText && !showSpellingGuarantee) return null;
+  // Only show for exact text requests, when spelling guarantee is enabled, or when V3 is unavailable
+  if (!isExactText && !showSpellingGuarantee && !isV3Unavailable) return null;
 
   const isV2Fallback = modelUsed.includes('V_2A_TURBO') || modelUsed.includes('fallback');
   
@@ -74,16 +78,30 @@ export function IdeogramSpellingOverlay({
               </div>
             )}
             
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={onRegenerate}
-                className="border-amber-300 text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-200 dark:hover:bg-amber-900/50"
-              >
-                <RefreshCw className="h-3 w-3 mr-1" />
-                Regenerate
-              </Button>
+            <div className="flex items-center gap-2 flex-wrap">
+              {!isV3Unavailable && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onRegenerate}
+                  className="border-amber-300 text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-200 dark:hover:bg-amber-900/50"
+                >
+                  <RefreshCw className="h-3 w-3 mr-1" />
+                  {isV2Fallback ? 'Retry with V3' : 'Regenerate'}
+                </Button>
+              )}
+              
+              {isExactText && onUseExactTextOverlay && (
+                <Button
+                  size="sm"
+                  variant="default"
+                  onClick={onUseExactTextOverlay}
+                  className="bg-amber-600 hover:bg-amber-700 text-white"
+                >
+                  <Type className="h-3 w-3 mr-1" />
+                  Use Caption Overlay
+                </Button>
+              )}
               
               <Button
                 size="sm"

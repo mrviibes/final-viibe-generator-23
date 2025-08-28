@@ -146,7 +146,24 @@ serve(async (req) => {
         const errorText = await response.text();
         console.error(`Ideogram API error (${response.status}) from ${endpointUsed}:`, errorText);
         
-        // Enhanced fallback conditions for V_3
+        // For exact text requests, fail V3-only instead of falling back to V2
+        if (isExactTextRequest && modelToUse === 'V_3') {
+          console.log(`❌ V_3 failed for exact text request with ${response.status}. Refusing V2 fallback to preserve text quality.`);
+          
+          return new Response(JSON.stringify({ 
+            error: 'V3 model required for exact text rendering but is currently unavailable',
+            errorType: 'V3_UNAVAILABLE_FOR_EXACT_TEXT',
+            status: response.status,
+            endpoint_used: endpointUsed,
+            v3_attempts: v3Attempts,
+            suggestion: 'V3 model is temporarily unavailable. You can try again later or use client-side caption overlay for guaranteed text accuracy.'
+          }), {
+            status: 503,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        // Enhanced fallback conditions for V_3 (non-exact text)
         if (modelToUse === 'V_3' && (
           response.status === 404 || 
           response.status === 400 || 
@@ -255,7 +272,9 @@ serve(async (req) => {
         // Add a note about the fallback
         return new Response(JSON.stringify({
           ...fallbackData,
-          _fallback_note: 'V3 had an issue; used Turbo instead'
+          _fallback_note: 'V3 had an issue; used Turbo instead',
+          _model_used: 'V_2A_TURBO',
+          _original_model_requested: 'V_3'
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });

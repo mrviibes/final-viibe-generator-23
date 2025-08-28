@@ -36,6 +36,9 @@ export interface IdeogramGenerateResponse {
   _fallback_note?: string;
   endpoint_used?: string;
   model_used?: string;
+  _model_used?: string;
+  _original_model_requested?: string;
+  errorType?: string;
 }
 
 export class IdeogramAPIError extends Error {

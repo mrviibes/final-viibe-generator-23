@@ -23,6 +23,7 @@ export interface AIRuntimeOverrides {
   magicPromptEnabled?: boolean;
   ideogramModel?: 'V_2A_TURBO' | 'V_3';
   typographyStyle?: 'poster' | 'negative_space' | 'subtle_caption';
+  exactTextOverlayMode?: boolean;
   strictModelEnabled?: boolean;
   fastVisualsEnabled?: boolean;
 }
@@ -49,6 +50,12 @@ export function getRuntimeOverrides(): AIRuntimeOverrides {
     }
     if (overrides.fastVisualsEnabled === undefined) {
       overrides.fastVisualsEnabled = true;
+    }
+    if (overrides.ideogramModel === undefined) {
+      overrides.ideogramModel = 'V_3';
+    }
+    if (overrides.typographyStyle === undefined) {
+      overrides.typographyStyle = 'subtle_caption';
     }
     
     return overrides;

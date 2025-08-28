@@ -15,6 +15,8 @@ import { ProxySettingsDialog } from "@/components/ProxySettingsDialog";
 import { CorsRetryDialog } from "@/components/CorsRetryDialog";
 import { StepProgress } from "@/components/StepProgress";
 import { StackedSelectionCard } from "@/components/StackedSelectionCard";
+import { IdeogramSpellingOverlay } from "@/components/IdeogramSpellingOverlay";
+import { ExactTextOverlay } from "@/components/ExactTextOverlay";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigate } from "react-router-dom";
 import { generateCandidates, VibeResult } from "@/lib/vibeModel";
@@ -4056,6 +4058,14 @@ const Index = () => {
   const [proxySettings, setLocalProxySettings] = useState(() => getProxySettings());
   const [proxyApiKey, setProxyApiKey] = useState('');
   
+  // Exact text overlay and spelling features
+  const [showExactTextOverlay, setShowExactTextOverlay] = useState<boolean>(false);
+  const [backgroundImageUrl, setBackgroundImageUrl] = useState<string>("");
+  const [originalTextRequest, setOriginalTextRequest] = useState<string>("");
+  const [showSpellingOverlay, setShowSpellingOverlay] = useState<boolean>(false);
+  const [lastModelUsed, setLastModelUsed] = useState<string>("");
+  const [isV3Unavailable, setIsV3Unavailable] = useState<boolean>(false);
+  
 
   // Remember choices toggle and load saved choices
   const [rememberChoices, setRememberChoices] = useState<boolean>(() => {
@@ -6787,62 +6797,65 @@ const Index = () => {
                return;
              }
              
-             if (currentStep === 4 && isStep4Complete()) {
-               // Start manual image generation on Step 4
-               setIsGeneratingImage(true);
-              try {
-                const finalText = selectedGeneratedOption || stepTwoText || "";
-                const visualStyle = selectedVisualStyle || "";
-                const subcategory = (() => {
-                  if (selectedStyle === 'celebrations' && selectedSubOption) {
-                    const celebOption = celebrationOptions.find(c => c.id === selectedSubOption);
-                    return celebOption?.name || selectedSubOption;
-                  } else if (selectedStyle === 'pop-culture' && selectedSubOption) {
-                    const popOption = popCultureOptions.find(p => p.id === selectedSubOption);
-                    return popOption?.name || selectedSubOption;
-                  }
-                  return selectedSubOption || 'general';
-                })();
-                const selectedTextStyleObj = textStyleOptions.find(ts => ts.id === selectedTextStyle);
-                const tone = selectedTextStyleObj?.name || 'Humorous';
-                const allTags = [...tags, ...subjectTags];
+            if (currentStep === 4 && isStep4Complete()) {
+              // Start manual image generation on Step 4
+              setIsGeneratingImage(true);
+              
+              // Define shared variables for error handling
+              const finalText = selectedGeneratedOption || stepTwoText || "";
+              let model: 'V_1' | 'V_1_TURBO' | 'V_2' | 'V_2_TURBO' | 'V_2A' | 'V_2A_TURBO' | 'V_3' = 'V_2_TURBO';
+              
+             try {
+               const visualStyle = selectedVisualStyle || "";
+               const subcategory = (() => {
+                 if (selectedStyle === 'celebrations' && selectedSubOption) {
+                   const celebOption = celebrationOptions.find(c => c.id === selectedSubOption);
+                   return celebOption?.name || selectedSubOption;
+                 } else if (selectedStyle === 'pop-culture' && selectedSubOption) {
+                   const popOption = popCultureOptions.find(p => p.id === selectedSubOption);
+                   return popOption?.name || selectedSubOption;
+                 }
+                 return selectedSubOption || 'general';
+               })();
+               const selectedTextStyleObj = textStyleOptions.find(ts => ts.id === selectedTextStyle);
+               const tone = selectedTextStyleObj?.name || 'Humorous';
+               const allTags = [...tags, ...subjectTags];
 
-                // Get chosen visual concept if selected
-                const chosenVisual = selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].prompt : undefined;
+               // Get chosen visual concept if selected
+               const chosenVisual = selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].prompt : undefined;
 
-                // Build comprehensive Ideogram handoff payload
-                const categoryName = selectedStyle ? styleOptions.find(s => s.id === selectedStyle)?.name || "" : "";
-                const aspectRatio = selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || "";
+               // Build comprehensive Ideogram handoff payload
+               const categoryName = selectedStyle ? styleOptions.find(s => s.id === selectedStyle)?.name || "" : "";
+               const aspectRatio = selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || "";
 
-                // Get secondary subcategory for pop culture
-                const subcategorySecondary = selectedStyle === 'pop-culture' && selectedPick ? selectedPick : undefined;
-                const ideogramPayload = buildIdeogramHandoff({
-                  // Core parameters
-                  visual_style: visualStyle,
-                  subcategory: subcategory,
-                  tone: tone.toLowerCase(),
-                  final_line: finalText,
-                  tags_csv: allTags.join(', '),
-                  chosen_visual: chosenVisual,
-                  // Extended parameters
-                  category: categoryName,
-                  subcategory_secondary: subcategorySecondary,
-                  aspect_ratio: aspectRatio,
-                  text_tags_csv: tags.join(', '),
-                  visual_tags_csv: subjectTags.join(', '),
-                  ai_text_assist_used: selectedCompletionOption === "ai-assist",
-                  ai_visual_assist_used: selectedSubjectOption === "ai-assist",
-                  negative_prompt: negativePrompt,
-                  // Visual AI Recommendations
-                  rec_subject: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].subject : selectedSubjectOption === "design-myself" ? subjectDescription : undefined,
-                  rec_background: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined
-                });
+               // Get secondary subcategory for pop culture
+               const subcategorySecondary = selectedStyle === 'pop-culture' && selectedPick ? selectedPick : undefined;
+               const ideogramPayload = buildIdeogramHandoff({
+                 // Core parameters
+                 visual_style: visualStyle,
+                 subcategory: subcategory,
+                 tone: tone.toLowerCase(),
+                 final_line: finalText,
+                 tags_csv: allTags.join(', '),
+                 chosen_visual: chosenVisual,
+                 // Extended parameters
+                 category: categoryName,
+                 subcategory_secondary: subcategorySecondary,
+                 aspect_ratio: aspectRatio,
+                 text_tags_csv: tags.join(', '),
+                 visual_tags_csv: subjectTags.join(', '),
+                 ai_text_assist_used: selectedCompletionOption === "ai-assist",
+                 ai_visual_assist_used: selectedSubjectOption === "ai-assist",
+                 negative_prompt: negativePrompt,
+                 // Visual AI Recommendations
+                 rec_subject: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].subject : selectedSubjectOption === "design-myself" ? subjectDescription : undefined,
+                 rec_background: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined
+               });
 
-                // Generate the Ideogram prompt
-                const promptText = buildIdeogramPrompt(ideogramPayload);
-                const aspectRatioKey = getAspectRatioForIdeogram(selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || "");
-                let styleType = getStyleTypeForIdeogram(visualStyle);
-                let model: 'V_1' | 'V_1_TURBO' | 'V_2' | 'V_2_TURBO' | 'V_2A' | 'V_2A_TURBO' | 'V_3' = 'V_2_TURBO';
+               // Generate the Ideogram prompt
+               const promptText = buildIdeogramPrompt(ideogramPayload);
+               const aspectRatioKey = getAspectRatioForIdeogram(selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || "");
+               let styleType = getStyleTypeForIdeogram(visualStyle);
 
                 // Get model from AI settings instead of auto-selecting based on style
                 const runtimeOverrides = getRuntimeOverrides();
@@ -6897,8 +6910,13 @@ const Index = () => {
                   let fallbackNote = '';
                   
                   if (result._fallback_note) {
-                    actualModelUsed = 'V_2A_TURBO';
+                    actualModelUsed = (result.model_used || 'V_2A_TURBO') as 'V_2A_TURBO' | 'V_3';
                     fallbackNote = ' (fallback)';
+                    setLastModelUsed(actualModelUsed);
+                    setShowSpellingOverlay(true);
+                    setOriginalTextRequest(finalText);
+                  } else {
+                    setLastModelUsed(actualModelUsed);
                   }
                   
                   console.log(`Final model used: ${actualModelUsed}${fallbackNote ? ' (fell back from V3)' : ''}`);
@@ -6910,7 +6928,17 @@ const Index = () => {
                 }
               } catch (error) {
                 console.error("Error generating image:", error);
-                sonnerToast.error("Failed to generate your vibe. Please try again.");
+                setLastModelUsed(model);
+                
+                // Check if this is a V3 unavailable error for exact text
+                if (error instanceof Error && error.message.includes('V3 model required for exact text')) {
+                  setIsV3Unavailable(true);
+                  setShowSpellingOverlay(true);
+                  setOriginalTextRequest(finalText);
+                  sonnerToast.error("V3 model unavailable for exact text rendering. Use caption overlay for guaranteed accuracy.");
+                } else {
+                  sonnerToast.error("Failed to generate your vibe. Please try again.");
+                }
               } finally {
                 setIsGeneratingImage(false);
               }
@@ -7018,6 +7046,51 @@ const Index = () => {
 
         {/* CORS Retry Dialog */}
         <CorsRetryDialog open={showCorsRetryDialog} onOpenChange={setShowCorsRetryDialog} onRetry={handleGenerateImage} />
+
+        {/* Spelling/Text Quality Overlay */}
+        {showSpellingOverlay && (
+          <IdeogramSpellingOverlay
+            originalPrompt={originalTextRequest}
+            generatedImageUrl={generatedImages[selectedImageIndex]}
+            onRegenerate={() => {
+              setShowSpellingOverlay(false);
+              setIsV3Unavailable(false);
+              handleGenerateImage();
+            }}
+            onDismiss={() => {
+              setShowSpellingOverlay(false);
+              setIsV3Unavailable(false);
+            }}
+            modelUsed={lastModelUsed}
+            isV3Unavailable={isV3Unavailable}
+            onUseExactTextOverlay={() => {
+              setShowSpellingOverlay(false);
+              setBackgroundImageUrl(generatedImages[selectedImageIndex]);
+              setShowExactTextOverlay(true);
+            }}
+          />
+        )}
+
+        {/* Exact Text Caption Overlay */}
+        {showExactTextOverlay && backgroundImageUrl && (
+          <ExactTextOverlay
+            imageUrl={backgroundImageUrl}
+            originalText={originalTextRequest}
+            onClose={() => {
+              setShowExactTextOverlay(false);
+              setBackgroundImageUrl("");
+            }}
+            onSave={(finalImageUrl) => {
+              // Replace the current image with the captioned version
+              const newImages = [...generatedImages];
+              newImages[selectedImageIndex] = finalImageUrl;
+              setGeneratedImages(newImages);
+              setShowExactTextOverlay(false);
+              setBackgroundImageUrl("");
+              sonnerToast.success("Caption overlay applied successfully!");
+            }}
+          />
+        )}
 
       </div>
     </div>;
