@@ -5,6 +5,11 @@ export function normalizeTypography(text: string): string {
     .replace(/['']/g, "'")
     // Convert em/en dashes to regular hyphens
     .replace(/[—–]/g, '-')
+    // Normalize ellipsis
+    .replace(/…/g, '...')
+    // Fix common spacing issues around punctuation
+    .replace(/\s+([,.!?;:])/g, '$1')
+    .replace(/([.!?])\s*([A-Z])/g, '$1 $2')
     // Remove any trailing/leading whitespace
     .trim();
 }
@@ -49,7 +54,33 @@ export function isTextMisspelled(originalText: string, renderedText: string): bo
   
   // Simple similarity check - if they're very different, likely misspelled
   const similarity = calculateSimilarity(normalized1, normalized2);
-  return similarity < 0.8; // 80% similarity threshold
+  return similarity < 0.75; // Stricter 75% similarity threshold for better detection
+}
+
+export function detectExactTextRequest(prompt: string): { isExactText: boolean; extractedText: string } {
+  // Look for EXACT TEXT patterns
+  const exactTextPattern = /EXACT TEXT:\s*["']([^"']+)["']/i;
+  const match = prompt.match(exactTextPattern);
+  
+  if (match) {
+    return { isExactText: true, extractedText: match[1] };
+  }
+  
+  // Also check for other exact text indicators
+  const altPatterns = [
+    /exact(?:ly)?\s*text\s*[:\-]\s*["']([^"']+)["']/i,
+    /render\s*text\s*[:\-]\s*["']([^"']+)["']/i,
+    /text\s*must\s*say\s*["']([^"']+)["']/i
+  ];
+  
+  for (const pattern of altPatterns) {
+    const altMatch = prompt.match(pattern);
+    if (altMatch) {
+      return { isExactText: true, extractedText: altMatch[1] };
+    }
+  }
+  
+  return { isExactText: false, extractedText: "" };
 }
 
 function calculateSimilarity(str1: string, str2: string): number {

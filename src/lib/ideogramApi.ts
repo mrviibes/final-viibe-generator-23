@@ -151,12 +151,15 @@ export async function generateIdeogramImage(request: IdeogramGenerateRequest): P
   const requestWithModel: IdeogramGenerateRequest = { ...request };
   
   // Always use backend API for V_3 model to ensure proper V3 endpoint usage
-  const forceBackend = requestWithModel.model === 'V_3';
+  // Also prioritize backend for exact text requests to get better V3 routing
+  const isExactTextRequest = /EXACT TEXT:/i.test(request.prompt);
+  const forceBackend = requestWithModel.model === 'V_3' || isExactTextRequest;
   
-  // Try backend API first if enabled or if V_3 model
+  // Try backend API first if enabled or if V_3 model or exact text request
   if (useBackendAPI || forceBackend) {
-    const apiPath = forceBackend ? 'backend (V3 model)' : 'backend';
-    console.log(`Calling Ideogram ${apiPath} - Model: ${request.model}, Style: ${request.style_type || 'AUTO'}, Prompt: ${request.prompt.substring(0, 50)}...`);
+    const reasonForBackend = requestWithModel.model === 'V_3' ? 'V3 model' : 
+                           isExactTextRequest ? 'exact text request' : 'backend';
+    console.log(`Calling Ideogram backend (${reasonForBackend}) - Model: ${request.model}, Style: ${request.style_type || 'AUTO'}, Prompt: ${request.prompt.substring(0, 50)}...`);
     
     try {
       const { data, error } = await supabase.functions.invoke('ideogram-generate', {
@@ -175,13 +178,28 @@ export async function generateIdeogramImage(request: IdeogramGenerateRequest): P
       // Check for fallback notification and log V3 status
       if (data._fallback_note) {
         console.log('⚠️ V3 unavailable, used fallback:', data._fallback_note);
+        if (isExactTextRequest) {
+          console.log('⚠️ Exact text request fell back to V2A_TURBO - text quality may be affected');
+        }
       } else if (data.endpoint_used && data.endpoint_used.startsWith('v3')) {
         console.log(`✅ V3 endpoint working (${data.endpoint_used})`);
+        if (isExactTextRequest) {
+          console.log('✅ Exact text request using V3 - enhanced text rendering');
+        }
       }
 
       const modelUsed = data._fallback_note ? 'V_2A_TURBO (fallback)' : request.model;
       console.log(`Backend Ideogram API success - Generated ${data.data?.length || 0} image(s) with Model: ${modelUsed}, Style: ${request.style_type || 'AUTO'}`);
-      return data as IdeogramGenerateResponse;
+      
+      // Add metadata for UI handling
+      const responseWithMetadata = {
+        ...data,
+        model_used: modelUsed,
+        exact_text_request: isExactTextRequest,
+        spelling_guarantee_active: isExactTextRequest && !data._fallback_note
+      } as IdeogramGenerateResponse;
+      
+      return responseWithMetadata;
 
     } catch (error) {
       console.error('Backend Ideogram API call failed:', error);
