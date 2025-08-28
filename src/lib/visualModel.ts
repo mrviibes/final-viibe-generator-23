@@ -1,5 +1,5 @@
 import { openAIService } from './openai';
-import { SYSTEM_PROMPTS, buildVisualGeneratorMessages, getStyleKeywords, getEffectiveConfig, isTemperatureSupported, BACKGROUND_PRESETS } from '../vibe-ai.config';
+import { SYSTEM_PROMPTS, buildVisualGeneratorMessages, getStyleKeywords, getEffectiveConfig, isTemperatureSupported, getSmartFallbackChain, MODEL_DISPLAY_NAMES, BACKGROUND_PRESETS } from '../vibe-ai.config';
 
 export interface VisualInputs {
   category: string;
@@ -26,6 +26,7 @@ export interface VisualOption {
 export interface VisualResult {
   options: VisualOption[];
   model: string;
+  modelDisplayName?: string;
   errorCode?: 'timeout' | 'unauthorized' | 'network' | 'parse_error';
   fallbackReason?: string;
 }
@@ -326,10 +327,14 @@ export async function generateVisualRecommendations(
           openAIService.chatJSON(messages, requestOptions),
           timeoutPromise
         ]);
+        console.log(`✅ Visual generation successful with ${MODEL_DISPLAY_NAMES[targetModel] || targetModel}`);
     } catch (firstError) {
-      // Retry with compact prompt on gpt-4o-mini for any JSON/timeout error
+      // Get smart fallback chain based on user's selected model
+      const fallbackChain = getSmartFallbackChain(targetModel, 'visual');
+      const nextModel = fallbackChain[1]; // Get next model after user's choice
+      
       if (firstError instanceof Error && (firstError.message.includes('JSON') || firstError.message.includes('parse') || firstError.message.includes('TIMEOUT'))) {
-        console.log('🔄 Retrying with compact prompt on gpt-4o-mini...');
+        console.log(`🔄 Retrying with ${MODEL_DISPLAY_NAMES[nextModel] || nextModel}...`);
         const compactUserPrompt = `${category}>${subcategory}, ${tone}. 4 visual JSON concepts.`;
         
         const compactMessages = [
@@ -343,18 +348,27 @@ export async function generateVisualRecommendations(
         });
         
         try {
+          // Use next model in chain instead of hardcoded gpt-4o-mini
+          const retryRequestOptions: any = {
+            max_completion_tokens: 450,
+            model: nextModel
+          };
+          
+          // Only add temperature for supported models
+          if (isTemperatureSupported(nextModel)) {
+            retryRequestOptions.temperature = 0.7;
+          }
+          
           result = await Promise.race([
-            openAIService.chatJSON(compactMessages, {
-              temperature: 0.7,
-              max_tokens: 450,
-              model: 'gpt-4o-mini'
-            }),
+            openAIService.chatJSON(compactMessages, retryRequestOptions),
             retryTimeoutPromise
           ]);
+          console.log(`✅ Visual generation retry successful with ${MODEL_DISPLAY_NAMES[nextModel] || nextModel}`);
         } catch (secondError) {
-          // Third attempt with ultra-compact prompt
+          // Final attempt with ultra-compact prompt and last fallback model
+          const finalModel = fallbackChain[2] || 'o4-mini-2025-04-16';
           if (secondError instanceof Error && secondError.message.includes('RETRY_TIMEOUT')) {
-            console.log('🔄 Final attempt with ultra-compact prompt...');
+            console.log(`🔄 Final attempt with ${MODEL_DISPLAY_NAMES[finalModel] || finalModel}...`);
             const ultraCompactMessages = [
               { role: 'system', content: 'Generate 4 visual concepts as JSON array.' },
               { role: 'user', content: `${tone} ${category} visuals. JSON only.` }
@@ -407,9 +421,17 @@ export async function generateVisualRecommendations(
       validOptions = [...validOptions, ...fallbacks].slice(0, 4);
     }
 
+    const actualModel = result._apiMeta?.modelUsed || targetModel;
+    
+    // Save last used model for UI tracking
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('last_visual_model', actualModel);
+    }
+    
     return {
       options: validOptions,
-      model: result._apiMeta?.modelUsed || 'gpt-4o-mini'
+      model: actualModel,
+      modelDisplayName: MODEL_DISPLAY_NAMES[actualModel] || actualModel
     };
   } catch (error) {
     console.error('Error generating visual recommendations:', error);

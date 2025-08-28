@@ -156,6 +156,7 @@ export interface VibeResult {
   picked: string;
   audit: {
     model: string;
+    modelDisplayName?: string;
     textSpeed?: string;
     usedFallback: boolean;
     blockedCount: number;
@@ -163,6 +164,7 @@ export interface VibeResult {
     reason?: string;
     retryAttempt?: number;
     originalModel?: string;
+    originalModelDisplayName?: string;
     spellingFiltered?: number;
   };
 }
@@ -183,6 +185,41 @@ export interface IdeogramHandoff {
 // =========================
 // 2) Feature Flags and Constants
 // =========================
+// Model fallback chains for retry strategy
+export const MODEL_FALLBACK_CHAINS = {
+  text: [
+    'gpt-5-mini-2025-08-07',
+    'gpt-4.1-2025-04-14', 
+    'o4-mini-2025-04-16'
+  ],
+  visual: [
+    'gpt-5-mini-2025-08-07',
+    'gpt-4.1-2025-04-14',
+    'o4-mini-2025-04-16'
+  ]
+};
+
+// Available models for UI
+export const AVAILABLE_MODELS = [
+  { value: 'gpt-5-2025-08-07', label: 'GPT-5 (Flagship)', isRecommended: false },
+  { value: 'gpt-5-mini-2025-08-07', label: 'GPT-5 Mini', isRecommended: true },
+  { value: 'gpt-4.1-2025-04-14', label: 'GPT-4.1', isRecommended: false },
+  { value: 'o4-mini-2025-04-16', label: 'O4 Mini (Fast Reasoning)', isRecommended: false },
+  { value: 'o3-2025-04-16', label: 'O3 (Powerful Reasoning)', isRecommended: false },
+];
+
+// Friendly model names for display
+export const MODEL_DISPLAY_NAMES: Record<string, string> = {
+  'gpt-5-2025-08-07': 'GPT-5',
+  'gpt-5-mini-2025-08-07': 'GPT-5 Mini', 
+  'gpt-4.1-2025-04-14': 'GPT-4.1',
+  'gpt-4.1-mini-2025-04-14': 'GPT-4.1 Mini',
+  'o4-mini-2025-04-16': 'O4 Mini',
+  'o3-2025-04-16': 'O3',
+  'gpt-4o-mini': 'GPT-4o Mini (Legacy)',
+  'gpt-4o': 'GPT-4o (Legacy)'
+};
+
 export const AI_CONFIG = {
   version: "1.0.0",
   reasoning_effort: "medium" as ReasoningEffort,
@@ -221,6 +258,19 @@ export const AI_CONFIG = {
     model: 'gpt-5-mini-2025-08-07' // Use selected model from settings
   }
 };
+
+// Helper to get smart fallback chain based on user's selected model
+export function getSmartFallbackChain(userModel: string, type: 'text' | 'visual' = 'text'): string[] {
+  const baseChain = MODEL_FALLBACK_CHAINS[type];
+  
+  // If user model is in our chain, start with it and add others
+  if (baseChain.includes(userModel)) {
+    return [userModel, ...baseChain.filter(m => m !== userModel)];
+  }
+  
+  // If user selected a model outside our chain, try it first then fallback
+  return [userModel, ...baseChain];
+}
 
 // Get effective configuration with runtime overrides applied
 export function getEffectiveConfig() {
@@ -944,15 +994,6 @@ export const bannedWords = BANNED_WORDS;
 // =====================================================================
 // ADDITIONAL EXPORTS - UI Constants and Helpers
 // =====================================================================
-
-// Available Models for dropdown selection
-export const AVAILABLE_MODELS = [
-  { value: 'gpt-5-2025-08-07', label: 'GPT-5 (Flagship)', isRecommended: false },
-  { value: 'gpt-5-mini-2025-08-07', label: 'GPT-5 Mini (Default)', isRecommended: true },
-  { value: 'gpt-4.1-2025-04-14', label: 'GPT-4.1', isRecommended: false },
-  { value: 'gpt-4o-mini', label: 'GPT-4o Mini (Fast)', isRecommended: false },
-  { value: 'o4-mini-2025-04-16', label: 'O4 Mini', isRecommended: false }
-];
 
 export const VISUAL_STYLES = [
   { id: "Realistic", name: "Realistic" },

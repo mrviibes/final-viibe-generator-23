@@ -17,6 +17,7 @@ import {
   clearRuntimeOverrides,
   AI_CONFIG,
   AVAILABLE_MODELS,
+  MODEL_DISPLAY_NAMES,
   VISUAL_STYLES, 
   TONES,
   isTemperatureSupported,
@@ -162,11 +163,29 @@ export default function AiSettings() {
                 <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                   <div>
                     <p className="font-medium">Active Model</p>
-                    <p className="text-sm text-muted-foreground">{effectiveConfig.generation.model}</p>
+                    <p className="text-sm text-muted-foreground">{MODEL_DISPLAY_NAMES[effectiveConfig.generation.model] || effectiveConfig.generation.model}</p>
                   </div>
                   <Badge variant={overrides.model ? "default" : "secondary"}>
                     {overrides.model ? "Override" : "Default"}
                   </Badge>
+                </div>
+                {/* Last Used Models (Read-only) */}
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground">Last Used Models</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex items-center justify-between p-2 bg-muted/50 rounded">
+                      <span className="text-xs font-medium">Text:</span>
+                      <Badge variant="outline" className="text-xs">
+                        {MODEL_DISPLAY_NAMES[localStorage.getItem('last_text_model') || effectiveConfig.generation.model] || 'Not set'}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between p-2 bg-muted/50 rounded">
+                      <span className="text-xs font-medium">Visuals:</span>
+                      <Badge variant="outline" className="text-xs">
+                        {MODEL_DISPLAY_NAMES[localStorage.getItem('last_visual_model') || effectiveConfig.visual_generation.model] || 'Not set'}
+                      </Badge>
+                    </div>
+                  </div>
                 </div>
               </div>
             </CardContent>

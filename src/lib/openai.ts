@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { buildPopCultureSearchPrompt, buildGenerateTextMessages } from "../vibe-ai.config";
+import { buildPopCultureSearchPrompt, buildGenerateTextMessages, getEffectiveConfig, MODEL_DISPLAY_NAMES } from "../vibe-ai.config";
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -415,8 +415,10 @@ export class OpenAIService {
 
     try {
       // Use effective config to get the model from AI settings
-      const effectiveConfig = { generation: { model: 'gpt-5-mini-2025-08-07' } }; // Default fallback
+      const effectiveConfig = getEffectiveConfig();
       const targetModel = effectiveConfig.generation.model;
+      
+      console.log(`🚀 Text generation using model from AI settings: ${MODEL_DISPLAY_NAMES[targetModel] || targetModel}`);
       
       const result = await this.chatJSON(messages, {
         max_completion_tokens: this.textSpeed === 'fast' ? 200 : 300,

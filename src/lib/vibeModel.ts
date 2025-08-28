@@ -4,6 +4,8 @@ import {
   TONE_FALLBACKS,
   AI_CONFIG,
   getEffectiveConfig,
+  getSmartFallbackChain,
+  MODEL_DISPLAY_NAMES,
   SYSTEM_PROMPTS,
   buildVibeGeneratorMessages,
   type VibeInputs,
@@ -36,17 +38,17 @@ async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: st
   try {
     // Use effective config with runtime overrides
     const config = getEffectiveConfig();
-    const modelToUse = overrideModel || config.generation.model;
+    const targetModel = overrideModel || config.generation.model;
+    
+    console.log(`🚀 Text generation starting with user-selected model: ${targetModel}`);
     
     // Use centralized message builder
     const messages = buildVibeGeneratorMessages(inputs);
     
-    console.log(`Generating candidates with model: ${modelToUse}, temperature: ${config.generation.temperature}`);
-    
     const result = await openAIService.chatJSON(messages, {
       max_tokens: config.generation.max_tokens,
       temperature: config.generation.temperature,
-      model: modelToUse
+      model: targetModel
     });
     
     // Store the API metadata for later use
@@ -103,29 +105,45 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
   let originalModel: string | undefined;
   let modelUsed = apiMeta?.modelUsed || 'gpt-5-mini-2025-08-07';
   
-  // Quality retry: if we have < 4 valid lines and spelling issues, try with flagship model
+  // Quality retry: if we have < 4 valid lines and spelling issues, try with next model in chain
   if (uniqueValidLines.length < 4 && spellingFiltered > 0) {
-    console.log(`Quality retry: only ${uniqueValidLines.length} valid lines, ${spellingFiltered} spelling filtered. Trying flagship model.`);
+    console.log(`🔄 Quality retry: only ${uniqueValidLines.length} valid lines, ${spellingFiltered} spelling filtered.`);
     
-    try {
-      const retryResults = await generateMultipleCandidates(inputs, 'gpt-5-2025-08-07');
-      const retryApiMeta = (retryResults as any)._apiMeta || null;
-      const retryValidCandidates = retryResults.filter(c => !c.blocked);
-      const retryUniqueValidLines = Array.from(new Set(retryValidCandidates.map(c => c.line)));
+    // Get the effective config to know user's preferred model
+    const config = getEffectiveConfig();
+    const userModel = config.generation.model;
+    
+    // Get fallback chain starting with user's model
+    const fallbackChain = getSmartFallbackChain(userModel, 'text');
+    const nextModel = fallbackChain[1]; // Get next model after user's choice
+    
+    if (nextModel && nextModel !== modelUsed) {
+      console.log(`🎯 Retrying with next model in chain: ${nextModel}`);
       
-      if (retryUniqueValidLines.length > uniqueValidLines.length) {
-        // Use retry results
-        finalCandidates = [...retryUniqueValidLines];
-        retryAttempt = 1;
-        originalModel = modelUsed;
-        modelUsed = retryApiMeta?.modelUsed || 'gpt-5-2025-08-07';
-        reason = 'Quality retry improved results';
-      } else {
-        // Retry didn't help, use original results
+      try {
+        const retryResults = await generateMultipleCandidates(inputs, nextModel);
+        const retryApiMeta = (retryResults as any)._apiMeta || null;
+        const retryValidCandidates = retryResults.filter(c => !c.blocked);
+        const retryUniqueValidLines = Array.from(new Set(retryValidCandidates.map(c => c.line)));
+        
+        if (retryUniqueValidLines.length > uniqueValidLines.length) {
+          // Use retry results
+          finalCandidates = [...retryUniqueValidLines];
+          retryAttempt = 1;
+          originalModel = modelUsed;
+          modelUsed = retryApiMeta?.modelUsed || nextModel;
+          reason = `Quality retry with ${MODEL_DISPLAY_NAMES[nextModel] || nextModel} improved results`;
+          console.log(`✅ Quality retry successful with ${MODEL_DISPLAY_NAMES[nextModel] || nextModel}`);
+        } else {
+          // Retry didn't help, use original results
+          finalCandidates = [...uniqueValidLines];
+          console.log(`🔄 Quality retry didn't improve results, using original`);
+        }
+      } catch (error) {
+        console.error('Quality retry failed:', error);
         finalCandidates = [...uniqueValidLines];
       }
-    } catch (error) {
-      console.error('Quality retry failed:', error);
+    } else {
       finalCandidates = [...uniqueValidLines];
     }
   } else {
@@ -196,11 +214,17 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
     }
   }
   
-  return {
+    // Save last used model for UI tracking
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('last_text_model', modelUsed);
+    }
+    
+    return {
     candidates: finalCandidates,
     picked,
     audit: {
       model: modelUsed,
+      modelDisplayName: MODEL_DISPLAY_NAMES[modelUsed] || modelUsed,
       textSpeed: apiMeta?.textSpeed || 'fast',
       usedFallback,
       blockedCount,
@@ -208,6 +232,7 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
       reason,
       retryAttempt,
       originalModel,
+      originalModelDisplayName: originalModel ? MODEL_DISPLAY_NAMES[originalModel] || originalModel : undefined,
       spellingFiltered
     }
   };
