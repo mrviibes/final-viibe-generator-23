@@ -15,7 +15,6 @@ import {
   getRuntimeOverrides, 
   setRuntimeOverrides, 
   clearRuntimeOverrides,
-  clearOpenAIApiKey,
   AI_CONFIG,
   AVAILABLE_MODELS,
   MODEL_DISPLAY_NAMES,
@@ -26,7 +25,6 @@ import {
   type VisualStyle,
   type Tone
 } from "@/vibe-ai.config";
-import { openAIService } from "@/lib/openai";
 
 export default function AiSettings() {
   const navigate = useNavigate();
@@ -102,14 +100,6 @@ export default function AiSettings() {
     const current = getRuntimeOverrides();
     setOverrides(current);
     setHasChanges(false);
-  };
-
-  const clearApiKey = () => {
-    clearOpenAIApiKey();
-    toast({
-      title: "API Key Cleared",
-      description: "Your OpenAI API key has been removed. The app will now use the server backend."
-    });
   };
 
   return (
@@ -201,90 +191,15 @@ export default function AiSettings() {
             </CardContent>
           </Card>
 
-          {/* API Source & Model Settings */}
+          {/* Model Settings */}
           <Card>
             <CardHeader>
-              <CardTitle>API Source & Model Configuration</CardTitle>
+              <CardTitle>Model Configuration</CardTitle>
               <CardDescription>
-                Control where AI requests are sent and which model is used for text generation.
+                Control which AI model and parameters are used for text generation.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              
-              {/* API Source Selection */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label>API Source</Label>
-                  {openAIService.hasApiKey() && (
-                    <Badge variant="outline" className="gap-1">
-                      <Settings className="h-3 w-3" />
-                      My Key Active
-                    </Badge>
-                  )}
-                </div>
-                
-                <Select
-                  value={overrides.apiSource || (openAIService.hasApiKey() ? 'my_key' : 'server')}
-                  onValueChange={(value) => updateOverride('apiSource', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="server">
-                      <div>
-                        <div className="font-medium">Server (Recommended)</div>
-                        <div className="text-xs text-muted-foreground">Use Lovable's backend service</div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="my_key">
-                      <div>
-                        <div className="font-medium">My OpenAI Key</div>
-                        <div className="text-xs text-muted-foreground">Use your personal API key</div>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                
-                {openAIService.hasApiKey() && (
-                  <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={clearApiKey}>
-                      Clear My API Key
-                    </Button>
-                    <span className="text-xs text-muted-foreground">
-                      Removes your key and switches to server mode
-                    </span>
-                  </div>
-                )}
-                
-                {overrides.apiSource === 'my_key' && !openAIService.hasApiKey() && (
-                  <div className="flex items-start gap-2 p-3 bg-muted rounded-lg">
-                    <AlertTriangle className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                    <div className="text-sm text-muted-foreground">
-                      <p className="font-medium">API Key Required</p>
-                      <p>To use your OpenAI key, please add it in the main generator page.</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <Separator />
-
-              {/* Strict Mode */}
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label>Strict Model (No Fallback)</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Use only your selected model, don't fallback to others if it fails
-                  </p>
-                </div>
-                <Switch
-                  checked={overrides.strictModel ?? false}
-                  onCheckedChange={(checked) => updateOverride('strictModel', checked)}
-                />
-              </div>
-
-              <Separator />
               <div className="space-y-2">
                 <Label htmlFor="model">AI Model</Label>
                 <Select

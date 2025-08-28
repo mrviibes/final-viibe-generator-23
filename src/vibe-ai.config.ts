@@ -23,9 +23,6 @@ export interface AIRuntimeOverrides {
   magicPromptEnabled?: boolean;
   ideogramModel?: 'V_2A_TURBO' | 'V_3';
   typographyStyle?: 'poster' | 'negative_space';
-  // API Source Controls
-  apiSource?: 'server' | 'my_key';
-  strictModel?: boolean; // No fallback when enabled
 }
 
 // Get runtime overrides from localStorage
@@ -67,15 +64,6 @@ export function clearRuntimeOverrides(): void {
     localStorage.removeItem('ai-runtime-overrides');
   } catch (error) {
     console.warn('Failed to clear AI runtime overrides:', error);
-  }
-}
-
-// Clear OpenAI API key
-export function clearOpenAIApiKey(): void {
-  try {
-    localStorage.removeItem('openai-api-key');
-  } catch (error) {
-    console.warn('Failed to clear OpenAI API key:', error);
   }
 }
 
@@ -178,10 +166,6 @@ export interface VibeResult {
     originalModel?: string;
     originalModelDisplayName?: string;
     spellingFiltered?: number;
-    // Enhanced audit information
-    apiSource?: string;
-    strictMode?: boolean;
-    fallbackReason?: string;
   };
 }
 

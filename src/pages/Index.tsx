@@ -4711,11 +4711,8 @@ const Index = () => {
 
       // Show success toast with model information if retry occurred
       if (vibeResult.audit.retryAttempt && vibeResult.audit.retryAttempt > 0) {
-        const fallbackMsg = vibeResult.audit.fallbackReason 
-          ? `(${vibeResult.audit.fallbackReason})`
-          : 'for better results';
         sonnerToast.success("Generated text with model fallback", {
-          description: `Switched from ${vibeResult.audit.originalModelDisplayName || vibeResult.audit.originalModel} to ${vibeResult.audit.modelDisplayName || vibeResult.audit.model} ${fallbackMsg}.`
+          description: `Switched from ${vibeResult.audit.originalModel} to ${vibeResult.audit.model} for better results.`
         });
       }
 
@@ -5892,34 +5889,12 @@ const Index = () => {
                           {isGenerating ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : "Regenerate"}
                         </Button>
                       </div>
-                        {generatedOptions.length > 0 && generationAudit && (
-                         <div className="text-xs text-muted-foreground space-y-1">
-                           <p>
-                             Using {generationAudit.modelDisplayName || generationAudit.model}
-                             {generationAudit.apiSource && (
-                               <span className="ml-1 px-1.5 py-0.5 bg-muted rounded text-xs">
-                                 {generationAudit.apiSource === 'my_key' ? 'My Key' : 'Server'}
-                               </span>
-                             )}
-                             {generationAudit.strictMode && (
-                               <span className="ml-1 px-1.5 py-0.5 bg-primary/10 text-primary rounded text-xs">
-                                 Strict
-                               </span>
-                             )}
-                             • Generated in {((Date.now() - textGenerationStartTime) / 1000).toFixed(1)}s
-                           </p>
-                           {generationAudit.usedFallback ? (
-                             <p className="text-amber-600">Used fallback • {generationAudit.reason}</p>
-                           ) : generationAudit.originalModel ? (
-                             <p className="text-green-600">
-                               Fallback: {generationAudit.originalModelDisplayName || generationAudit.originalModel} → {generationAudit.modelDisplayName || generationAudit.model}
-                               {generationAudit.fallbackReason && ` (${generationAudit.fallbackReason})`}
-                             </p>
-                           ) : (
-                             <p>Received {generationAudit.candidateCount} options</p>
-                           )}
-                         </div>
-                       )}
+                       {generatedOptions.length > 0 && generationAudit && (
+                        <p className="text-xs text-muted-foreground">
+                           Using {generationAudit.model} • Generated in {((Date.now() - textGenerationStartTime) / 1000).toFixed(1)}s
+                           {generationAudit.usedFallback ? " • Used fallback" : ` • Received ${generationAudit.candidateCount} options`}
+                        </p>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-6">
