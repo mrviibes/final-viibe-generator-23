@@ -233,6 +233,91 @@ export class OpenAIService {
     }
   }
 
+  private async callBackendAPIWithHedging(messages: Array<{role: string; content: string}>, options: {
+    temperature?: number;
+    max_tokens?: number;
+    max_completion_tokens?: number;
+    model?: string;
+  }): Promise<any> {
+    const {
+      model = 'gpt-5-mini-2025-08-07'
+    } = options;
+
+    console.log(`🔄 Starting hedged backend API call - Primary: ${model}`);
+    const startTime = Date.now();
+
+    // Primary call promise
+    const primaryPromise = this.callBackendAPI(messages, options);
+
+    // Hedge promise - start a faster model after 700ms if primary hasn't resolved
+    const hedgePromise = new Promise<any>((resolve, reject) => {
+      const hedgeTimer = setTimeout(async () => {
+        try {
+          console.log(`⚡ Hedging with faster model after 700ms - Primary: ${model}`);
+          const fastModel = 'o4-mini-2025-04-16'; // Fastest reasoning model
+          const hedgeResult = await this.callBackendAPI(messages, {
+            ...options,
+            model: fastModel
+          });
+          
+          // Mark as hedged for audit
+          if (hedgeResult && typeof hedgeResult === 'object') {
+            hedgeResult._apiMeta = {
+              ...hedgeResult._apiMeta,
+              hedged: true,
+              hedgeModel: fastModel,
+              originalModel: model
+            };
+          }
+          
+          resolve(hedgeResult);
+        } catch (error) {
+          reject(error);
+        }
+      }, 700);
+
+      // Clean up timer if primary resolves first
+      primaryPromise.then(() => clearTimeout(hedgeTimer)).catch(() => clearTimeout(hedgeTimer));
+    });
+
+    // Race primary vs hedge with 8s total timeout
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Total request timeout after 8 seconds')), 8000);
+    });
+
+    try {
+      const result = await Promise.race([primaryPromise, hedgePromise, timeoutPromise]);
+      const elapsedMs = Date.now() - startTime;
+      
+      console.log(`✅ Hedged backend API completed - Elapsed: ${elapsedMs}ms`);
+      
+      // Add timing metadata
+      if (result && typeof result === 'object') {
+        result._apiMeta = {
+          ...result._apiMeta,
+          elapsedMs,
+          backendUsed: true
+        };
+      }
+      
+      return result;
+    } catch (error) {
+      const elapsedMs = Date.now() - startTime;
+      console.error(`❌ Hedged backend API failed after ${elapsedMs}ms:`, error);
+      
+      // Fallback to frontend if available
+      if (this.apiKey) {
+        console.log('🔄 Falling back to frontend API...');
+        this.useBackendAPI = false;
+        const result = await this.chatJSON(messages, options);
+        this.useBackendAPI = true;
+        return result;
+      }
+      
+      throw error;
+    }
+  }
+
   async chatJSON(messages: Array<{role: string; content: string}>, options: {
     temperature?: number;
     max_tokens?: number;
@@ -241,7 +326,7 @@ export class OpenAIService {
   } = {}): Promise<any> {
     // Use backend API if available, fallback to frontend
     if (this.useBackendAPI) {
-      return this.callBackendAPI(messages, options);
+      return this.callBackendAPIWithHedging(messages, options);
     }
     
     if (!this.apiKey) {

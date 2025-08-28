@@ -206,17 +206,17 @@ export interface IdeogramHandoff {
 
 // Fixed negative prompt applied to all image generations
 export const DEFAULT_NEGATIVE_PROMPT = "misspellings, distorted letters, extra characters, typos, random symbols, unreadable fonts, cartoon style, flat colors, empty background, isolated subject, small text, hidden text";
-// Model fallback chains for retry strategy
+// Model fallback chains for retry strategy - prioritize fast models
 export const MODEL_FALLBACK_CHAINS = {
   text: [
-    'gpt-5-mini-2025-08-07',
-    'gpt-4.1-2025-04-14', 
-    'o4-mini-2025-04-16'
+    'o4-mini-2025-04-16',      // Fastest reasoning model
+    'gpt-5-mini-2025-08-07',   // Fast and efficient
+    'gpt-4.1-2025-04-14'       // Reliable fallback
   ],
   visual: [
-    'gpt-5-mini-2025-08-07',
-    'gpt-4.1-2025-04-14',
-    'o4-mini-2025-04-16'
+    'o4-mini-2025-04-16',      // Fastest reasoning model
+    'gpt-5-mini-2025-08-07',   // Fast and efficient  
+    'gpt-4.1-2025-04-14'       // Reliable fallback
   ]
 };
 
@@ -270,9 +270,9 @@ export const AI_CONFIG = {
     popCultureAllowsSecondary: (cat: Category) => cat === "Pop Culture"
   },
   generation: {
-    max_candidates: 6,
+    max_candidates: 4, // Reduced from 6 to 4 for faster generation
     temperature: 0.7,
-    max_tokens: 120, // Reduced for faster generation
+    max_tokens: 120, // Kept at 120 for quality
     model: 'gpt-4o-mini' // Fast mini model by default
   },
   visual_generation: {
@@ -1167,7 +1167,7 @@ export function buildVibeGeneratorMessages(inputs: VibeInputs): Array<{role: str
       ? `\n• Incorporate "${inputs.recipient_name}" naturally into the setup or punchline (PG-rated, no slurs)`
       : '';
     
-    const corePrompt = `Generate 6 knock-knock joke options. Each joke must be exactly 5 lines with newlines between them:
+    const corePrompt = `Generate 4 knock-knock joke options. Each joke must be exactly 5 lines with newlines between them:
 
 Line 1: "Knock, knock."
 Line 2: "Who's there?"
@@ -1182,7 +1182,7 @@ ${inputs.recipient_name && inputs.recipient_name !== "-" ? `Target: ${inputs.rec
 Each joke should be a single string with actual newline characters (\\n) between the 5 lines.
 Keep total length under 180 characters including newlines.
 
-Return only: {"lines":["joke1\\nwith\\nnewlines","joke2\\nwith\\nnewlines","joke3\\nwith\\nnewlines","joke4\\nwith\\nnewlines","joke5\\nwith\\nnewlines","joke6\\nwith\\nnewlines"]}`;
+Return only: {"lines":["joke1\\nwith\\nnewlines","joke2\\nwith\\nnewlines","joke3\\nwith\\nnewlines","joke4\\nwith\\nnewlines"]}`;
 
     return [
       { role: 'system', content: 'Generate proper 5-line knock-knock jokes with newlines. JSON array only. No explanations.' },
@@ -1215,7 +1215,7 @@ Return only: {"lines":["joke1\\nwith\\nnewlines","joke2\\nwith\\nnewlines","joke
     ? `\n• CRITICAL: Each option must include at least one of these tags (or a clear paraphrase): ${inputs.tags.join(', ')}`
     : '';
 
-  const corePrompt = `Generate 6 distinct options, each 8-16 words (28-100 characters) for:
+  const corePrompt = `Generate 4 distinct options, each 8-16 words (28-100 characters) for:
 Category: ${inputs.category} > ${inputs.subcategory}
 Tone: ${inputs.tone}
 Tags: ${inputs.tags?.join(', ') || 'none'}
@@ -1230,7 +1230,7 @@ ${tagRequirement}${specialInstructions}
 
 IMPORTANT: Never generate meta phrases like "Short and witty like you asked", "As requested", "Here you go", or any commentary about the request. Only generate direct, usable content lines.
 
-Return only: {"lines":["option1","option2","option3","option4","option5","option6"]}`;
+Return only: {"lines":["option1","option2","option3","option4"]}`;
 
   const systemMessage = inputs.tone === 'Savage' 
     ? 'Generate short, savage roasts/burns. Make them cutting and direct, NOT joke-like. JSON array only. Never include meta commentary.'
