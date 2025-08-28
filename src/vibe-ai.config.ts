@@ -943,9 +943,9 @@ export const TONES = [
 
 // Helper function to check if current model supports temperature
 export const isTemperatureSupported = (modelId: string): boolean => {
-  // Only GPT-5 models and O3 models don't support temperature
-  // GPT-4.1 and O4 models DO support temperature
-  return !modelId.includes('gpt-5') && !modelId.startsWith('o3');
+  // GPT-5, GPT-4.1, O3, and O4 models don't support temperature
+  // Only older models like gpt-4o and gpt-4o-mini support temperature
+  return modelId.includes('gpt-4o') && !modelId.includes('gpt-4.1');
 };
 
 // =====================================================================

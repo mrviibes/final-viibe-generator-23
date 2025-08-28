@@ -27,6 +27,7 @@ export interface VisualResult {
   options: VisualOption[];
   model: string;
   errorCode?: 'timeout' | 'unauthorized' | 'network' | 'parse_error';
+  fallbackReason?: string;
 }
 
 const VISUAL_OPTIONS_COUNT = 4;
@@ -326,7 +327,7 @@ export async function generateVisualRecommendations(
     
     // Create a timeout promise with reduced timeout
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('TIMEOUT')), 18000);
+      setTimeout(() => reject(new Error('TIMEOUT')), 12000);
     });
 
     // Primary attempt with user's preferred model settings
@@ -347,9 +348,9 @@ export async function generateVisualRecommendations(
           timeoutPromise
         ]);
     } catch (firstError) {
-      // Retry with shorter prompt on failure
+      // Retry with compact prompt on gpt-4o-mini for any JSON/timeout error
       if (firstError instanceof Error && (firstError.message.includes('JSON') || firstError.message.includes('parse') || firstError.message.includes('TIMEOUT'))) {
-        console.log('🔄 Retrying with compact prompt...');
+        console.log('🔄 Retrying with compact prompt on gpt-4o-mini...');
         const compactUserPrompt = `${category}>${subcategory}, ${tone}. 4 visual JSON concepts.`;
         
         const compactMessages = [
@@ -357,13 +358,18 @@ export async function generateVisualRecommendations(
           { role: 'user', content: compactUserPrompt }
         ];
         
+        // Use compact timeout for retry
+        const retryTimeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('RETRY_TIMEOUT')), 8000);
+        });
+        
         result = await Promise.race([
           openAIService.chatJSON(compactMessages, {
             temperature: 0.6,
             max_tokens: 600,
             model: 'gpt-4o-mini'
           }),
-          timeoutPromise
+          retryTimeoutPromise
         ]);
       } else {
         throw firstError;
@@ -422,10 +428,15 @@ export async function generateVisualRecommendations(
     // Use contextual fallbacks instead of generic ones
     const fallbackOptions = getSlotBasedFallbacks(enrichedInputs);
 
+    const fallbackReason = errorCode === 'timeout' ? 'Timeout' : 
+                          errorCode === 'parse_error' ? 'JSON Error' : 
+                          errorCode === 'unauthorized' ? 'API Key' : 'Network';
+    
     return {
       options: fallbackOptions,
       model: 'fallback',
-      errorCode
+      errorCode,
+      fallbackReason
     };
   }
 }
