@@ -6616,6 +6616,25 @@ const Index = () => {
                 </div>
               </div>
 
+                {/* Applied Settings Summary */}
+                <div className="mb-6 p-4 bg-muted/50 rounded-lg border">
+                  <h4 className="text-sm font-medium text-foreground mb-2">Applied Settings</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
+                    <div>
+                      <span className="font-medium">Typography Style:</span> {(() => {
+                        const runtimeOverrides = getRuntimeOverrides();
+                        return runtimeOverrides.typographyStyle || "Natural";
+                      })()}
+                    </div>
+                    <div>
+                      <span className="font-medium">Negative Prompt:</span> {negativePrompt.trim() ? 
+                        `${negativePrompt.substring(0, 30)}${negativePrompt.length > 30 ? '...' : ''}` : 
+                        'None'
+                      }
+                    </div>
+                  </div>
+                </div>
+
                 {/* Negative Prompt */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium text-foreground">Negative Prompt (optional)</h3>
