@@ -4816,17 +4816,20 @@ const Index = () => {
       // Get model from runtime overrides
       const runtimeOverrides = getRuntimeOverrides();
       const chosenModel = runtimeOverrides.ideogramModel || 'V_2A_TURBO';
+      const magicPromptEnabled = runtimeOverrides.magicPromptEnabled ?? true;
       console.log('=== Ideogram Generation Debug ===');
+      
       console.log('Direct prompt provided:', !!directPrompt.trim());
       console.log('Final prompt:', prompt);
       console.log('Aspect ratio:', aspectForIdeogram);
       console.log('Style type:', styleForIdeogram);
       console.log('Chosen model:', chosenModel);
+      console.log(`Magic Prompt: ${magicPromptEnabled ? 'ON' : 'OFF'} (Turbo only)`);
       console.log('Final payload:', {
         prompt,
         aspect_ratio: aspectForIdeogram,
         model: chosenModel,
-        magic_prompt_option: 'AUTO',
+        magic_prompt_option: magicPromptEnabled ? 'AUTO' : 'OFF',
         style_type: styleForIdeogram
       });
       // Generate multiple images
@@ -4835,7 +4838,7 @@ const Index = () => {
           prompt,
           aspect_ratio: aspectForIdeogram,
           model: chosenModel,
-          magic_prompt_option: 'AUTO',
+          magic_prompt_option: magicPromptEnabled ? 'AUTO' : 'OFF',
           style_type: styleForIdeogram
         })
       );
@@ -6785,12 +6788,16 @@ const Index = () => {
                 if (spellingGuaranteeMode && finalText && finalText.trim()) {
                   // Generate background-only image first - remove ALL text-related instructions
                   const backgroundPrompt = promptText.replace(/EXACT_TEXT \(VERBATIM\): ".*?"/g, '').replace(/Render this text EXACTLY.*?\./g, '').replace(/Use only standard ASCII.*?\./g, '').replace(/If you cannot render.*?\./g, '').replace(/Style and display this text.*?\./g, '').replace(/Ensure the text is.*?\./g, '').replace(/NEGATIVE PROMPTS:.*?\./g, '').replace(/\s+/g, ' ').trim() + ' No text, no typography, no words, no letters, no characters, no glyphs, no symbols, no UI elements overlaid on the image. Clean minimal background only.';
+                  
+                  const runtimeOverrides2 = getRuntimeOverrides();
+                  const magicPromptEnabled2 = runtimeOverrides2.magicPromptEnabled ?? true;
+                  
                   const backgroundResult = await generateIdeogramImage({
                     prompt: backgroundPrompt,
                     aspect_ratio: aspectRatioKey,
                     style_type: styleType,
                     model: model,
-                    magic_prompt_option: 'AUTO'
+                    magic_prompt_option: magicPromptEnabled2 ? 'AUTO' : 'OFF'
                   });
                   if (backgroundResult.data?.[0]?.url) {
                     setBackgroundOnlyImageUrl(backgroundResult.data[0].url);
@@ -6801,12 +6808,18 @@ const Index = () => {
                 }
 
                 // Generate 1 image with appropriate model
+                const runtimeOverrides3 = getRuntimeOverrides();
+                const magicPromptEnabled3 = runtimeOverrides3.magicPromptEnabled ?? true;
+                
+                console.log(`Magic Prompt: ${magicPromptEnabled3 ? 'ON' : 'OFF'} (Turbo only)`);
+                console.log(`Using model: ${model}`);
+                
                 const result = await generateIdeogramImage({
                   prompt: promptText,
                   aspect_ratio: aspectRatioKey,
                   style_type: styleType,
                   model: model, // Use the chosen model
-                  magic_prompt_option: 'AUTO',
+                  magic_prompt_option: magicPromptEnabled3 ? 'AUTO' : 'OFF',
                   count: 1
                 });
                 if (result.data && result.data.length > 0) {
@@ -6821,6 +6834,8 @@ const Index = () => {
                     actualModelUsed = 'V_2A_TURBO';
                     fallbackNote = ' (fallback)';
                   }
+                  
+                  console.log(`Final model used: ${actualModelUsed}${fallbackNote ? ' (fell back from V3)' : ''}`);
                   
                   const modelDescription = actualModelUsed === 'V_3' ? 'Ideogram V3 (Realistic)' : 'Ideogram Turbo';
                   sonnerToast.success(`Generated ${imageUrls.length} vibe options with ${modelDescription}${fallbackNote}! Choose your favorite.`);

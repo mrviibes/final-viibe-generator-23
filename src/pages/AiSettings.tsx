@@ -344,7 +344,7 @@ export default function AiSettings() {
                 <div className="space-y-1">
                   <Label>Magic Prompt Enabled</Label>
                   <p className="text-sm text-muted-foreground">
-                    Use enhanced prompt engineering for better results
+                    Use enhanced prompt engineering for better results (Turbo/V2 only - ignored by V3)
                   </p>
                 </div>
                 <Switch
