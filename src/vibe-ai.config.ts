@@ -257,11 +257,11 @@ export const AI_CONFIG = {
     max_candidates: 6,
     temperature: 0.7,
     max_tokens: 150,
-    model: 'gpt-5-mini-2025-08-07' // High-quality model for better spelling accuracy
+    model: 'gpt-4.1-2025-04-14' // Default to GPT-4.1 as requested
   },
   visual_generation: {
     max_tokens: 450, // Reduced for faster concepts
-    model: 'gpt-5-mini-2025-08-07' // Use selected model from settings
+    model: 'gpt-4.1-2025-04-14' // Default to GPT-4.1 as requested
   }
 };
 

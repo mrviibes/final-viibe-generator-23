@@ -340,18 +340,6 @@ export default function AiSettings() {
                 />
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label>Magic Prompt Enabled</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Use enhanced prompt engineering for better results (Turbo/V2 only - ignored by V3)
-                  </p>
-                </div>
-                <Switch
-                  checked={overrides.magicPromptEnabled ?? true}
-                  onCheckedChange={(checked) => updateOverride('magicPromptEnabled', checked)}
-                />
-              </div>
             </CardContent>
           </Card>
 
