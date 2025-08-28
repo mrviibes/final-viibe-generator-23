@@ -1,5 +1,5 @@
 import { openAIService } from './openai';
-import { SYSTEM_PROMPTS, buildVisualGeneratorMessages, getStyleKeywords, getEffectiveConfig, isTemperatureSupported, getSmartFallbackChain, MODEL_DISPLAY_NAMES, BACKGROUND_PRESETS } from '../vibe-ai.config';
+import { SYSTEM_PROMPTS, buildVisualGeneratorMessages, getStyleKeywords, getEffectiveConfig, isTemperatureSupported, getSmartFallbackChain, MODEL_DISPLAY_NAMES, BACKGROUND_PRESETS, getRuntimeOverrides } from '../vibe-ai.config';
 
 export interface VisualInputs {
   category: string;
@@ -28,8 +28,9 @@ export interface VisualResult {
   options: VisualOption[];
   model: string;
   modelDisplayName?: string;
-  errorCode?: 'timeout' | 'unauthorized' | 'network' | 'parse_error';
+  errorCode?: 'timeout' | 'unauthorized' | 'network' | 'parse_error' | 'FAST_TIMEOUT' | 'STRICT_MODE_FAILED';
   fallbackReason?: string;
+  _debug?: any;
 }
 
 const VISUAL_OPTIONS_COUNT = 4;
@@ -487,30 +488,93 @@ export async function generateVisualRecommendations(
   const enrichedInputs = autoEnrichInputs(inputs);
   const { category, subcategory, tone, tags, visualStyle, finalLine, specificEntity, subjectOption, dimensions } = enrichedInputs;
   
-    // Use centralized message builder
-    const messages = buildVisualGeneratorMessages(enrichedInputs);
-
+  // Use effective config (respecting user AI settings)
+  const effectiveConfig = getEffectiveConfig();
+  const { fastVisualsEnabled, strictModelEnabled } = getRuntimeOverrides();
+  const targetModel = effectiveConfig.visual_generation.model;
+  const targetTemperature = isTemperatureSupported(targetModel) ? effectiveConfig.generation.temperature : undefined;
+  
   try {
     const startTime = Date.now();
+    
+    if (fastVisualsEnabled) {
+      console.log('⚡ Fast visuals mode enabled - targeting 3-6s generation...');
+      
+      // Ultra-compact prompt for fast mode
+      const fastPrompt = `${category}>${subcategory}, ${tone}. 4 visual JSON.`;
+      const fastMessages = [
+        { role: 'system', content: SYSTEM_PROMPTS.visual_generator_fast },
+        { role: 'user', content: fastPrompt }
+      ];
+      
+      // Strict timeout for fast mode
+      const fastTimeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('FAST_TIMEOUT')), 6000); // 6s max
+      });
+      
+      const fastRequestOptions: any = {
+        max_completion_tokens: effectiveConfig.visual_generation.max_tokens, // 180 in fast mode
+        model: targetModel
+      };
+      
+      // Only add temperature for supported models
+      if (isTemperatureSupported(targetModel)) {
+        fastRequestOptions.temperature = targetTemperature || 0.7;
+      }
+      
+      try {
+        const result = await Promise.race([
+          openAIService.chatJSON(fastMessages, fastRequestOptions),
+          fastTimeoutPromise
+        ]);
+        
+        console.log(`⚡ Fast visual generation completed in ${Date.now() - startTime}ms`);
+        
+        if (result?.options && Array.isArray(result.options)) {
+          const visualOptions = result.options.slice(0, n);
+          const validatedOptions = validateVisualOptions(visualOptions, enrichedInputs);
+          
+          // Merge fallbacks if we need more options
+          if (validatedOptions.length < n) {
+            const fallbacks = getSlotBasedFallbacks(enrichedInputs).slice(0, n - validatedOptions.length);
+            validatedOptions.push(...fallbacks);
+          }
+          
+          return {
+            options: validatedOptions,
+            model: targetModel,
+            errorCode: undefined,
+            _debug: { fastMode: true, responseTime: Date.now() - startTime }
+          };
+        }
+      } catch (fastError) {
+        console.log(`⚡ Fast mode failed in ${Date.now() - startTime}ms, using fallbacks`);
+        const fallbacks = getSlotBasedFallbacks(enrichedInputs).slice(0, n);
+        return {
+          options: fallbacks,
+          model: 'fallback',
+          errorCode: 'FAST_TIMEOUT',
+          _debug: { fastMode: true, fallbackUsed: true }
+        };
+      }
+    }
+    
     console.log('🚀 Starting visual generation with optimized settings...');
-    
-    // Use effective config (respecting user AI settings)
-    const effectiveConfig = getEffectiveConfig();
-    const targetModel = effectiveConfig.visual_generation.model;
-    const targetTemperature = isTemperatureSupported(targetModel) ? effectiveConfig.generation.temperature : undefined;
-    
     console.log(`🎨 Visual generation using model: ${targetModel}`);
     
-    // Create a timeout promise with increased primary timeout
+    // Use centralized message builder for normal mode
+    const messages = buildVisualGeneratorMessages(enrichedInputs);
+    
+    // Create a timeout promise
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('TIMEOUT')), 15000); // Increased to 15s
+      setTimeout(() => reject(new Error('TIMEOUT')), strictModelEnabled ? 10000 : 15000);
     });
 
     // Primary attempt - use model from AI settings
     let result;
     const requestOptions: any = {
-      max_completion_tokens: 450, // Reduced tokens for faster generation
-      model: targetModel // Use model from AI settings
+      max_completion_tokens: effectiveConfig.visual_generation.max_tokens,
+      model: targetModel
     };
     
     // Only add temperature for supported models
@@ -518,76 +582,102 @@ export async function generateVisualRecommendations(
       requestOptions.temperature = targetTemperature || 0.7;
     }
     
-    try {
+    // Check if strict mode is enabled - only use the user's selected model  
+    if (strictModelEnabled) {
+      console.log(`🔒 Strict mode enabled - using only selected model: ${MODEL_DISPLAY_NAMES[targetModel] || targetModel}`);
+      try {
         result = await Promise.race([
           openAIService.chatJSON(messages, requestOptions),
           timeoutPromise
         ]);
         console.log(`✅ Visual generation successful with ${MODEL_DISPLAY_NAMES[targetModel] || targetModel}`);
-    } catch (firstError) {
-      // Get smart fallback chain based on user's selected model
-      const fallbackChain = getSmartFallbackChain(targetModel, 'visual');
-      const nextModel = fallbackChain[1]; // Get next model after user's choice
-      
-      if (firstError instanceof Error && (firstError.message.includes('JSON') || firstError.message.includes('parse') || firstError.message.includes('TIMEOUT'))) {
-        console.log(`🔄 Retrying with ${MODEL_DISPLAY_NAMES[nextModel] || nextModel}...`);
-        const compactUserPrompt = `${category}>${subcategory}, ${tone}. 4 visual JSON concepts.`;
+      } catch (strictError) {
+        console.log(`🔒 Strict mode failed, using fallbacks`);
+        const fallbacks = getSlotBasedFallbacks(enrichedInputs).slice(0, n);
+        return {
+          options: fallbacks,
+          model: 'fallback',
+          errorCode: 'STRICT_MODE_FAILED',
+          _debug: { strictMode: true, fallbackUsed: true }
+        };
+      }
+    } else {
+      // Normal mode with fallback chain
+      try {
+        result = await Promise.race([
+          openAIService.chatJSON(messages, requestOptions),
+          timeoutPromise
+        ]);
+        console.log(`✅ Visual generation successful with ${MODEL_DISPLAY_NAMES[targetModel] || targetModel}`);
+      } catch (firstError) {
+        // Get smart fallback chain based on user's selected model
+        const fallbackChain = getSmartFallbackChain(targetModel, 'visual');
+        const nextModel = fallbackChain[1]; // Get next model after user's choice
         
-        const compactMessages = [
-          { role: 'system', content: SYSTEM_PROMPTS.visual_generator },
-          { role: 'user', content: compactUserPrompt }
-        ];
-        
-        // Use compact timeout for retry
-        const retryTimeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('RETRY_TIMEOUT')), 10000); // Increased to 10s
-        });
-        
-        try {
-          // Use next model in smart fallback chain
-          const retryRequestOptions: any = {
-            max_completion_tokens: 450,
-            model: nextModel || 'o4-mini-2025-04-16' // Fallback to o4-mini if chain exhausted
-          };
+        if (firstError instanceof Error && (firstError.message.includes('JSON') || firstError.message.includes('parse') || firstError.message.includes('TIMEOUT'))) {
+          console.log(`🔄 Retrying with ${MODEL_DISPLAY_NAMES[nextModel] || nextModel}...`);
+          const compactUserPrompt = `${category}>${subcategory}, ${tone}. 4 visual JSON concepts.`;
           
-          // Only add temperature for supported models
-          if (isTemperatureSupported(nextModel || 'o4-mini-2025-04-16')) {
-            retryRequestOptions.temperature = 0.7;
-          }
+          const compactMessages = [
+            { role: 'system', content: SYSTEM_PROMPTS.visual_generator },
+            { role: 'user', content: compactUserPrompt }
+          ];
           
-          result = await Promise.race([
-            openAIService.chatJSON(compactMessages, retryRequestOptions),
-            retryTimeoutPromise
-          ]);
-          console.log(`✅ Visual generation retry successful with ${MODEL_DISPLAY_NAMES[nextModel] || nextModel}`);
-        } catch (secondError) {
-          // Final attempt with ultra-compact prompt and last fallback model
-          const finalModel = fallbackChain[2] || 'o4-mini-2025-04-16';
-          if (secondError instanceof Error && secondError.message.includes('RETRY_TIMEOUT')) {
-            console.log(`🔄 Final attempt with ${MODEL_DISPLAY_NAMES[finalModel] || finalModel}...`);
-            const ultraCompactMessages = [
-              { role: 'system', content: 'Generate 4 visual concepts as JSON array.' },
-              { role: 'user', content: `${tone} ${category} visuals. JSON only.` }
-            ];
-            
-            const finalTimeoutPromise = new Promise((_, reject) => {
-              setTimeout(() => reject(new Error('FINAL_TIMEOUT')), 6000); // 6s final attempt
-            });
-            
-            result = await Promise.race([
-              openAIService.chatJSON(ultraCompactMessages, {
-                temperature: 0.7,
-                max_tokens: 300,
-                model: finalModel
-              }),
-              finalTimeoutPromise
-            ]);
-          } else {
-            throw secondError;
-          }
+          // Use compact timeout for retry
+          const retryTimeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('RETRY_TIMEOUT')), 10000);
+          });
+          
+            try {
+              // Use next model in smart fallback chain
+              const retryRequestOptions: any = {
+                max_completion_tokens: 450,
+                model: nextModel || 'o4-mini-2025-04-16' // Fallback to o4-mini if chain exhausted
+              };
+              
+              // Only add temperature for supported models
+              if (isTemperatureSupported(nextModel || 'o4-mini-2025-04-16')) {
+                retryRequestOptions.temperature = 0.7;
+              }
+              
+              result = await Promise.race([
+                openAIService.chatJSON(compactMessages, retryRequestOptions),
+                retryTimeoutPromise
+              ]);
+              console.log(`✅ Visual generation retry successful with ${MODEL_DISPLAY_NAMES[nextModel] || nextModel}`);
+            } catch (secondError) {
+              // Final attempt with ultra-compact prompt and last fallback model
+              const finalModel = fallbackChain[2] || 'o4-mini-2025-04-16';
+              if (secondError instanceof Error && secondError.message.includes('RETRY_TIMEOUT')) {
+                console.log(`🔄 Final attempt with ${MODEL_DISPLAY_NAMES[finalModel] || finalModel}...`);
+                const ultraCompactMessages = [
+                  { role: 'system', content: 'Generate 4 visual concepts as JSON array.' },
+                  { role: 'user', content: `${tone} ${category} visuals. JSON only.` }
+                ];
+                
+                const finalTimeoutPromise = new Promise((_, reject) => {
+                  setTimeout(() => reject(new Error('FINAL_TIMEOUT')), 6000); // 6s final attempt
+                });
+                
+                try {
+                  result = await Promise.race([
+                    openAIService.chatJSON(ultraCompactMessages, {
+                      temperature: 0.7,
+                      max_tokens: 300,
+                      model: finalModel
+                    }),
+                    finalTimeoutPromise
+                  ]);
+                } catch (thirdError) {
+                  throw thirdError;
+                }
+              } else {
+                throw secondError;
+              }
+            }
+        } else {
+          throw firstError;
         }
-      } else {
-        throw firstError;
       }
     }
     

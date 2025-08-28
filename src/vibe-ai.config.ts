@@ -24,6 +24,7 @@ export interface AIRuntimeOverrides {
   ideogramModel?: 'V_2A_TURBO' | 'V_3';
   typographyStyle?: 'poster' | 'negative_space';
   strictModelEnabled?: boolean;
+  fastVisualsEnabled?: boolean;
 }
 
 // Get runtime overrides from localStorage
@@ -260,6 +261,7 @@ export const AI_CONFIG = {
   },
   visual_generation: {
     max_tokens: 450, // Reduced for faster concepts
+    fast_max_tokens: 180, // For ultra-fast 3-6s generation
     model: 'gpt-5-mini-2025-08-07' // Use selected model from settings
   }
 };
@@ -297,7 +299,8 @@ export function getEffectiveConfig() {
     },
     visual_generation: {
       ...AI_CONFIG.visual_generation,
-      model: overrides.model ?? AI_CONFIG.visual_generation.model
+      model: overrides.model ?? AI_CONFIG.visual_generation.model,
+      max_tokens: overrides.fastVisualsEnabled ? AI_CONFIG.visual_generation.fast_max_tokens : AI_CONFIG.visual_generation.max_tokens
     }
   };
 }
@@ -334,7 +337,10 @@ Format:
       "prompt": "concise prompt (40-60 words)"
     }
   ]
-}`
+}`,
+
+  visual_generator_fast: `4 visual concepts, JSON only, 30 words max each:
+{"options":[{"subject":"brief","background":"brief","prompt":"30 words max"}]}`
 };
 
 // =========================
