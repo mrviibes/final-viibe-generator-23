@@ -45,18 +45,11 @@ async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: st
     // Use centralized message builder
     const messages = buildVibeGeneratorMessages(inputs);
     
-    // Add 20-second timeout wrapper
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Generation timeout after 20 seconds')), 20000);
-    });
-    
-    const generatePromise = openAIService.chatJSON(messages, {
+    const result = await openAIService.chatJSON(messages, {
       max_tokens: config.generation.max_tokens,
       temperature: config.generation.temperature,
       model: targetModel
     });
-    
-    const result = await Promise.race([generatePromise, timeoutPromise]);
     
     // Store the API metadata for later use
     const apiMeta = result._apiMeta;

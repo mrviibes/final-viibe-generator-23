@@ -34,7 +34,6 @@ export class OpenAIService {
   private apiKey: string | null = null;
   private useBackendAPI: boolean = true; // Use Supabase backend by default
   private textSpeed: 'fast' | 'creative' = 'fast'; // Locked to fast
-  private originalRequestedModel?: string; // Track original model to prevent loops
 
   constructor() {
     // Still support localStorage for fallback, but prefer backend
@@ -119,12 +118,12 @@ export class OpenAIService {
       
       console.log(`Backend API Response - Model: ${model}, Finish Reason: ${finishReason}, Content Length: ${content?.length || 0}`);
       
-    if (!content || content.trim() === '') {
-      if (finishReason === 'length') {
-        throw new Error('Ran out of output tokens - try shorter content or increase token limit.');
+      if (!content || content.trim() === '') {
+        if (finishReason === 'length') {
+          throw new Error('Response truncated - prompt too long. Try shorter input.');
+        }
+        throw new Error(`No content received from backend API (finish_reason: ${finishReason})`);
       }
-      throw new Error(`No content received from backend API (finish_reason: ${finishReason})`);
-    }
 
       // Parse JSON response
       try {
@@ -166,23 +165,13 @@ export class OpenAIService {
     } catch (error) {
       console.error('Backend API call failed:', error);
       
-      // Check if this is already a fallback call to prevent infinite loop
-      const runtimeOverrides = getRuntimeOverrides();
-      const isFallbackCall = options.model && options.model !== this.originalRequestedModel;
-      
-      // Force fallback to stay on frontend to prevent backend re-entry
-      if (this.apiKey && !isFallbackCall) {
+      // Fallback to frontend if backend fails
+      if (this.apiKey) {
         console.log('Falling back to frontend API...');
-        // Store original model to prevent backend re-entry
-        this.originalRequestedModel = options.model;
-        try {
-          const result = await this.attemptChatJSON(messages, options);
-          delete this.originalRequestedModel;
-          return result;
-        } catch (frontendError) {
-          delete this.originalRequestedModel;
-          throw frontendError;
-        }
+        this.useBackendAPI = false;
+        const result = await this.chatJSON(messages, options);
+        this.useBackendAPI = true; // Reset for next call
+        return result;
       }
       
       throw error;
@@ -195,20 +184,8 @@ export class OpenAIService {
     max_completion_tokens?: number;
     model?: string;
   } = {}): Promise<any> {
-    // Check runtime overrides to determine API source
-    const overrides = getRuntimeOverrides();
-    const shouldUseMyKey = overrides.apiSource === 'my_key';
-    
-    // Force backend/frontend based on user preference
-    if (shouldUseMyKey) {
-      if (!this.apiKey) {
-        throw new Error('My OpenAI key selected but no API key provided. Please add your API key in settings.');
-      }
-      return this.attemptChatJSON(messages, options);
-    }
-    
     // Use backend API if available, fallback to frontend
-    if (this.useBackendAPI && !shouldUseMyKey) {
+    if (this.useBackendAPI) {
       return this.callBackendAPI(messages, options);
     }
     
@@ -223,15 +200,17 @@ export class OpenAIService {
       model = 'gpt-5-mini-2025-08-07'
     } = options;
 
-    // Get user preferences for strict mode
+    // Check if user wants strict mode (no fallbacks)
+    const overrides = getRuntimeOverrides();
     const isStrictMode = overrides.strictModel === true;
+    const shouldUseMyKey = overrides.apiSource === 'my_key';
     
     // Use smart fallback chain based on the requested model, but respect strict mode
     const retryModels = isStrictMode ? [model] : getSmartFallbackChain(model, 'text');
     console.log(`📋 Text generation ${isStrictMode ? '(strict mode)' : ''} retry chain: ${retryModels.map(m => MODEL_DISPLAY_NAMES[m] || m).join(' → ')}`);
     
-    // Ensure API key is available for frontend mode
-    if (!this.apiKey) {
+    // Force backend/frontend based on user preference
+    if (shouldUseMyKey && !this.apiKey) {
       throw new Error('My OpenAI key selected but no API key provided. Please add your API key in settings.');
     }
 
@@ -243,12 +222,13 @@ export class OpenAIService {
       
       try {
         // For my_key mode, always use frontend; for server mode, always use backend
-        // Skip redundant API source check since it's already handled in chatJSON
-        const result = await this.attemptChatJSON(messages, { temperature, max_tokens, max_completion_tokens, model: tryModel });
+        const result = shouldUseMyKey 
+          ? await this.attemptChatJSON(messages, { temperature, max_tokens, max_completion_tokens, model: tryModel })
+          : await this.callBackendAPI(messages, { temperature, max_tokens, max_completion_tokens, model: tryModel });
         
         // Store API metadata including the actual model used and fallback reason
         const fallbackReason = retryAttempt > 0 
-          ? 'Model fallback'
+          ? (shouldUseMyKey ? 'API key lacks model access' : 'Server retry') 
           : undefined;
         
         if (result && typeof result === 'object') {
@@ -267,45 +247,12 @@ export class OpenAIService {
         return result;
       } catch (error) {
         console.error(`❌ Text generation failed with ${MODEL_DISPLAY_NAMES[tryModel] || tryModel}:`, error);
-        const errorMessage = error instanceof Error ? error.message : String(error);
         lastError = error as Error;
         retryAttempt++;
         
         // Don't retry if it's an auth error
-        if (errorMessage.includes('401')) {
+        if (error instanceof Error && error.message.includes('401')) {
           throw error;
-        }
-        
-        // Smart retry for token exhaustion - retry once on same model with higher budget
-        if (errorMessage.includes('Ran out of output tokens') && retryAttempt === 1) {
-          console.log(`🔄 Token exhaustion detected, retrying ${MODEL_DISPLAY_NAMES[tryModel] || tryModel} with higher token budget`);
-          try {
-            const higherTokens = Math.round((max_completion_tokens || max_tokens) * 1.5);
-            const retryResult = await this.attemptChatJSON(messages, { 
-              temperature, 
-              max_tokens: higherTokens, 
-              max_completion_tokens: higherTokens, 
-              model: tryModel 
-            });
-            
-            if (retryResult && typeof retryResult === 'object') {
-              retryResult._apiMeta = {
-                modelUsed: tryModel,
-                textSpeed: this.textSpeed,
-                retryAttempt: 1,
-                originalModel: model !== tryModel ? model : undefined,
-                fallbackReason: 'Token budget retry',
-                apiSource: shouldUseMyKey ? 'my_key' : 'server',
-                strictMode: isStrictMode
-              };
-            }
-            
-            console.log(`✅ Token budget retry successful with ${MODEL_DISPLAY_NAMES[tryModel] || tryModel}`);
-            return retryResult;
-          } catch (retryError) {
-            console.error(`❌ Token budget retry failed:`, retryError);
-            // Continue to next model in fallback chain
-          }
         }
         
         // If in strict mode, don't retry with other models
@@ -386,7 +333,7 @@ export class OpenAIService {
     
     if (!content || content.trim() === '') {
       if (finishReason === 'length') {
-        throw new Error('Ran out of output tokens - try shorter content or increase token limit.');
+        throw new Error('Response truncated - prompt too long. Try shorter input.');
       }
       throw new Error(`No content received from OpenAI (finish_reason: ${finishReason})`);
     }
