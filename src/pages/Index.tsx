@@ -4041,6 +4041,7 @@ const Index = () => {
   const popSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [stepTwoText, setStepTwoText] = useState<string>("");
   const [isCustomTextConfirmed, setIsCustomTextConfirmed] = useState<boolean>(false);
+  const [negativePrompt, setNegativePrompt] = useState<string>("");
   const [showIdeogramKeyDialog, setShowIdeogramKeyDialog] = useState<boolean>(false);
   const [showProxySettingsDialog, setShowProxySettingsDialog] = useState<boolean>(false);
   const [showCorsRetryDialog, setShowCorsRetryDialog] = useState<boolean>(false);
@@ -4063,6 +4064,12 @@ const Index = () => {
   // Load saved choices on component mount
   useEffect(() => {
     const overrides = getRuntimeOverrides();
+    
+    // Load negative prompt from localStorage
+    const savedNegativePrompt = localStorage.getItem('negative_prompt');
+    if (savedNegativePrompt) {
+      setNegativePrompt(savedNegativePrompt);
+    }
     
     if (rememberChoices) {
       const savedTextStyle = localStorage.getItem('last_selected_text_style');
@@ -4804,6 +4811,7 @@ const Index = () => {
         visual_tags_csv: visualTagsStr,
         ai_text_assist_used: selectedCompletionOption === "ai-assist",
         ai_visual_assist_used: selectedSubjectOption === "ai-assist",
+        negative_prompt: negativePrompt,
         rec_subject: recSubject,
         rec_background: recBackground
       });
@@ -6608,6 +6616,64 @@ const Index = () => {
                 </div>
               </div>
 
+                {/* Negative Prompt */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium text-foreground">Negative Prompt (optional)</h3>
+                  <div className="space-y-3">
+                    <Textarea
+                      value={negativePrompt}
+                      onChange={(e) => setNegativePrompt(e.target.value)}
+                      placeholder="Enter things to avoid in the image (e.g., misspellings, typos, bad lighting, extra text)"
+                      className="min-h-[80px] resize-none"
+                    />
+                    
+                    {/* Quick negative prompt chips */}
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        "misspellings",
+                        "typos", 
+                        "extra text",
+                        "bad lighting",
+                        "blurry",
+                        "distorted faces",
+                        "cropped text",
+                        "watermarks"
+                      ].map((chip) => (
+                        <Button
+                          key={chip}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const existing = negativePrompt.trim();
+                            const newPrompt = existing ? `${existing}, ${chip}` : chip;
+                            setNegativePrompt(newPrompt);
+                          }}
+                          className="h-7 text-xs"
+                        >
+                          + {chip}
+                        </Button>
+                      ))}
+                    </div>
+                    
+                    {negativePrompt && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>Current:</span>
+                        <span className="font-mono bg-muted/50 px-2 py-1 rounded">
+                          {negativePrompt}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setNegativePrompt("")}
+                          className="h-6 w-6 p-0"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* Generated Prompt */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium text-foreground">Generated Prompt</h3>
@@ -6644,6 +6710,7 @@ const Index = () => {
                   visual_tags_csv: subjectTags.join(', '),
                   ai_text_assist_used: selectedCompletionOption === "ai-assist",
                   ai_visual_assist_used: selectedSubjectOption === "ai-assist",
+                  negative_prompt: negativePrompt,
                   rec_subject: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].subject : selectedSubjectOption === "design-myself" ? subjectDescription : undefined,
                   rec_background: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined
                 });
@@ -6767,6 +6834,7 @@ const Index = () => {
                   visual_tags_csv: subjectTags.join(', '),
                   ai_text_assist_used: selectedCompletionOption === "ai-assist",
                   ai_visual_assist_used: selectedSubjectOption === "ai-assist",
+                  negative_prompt: negativePrompt,
                   // Visual AI Recommendations
                   rec_subject: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].subject : selectedSubjectOption === "design-myself" ? subjectDescription : undefined,
                   rec_background: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined
@@ -6891,6 +6959,7 @@ const Index = () => {
                 visual_tags_csv: subjectTags.join(', '),
                 ai_text_assist_used: selectedCompletionOption === "ai-assist",
                 ai_visual_assist_used: selectedSubjectOption === "ai-assist",
+                negative_prompt: negativePrompt,
                 // Visual AI Recommendations
                 rec_subject: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].subject : selectedSubjectOption === "design-myself" ? subjectDescription : undefined,
                 rec_background: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined

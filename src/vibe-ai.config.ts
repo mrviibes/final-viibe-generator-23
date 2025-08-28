@@ -180,6 +180,7 @@ export interface IdeogramHandoff {
   visual_style?: string;
   tone?: string;
   aspect_ratio?: string;
+  negative_prompt?: string;
 }
 
 // =========================
@@ -850,6 +851,15 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   if (typographyStyle === 'poster') {
     avoidList.push("small text", "hidden text", "subtle typography");
   }
+  
+  // ADD USER'S NEGATIVE PROMPT
+  if (handoff.negative_prompt && handoff.negative_prompt.trim()) {
+    // For spelling guarantee mode with background-only, don't append negative prompt to avoid conflicts
+    if (!cleanBackground || !handoff.negative_prompt.toLowerCase().includes('negative prompts:')) {
+      avoidList.push(handoff.negative_prompt.trim());
+    }
+  }
+  
   parts.push(`Avoid: ${avoidList.join(', ')}.`);
   
   return parts.join(' ');
