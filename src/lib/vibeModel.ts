@@ -111,10 +111,10 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
   let reason: string | undefined;
   let retryAttempt = 0;
   let originalModel: string | undefined;
-  let modelUsed = apiMeta?.modelUsed || 'gpt-5-mini-2025-08-07';
   
   // Get the effective config to check if strict mode is enabled
   const config = getEffectiveConfig();
+  let modelUsed = apiMeta?.modelUsed || config.generation.model;
   const strictModeEnabled = getRuntimeOverrides().strictModelEnabled ?? true; // Default to true for speed
   
   // Quality retry: if we have < 4 valid lines, spelling issues, and strict mode is disabled

@@ -129,6 +129,18 @@ export class OpenAIService {
       try {
         const parsed = JSON.parse(content);
         console.log('Successfully parsed backend JSON response');
+        
+        // Add metadata about the API call for proper audit tracking
+        if (parsed && typeof parsed === 'object') {
+          parsed._apiMeta = {
+            modelUsed: model,
+            retryAttempt: 0,
+            originalModel: model,
+            textSpeed: 'fast',
+            backendUsed: true
+          };
+        }
+        
         return parsed;
       } catch (parseError) {
         console.error('JSON parse error from backend:', parseError);
@@ -144,6 +156,18 @@ export class OpenAIService {
         try {
           const parsed = JSON.parse(cleanedContent);
           console.log('Successfully parsed cleaned backend JSON:', parsed);
+          
+          // Add metadata for cleaned parse
+          if (parsed && typeof parsed === 'object') {
+            parsed._apiMeta = {
+              modelUsed: model,
+              retryAttempt: 0,
+              originalModel: model,
+              textSpeed: 'fast',
+              backendUsed: true
+            };
+          }
+          
           return parsed;
         } catch (cleanError) {
           // Final attempt: extract largest JSON block
@@ -152,6 +176,18 @@ export class OpenAIService {
             try {
               const extracted = JSON.parse(jsonMatch[0]);
               console.log('Successfully extracted JSON from backend response:', extracted);
+              
+              // Add metadata for extracted parse
+              if (extracted && typeof extracted === 'object') {
+                extracted._apiMeta = {
+                  modelUsed: model,
+                  retryAttempt: 0,
+                  originalModel: model,
+                  textSpeed: 'fast',
+                  backendUsed: true
+                };
+              }
+              
               return extracted;
             } catch (e) {
               console.error('Failed to parse extracted JSON:', e);
