@@ -414,9 +414,13 @@ export class OpenAIService {
     const messages = buildGenerateTextMessages(params);
 
     try {
+      // Use effective config to get the model from AI settings
+      const effectiveConfig = { generation: { model: 'gpt-5-mini-2025-08-07' } }; // Default fallback
+      const targetModel = effectiveConfig.generation.model;
+      
       const result = await this.chatJSON(messages, {
         max_completion_tokens: this.textSpeed === 'fast' ? 200 : 300,
-        model: this.textSpeed === 'fast' ? 'gpt-4o-mini' : 'gpt-5-mini-2025-08-07'
+        model: targetModel
       });
 
       const options = result?.options || [];

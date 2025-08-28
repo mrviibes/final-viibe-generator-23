@@ -394,7 +394,7 @@ export default function AiSettings() {
                 Image Generation
               </CardTitle>
               <CardDescription>
-                Configure image generation model and settings.
+                Configure image generation model and typography settings.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -424,6 +424,35 @@ export default function AiSettings() {
                 </Select>
                 <p className="text-sm text-muted-foreground">
                   V3 provides higher quality but may cost more and occasionally fallback to Turbo.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Typography Style</Label>
+                <Select
+                  value={overrides.typographyStyle || 'poster'}
+                  onValueChange={(value) => updateOverride('typographyStyle', value as 'poster' | 'negative_space')}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="poster">
+                      <div className="space-y-1">
+                        <div className="font-medium">Poster (Large Text)</div>
+                        <div className="text-sm text-muted-foreground">Bold, centered, dominant text</div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="negative_space">
+                      <div className="space-y-1">
+                        <div className="font-medium">Negative Space</div>
+                        <div className="text-sm text-muted-foreground">Text in empty areas</div>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground">
+                  Poster style creates larger, more prominent text like the examples you prefer.
                 </p>
               </div>
             </CardContent>

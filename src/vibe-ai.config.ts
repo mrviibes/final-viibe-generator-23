@@ -22,6 +22,7 @@ export interface AIRuntimeOverrides {
   defaultTone?: Tone;
   magicPromptEnabled?: boolean;
   ideogramModel?: 'V_2A_TURBO' | 'V_3';
+  typographyStyle?: 'poster' | 'negative_space';
 }
 
 // Get runtime overrides from localStorage
@@ -217,7 +218,7 @@ export const AI_CONFIG = {
   },
   visual_generation: {
     max_tokens: 450, // Reduced for faster concepts
-    model: 'gpt-4o-mini' // Default to faster model for visual concepts
+    model: 'gpt-5-mini-2025-08-07' // Use selected model from settings
   }
 };
 
@@ -238,6 +239,10 @@ export function getEffectiveConfig() {
       ...AI_CONFIG.generation,
       model: overrides.model ?? AI_CONFIG.generation.model,
       temperature: overrides.temperature ?? AI_CONFIG.generation.temperature
+    },
+    visual_generation: {
+      ...AI_CONFIG.visual_generation,
+      model: overrides.model ?? AI_CONFIG.visual_generation.model
     }
   };
 }
@@ -712,6 +717,8 @@ export function getBackgroundPreset(presetId: string): BackgroundPreset | null {
 // =========================
 export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: boolean = false): string {
   const parts: string[] = [];
+  const overrides = getRuntimeOverrides();
+  const typographyStyle = overrides.typographyStyle || 'poster'; // Default to poster style
   
   // EXACT TEXT RENDERING (if present)
   if (handoff.key_line && handoff.key_line.trim()) {
@@ -770,9 +777,13 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     parts.push(`Format: ${handoff.aspect_ratio}.`);
   }
   
-  // ADVANCED TEXT PLACEMENT (if present)
+  // TYPOGRAPHY STYLE PLACEMENT (if present)
   if (handoff.key_line && handoff.key_line.trim()) {
-    parts.push("Place text in natural negative space areas like sky, walls, or empty backgrounds. Use TOP, BOTTOM, LEFT, or RIGHT zones rather than always centering. Ensure high contrast and avoid overlapping with faces or main subjects.");
+    if (typographyStyle === 'poster') {
+      parts.push("POSTER STYLE TEXT: Large, bold, centered text prominently displayed. Make text the main focal point with high impact typography. Use large font sizes that dominate the composition.");
+    } else {
+      parts.push("Place text in natural negative space areas like sky, walls, or empty backgrounds. Use TOP, BOTTOM, LEFT, or RIGHT zones rather than always centering. Ensure high contrast and avoid overlapping with faces or main subjects.");
+    }
   }
   
   // AVOID LIST
@@ -785,6 +796,9 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   }
   if (needsPeople) {
     avoidList.push("empty scenes", "isolated backgrounds");
+  }
+  if (typographyStyle === 'poster') {
+    avoidList.push("small text", "hidden text", "subtle typography");
   }
   parts.push(`Avoid: ${avoidList.join(', ')}.`);
   

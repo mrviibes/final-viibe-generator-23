@@ -4190,11 +4190,15 @@ const Index = () => {
   const testAIConnection = async () => {
     setIsTestingProxy(true);
     try {
+      const overrides = getRuntimeOverrides();
+      const selectedModel = overrides.model || 'gpt-5-mini-2025-08-07';
+      console.log(`🧪 Testing AI connection with model: ${selectedModel}`);
+      
       const testResult = await openAIService.chatJSON([{
         role: 'user',
         content: 'Test connection. Return JSON response: {"status": "ok"}'
       }], {
-        model: 'gpt-5-mini-2025-08-07',
+        model: selectedModel,
         max_completion_tokens: 50
       });
       if (testResult?.status === 'ok') {
@@ -6763,9 +6767,11 @@ const Index = () => {
                 let styleType = getStyleTypeForIdeogram(visualStyle);
                 let model: 'V_1' | 'V_1_TURBO' | 'V_2' | 'V_2_TURBO' | 'V_2A' | 'V_2A_TURBO' | 'V_3' = 'V_2_TURBO';
 
-                // Choose model based on style type
-                const chosenModel = styleType === 'REALISTIC' ? 'V_3' : 'V_2A_TURBO';
+                // Get model from AI settings instead of auto-selecting based on style
+                const runtimeOverrides = getRuntimeOverrides();
+                const chosenModel = runtimeOverrides.ideogramModel || 'V_2A_TURBO';
                 model = chosenModel;
+                console.log(`🎨 Using Ideogram model from AI Settings: ${chosenModel}`);
 
                 // Handle spelling guarantee mode
                 if (spellingGuaranteeMode && finalText && finalText.trim()) {

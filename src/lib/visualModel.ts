@@ -299,24 +299,26 @@ export async function generateVisualRecommendations(
     
     // Use effective config (respecting user AI settings)
     const effectiveConfig = getEffectiveConfig();
-    const targetModel = effectiveConfig.generation.model;
+    const targetModel = effectiveConfig.visual_generation.model;
     const targetTemperature = isTemperatureSupported(targetModel) ? effectiveConfig.generation.temperature : undefined;
+    
+    console.log(`🎨 Visual generation using model: ${targetModel}`);
     
     // Create a timeout promise with increased primary timeout
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error('TIMEOUT')), 15000); // Increased to 15s
     });
 
-    // Primary attempt - use faster model for visual concepts
+    // Primary attempt - use model from AI settings
     let result;
     const requestOptions: any = {
       max_completion_tokens: 450, // Reduced tokens for faster generation
-      model: 'gpt-4o-mini' // Always use fast model for concepts
+      model: targetModel // Use model from AI settings
     };
     
     // Only add temperature for supported models
-    if (isTemperatureSupported('gpt-4o-mini')) {
-      requestOptions.temperature = 0.7; // Fixed optimal temperature for concepts
+    if (isTemperatureSupported(targetModel)) {
+      requestOptions.temperature = targetTemperature || 0.7;
     }
     
     try {
