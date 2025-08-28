@@ -50,17 +50,26 @@ export function getRuntimeOverrides(): AIRuntimeOverrides {
     if (overrides.fastVisualsEnabled === undefined) {
       overrides.fastVisualsEnabled = true;
     }
-    if (overrides.model === undefined) {
+    // Lock to gpt-4o-mini for reliability
+    if (overrides.model === undefined || overrides.model !== 'gpt-4o-mini') {
       overrides.model = 'gpt-4o-mini';
+      // Persist the lock immediately
+      if (overrides.model !== 'gpt-4o-mini') {
+        setRuntimeOverrides({ model: 'gpt-4o-mini' });
+      }
     }
     
     return overrides;
   } catch {
-    return {
+    // Lock to gpt-4o-mini as default fallback
+    const defaults = {
       strictModelEnabled: true,
       fastVisualsEnabled: true,
-      model: 'gpt-4o-mini'
+      model: 'gpt-4o-mini' as const
     };
+    // Persist the lock immediately
+    setRuntimeOverrides(defaults);
+    return defaults;
   }
 }
 

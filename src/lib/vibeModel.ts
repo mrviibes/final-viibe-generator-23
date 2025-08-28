@@ -58,10 +58,11 @@ async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: st
     // Store the API metadata for later use
     const apiMeta = result._apiMeta;
     
-    // Extract lines from JSON response
-    const lines = result.lines || [];
+    // Extract lines from JSON response - be tolerant of different formats
+    const lines = result.lines || result.options || result.candidates || result.texts || [];
     if (!Array.isArray(lines) || lines.length === 0) {
-      throw new Error('Invalid response format - no lines array');
+      console.error('API format mismatch - no valid lines array found in:', result);
+      throw new Error('Local placeholder (API format mismatch)');
     }
     
     // Check if this is knock-knock format
@@ -79,13 +80,22 @@ async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: st
     return candidates;
   } catch (error) {
     console.error('Failed to generate multiple candidates:', error);
-    // Return fallback variants instead of duplicates
+    // Blend first tag into fallback variants if available
     const fallbackVariants = getFallbackVariants(inputs.tone, inputs.category, inputs.subcategory);
-    return fallbackVariants.map((line, index) => ({
-      line,
-      blocked: true,
-      reason: index === 0 ? `API Error: ${error instanceof Error ? error.message : 'Unknown error'}` : 'Fallback variant'
-    }));
+    const firstTag = inputs.tags && inputs.tags.length > 0 ? inputs.tags[0] : null;
+    
+    return fallbackVariants.map((line, index) => {
+      let finalLine = line;
+      // Blend first tag into the first two fallbacks
+      if (firstTag && index < 2) {
+        finalLine = `${line} ${firstTag}`;
+      }
+      return {
+        line: finalLine,
+        blocked: true,
+        reason: index === 0 ? `Local placeholder (${error instanceof Error ? error.message : 'API failure'})` : 'Local fallback variant'
+      };
+    });
   }
 }
 
@@ -172,10 +182,39 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
       finalCandidates.push(...tagBlockedLines);
     }
     
+    // Re-rank to prioritize tag inclusion - ensure at least 2 of 4 include tags
+    if (inputs.tags && inputs.tags.length > 0) {
+      const taggedCandidates: string[] = [];
+      const untaggedCandidates: string[] = [];
+      
+      finalCandidates.forEach(candidate => {
+        const hasTag = inputs.tags!.some(tag => 
+          candidate.toLowerCase().includes(tag.toLowerCase()) ||
+          // Check for close paraphrases
+          candidate.toLowerCase().includes(tag.toLowerCase().slice(0, 4))
+        );
+        if (hasTag) {
+          taggedCandidates.push(candidate);
+        } else {
+          untaggedCandidates.push(candidate);
+        }
+      });
+      
+      // Ensure we have at least 2 tagged options out of 4
+      finalCandidates = [...taggedCandidates.slice(0, 2), ...untaggedCandidates.slice(0, 2)];
+    }
+    
     // Ensure we have exactly 4 options by adding fallbacks if needed
     while (finalCandidates.length < 4) {
       const fallbackVariants = getFallbackVariants(inputs.tone, inputs.category, inputs.subcategory);
-      const nextFallback = fallbackVariants[finalCandidates.length % fallbackVariants.length];
+      let nextFallback = fallbackVariants[finalCandidates.length % fallbackVariants.length];
+      
+      // Blend first tag into fallbacks if available
+      const firstTag = inputs.tags && inputs.tags.length > 0 ? inputs.tags[0] : null;
+      if (firstTag && finalCandidates.length < 2) {
+        nextFallback = `${nextFallback} ${firstTag}`;
+      }
+      
       if (!finalCandidates.includes(nextFallback)) {
         finalCandidates.push(nextFallback);
       } else {
@@ -196,7 +235,7 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
     picked = finalCandidates[0];
     usedFallback = false;
     if (!reason && tagOnlyBlocked.length > 0) {
-      reason = 'Used lines with partial tag coverage';
+      reason = 'Partial tag coverage but good results';
     }
   } else {
     // Check if all were blocked only for tag coverage
@@ -216,11 +255,21 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
       usedFallback = false;
       reason = 'Used model output with partial tag coverage';
     } else {
-      // Genuine blocks (banned words, etc.) - use tone-based fallbacks
-      finalCandidates = getFallbackVariants(inputs.tone, inputs.category, inputs.subcategory);
+      // Genuine blocks (banned words, etc.) - use tone-based fallbacks with tag blending
+      const fallbackVariants = getFallbackVariants(inputs.tone, inputs.category, inputs.subcategory);
+      const firstTag = inputs.tags && inputs.tags.length > 0 ? inputs.tags[0] : null;
+      
+      finalCandidates = fallbackVariants.map((variant, index) => {
+        // Blend first tag into the first two fallbacks
+        if (firstTag && index < 2) {
+          return `${variant} ${firstTag}`;
+        }
+        return variant;
+      });
+      
       picked = finalCandidates[0];
       usedFallback = true;
-      reason = candidateResults.find(c => c.reason)?.reason || 'All candidates blocked';
+      reason = candidateResults.find(c => c.reason)?.reason || 'Local placeholder (content filtered)';
     }
   }
   
