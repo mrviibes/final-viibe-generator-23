@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, RotateCcw, Settings, AlertTriangle, ImageIcon } from "lucide-react";
+import { ArrowLeft, RotateCcw, Settings, AlertTriangle, ImageIcon, Zap, TestTube } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -18,6 +18,7 @@ import {
   MODEL_DISPLAY_NAMES,
   type AIRuntimeOverrides
 } from "@/vibe-ai.config";
+import { testIdeogramBackend } from "@/lib/ideogramApi";
 
 export default function AiSettings() {
   const navigate = useNavigate();
@@ -25,6 +26,12 @@ export default function AiSettings() {
   const [overrides, setOverrides] = useState<AIRuntimeOverrides>({});
   const [hasChanges, setHasChanges] = useState(false);
   const [showLegacyWarning, setShowLegacyWarning] = useState(false);
+  const [testingBackend, setTestingBackend] = useState(false);
+  const [backendStatus, setBackendStatus] = useState<{
+    success: boolean;
+    error?: string;
+    latency?: number;
+  } | null>(null);
 
   useEffect(() => {
     const current = getRuntimeOverrides();
@@ -98,6 +105,42 @@ export default function AiSettings() {
       title: "Strict Mode Enabled",
       description: "Now using GPT-4.1 directly without slow retry chains."
     });
+  };
+
+  const testBackendConnection = async () => {
+    setTestingBackend(true);
+    setBackendStatus(null);
+    
+    try {
+      const result = await testIdeogramBackend();
+      setBackendStatus(result);
+      
+      if (result.success) {
+        toast({
+          title: "Backend Test Successful",
+          description: `Connection OK (${result.latency}ms)`
+        });
+      } else {
+        toast({
+          title: "Backend Test Failed",
+          description: result.error,
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setBackendStatus({
+        success: false,
+        error: errorMessage
+      });
+      toast({
+        title: "Backend Test Failed",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    } finally {
+      setTestingBackend(false);
+    }
   };
 
   return (
@@ -402,6 +445,38 @@ export default function AiSettings() {
                 <p className="text-sm text-muted-foreground">
                   V3 provides higher quality but may cost more and occasionally fallback to Turbo.
                 </p>
+                
+                <div className="flex items-center gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={testBackendConnection}
+                    disabled={testingBackend}
+                    className="gap-2"
+                  >
+                    {testingBackend ? (
+                      <>
+                        <TestTube className="h-4 w-4 animate-spin" />
+                        Testing...
+                      </>
+                    ) : (
+                      <>
+                        <TestTube className="h-4 w-4" />
+                        Test Backend
+                      </>
+                    )}
+                  </Button>
+                  
+                  {backendStatus && (
+                    <div className={`text-sm ${backendStatus.success ? 'text-green-600' : 'text-red-600'}`}>
+                      {backendStatus.success ? (
+                        `✓ OK (${backendStatus.latency}ms)`
+                      ) : (
+                        `✗ ${backendStatus.error}`
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-2">

@@ -13,6 +13,7 @@ import { ApiKeyDialog } from "@/components/ApiKeyDialog";
 import { IdeogramKeyDialog } from "@/components/IdeogramKeyDialog";
 import { ProxySettingsDialog } from "@/components/ProxySettingsDialog";
 import { CorsRetryDialog } from "@/components/CorsRetryDialog";
+import { IdeogramErrorDialog } from "@/components/IdeogramErrorDialog";
 import { StepProgress } from "@/components/StepProgress";
 import { StackedSelectionCard } from "@/components/StackedSelectionCard";
 import { IdeogramSpellingOverlay } from "@/components/IdeogramSpellingOverlay";
@@ -4050,6 +4051,8 @@ const Index = () => {
   const [showIdeogramKeyDialog, setShowIdeogramKeyDialog] = useState<boolean>(false);
   const [showProxySettingsDialog, setShowProxySettingsDialog] = useState<boolean>(false);
   const [showCorsRetryDialog, setShowCorsRetryDialog] = useState<boolean>(false);
+  const [ideogramError, setIdeogramError] = useState<IdeogramAPIError | null>(null);
+  const [showIdeogramErrorDialog, setShowIdeogramErrorDialog] = useState<boolean>(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState<boolean>(false);
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
@@ -4883,8 +4886,18 @@ const Index = () => {
     } catch (error) {
       console.error('Image generation failed:', error);
       if (error instanceof IdeogramAPIError) {
-        // Handle specific CORS demo activation error
-        if (error.message === 'CORS_DEMO_REQUIRED') {
+        // Handle specific errors with enhanced UX
+        if (error.errorType === 'V3_UNAVAILABLE' && error.shouldShowExactTextOverlay) {
+          // Auto-trigger exact text overlay for V3 unavailable with exact text
+          setIdeogramError(error);
+          setShowExactTextOverlay(true);
+          setOriginalTextRequest(selectedGeneratedOption || stepTwoText || "");
+          sonnerToast.info(
+            "V3 temporarily unavailable. Switching to caption overlay for perfect text.",
+            { duration: 4000 }
+          );
+          return; // Exit early, don't show error dialog
+        } else if (error.message === 'CORS_DEMO_REQUIRED') {
           setShowCorsRetryDialog(true);
           setImageGenerationError('CORS proxy needs activation. Click "Enable CORS Proxy" button below, then try again.');
         } else if (error.message.includes('proxy.cors.sh') && !getProxySettings().apiKey) {
@@ -4894,16 +4907,17 @@ const Index = () => {
           setImageGenerationError('Connection failed. Trying alternative proxy methods automatically...');
           setTimeout(() => setShowProxySettingsDialog(true), 2000);
         } else {
-          setImageGenerationError(error.message);
+          // Show the enhanced error dialog for all other IdeogramAPIErrors
+          setIdeogramError(error);
+          setShowIdeogramErrorDialog(true);
+          setImageGenerationError(error.message); // Keep for legacy UI components
         }
       } else {
+        const genericError = new IdeogramAPIError('An unexpected error occurred while generating the image.');
+        setIdeogramError(genericError);
+        setShowIdeogramErrorDialog(true);
         setImageGenerationError('An unexpected error occurred while generating the image.');
       }
-      toast({
-        title: "Generation Failed",
-        description: imageGenerationError || "Failed to generate image. Please try again.",
-        variant: "destructive"
-      });
     } finally {
       setIsGeneratingImage(false);
     }
@@ -7129,6 +7143,39 @@ const Index = () => {
 
         {/* CORS Retry Dialog */}
         <CorsRetryDialog open={showCorsRetryDialog} onOpenChange={setShowCorsRetryDialog} onRetry={handleGenerateImage} />
+
+        {/* Enhanced Ideogram Error Dialog */}
+        {ideogramError && (
+          <IdeogramErrorDialog
+            open={showIdeogramErrorDialog}
+            onOpenChange={setShowIdeogramErrorDialog}
+            error={ideogramError}
+            onRetryWithTurbo={() => {
+              // Switch to Turbo model and retry
+              const runtimeOverrides = getRuntimeOverrides();
+              const originalModel = runtimeOverrides.ideogramModel;
+              
+              // Temporarily set to Turbo
+              const tempOverrides = { ...runtimeOverrides, ideogramModel: 'V_2A_TURBO' as const };
+              localStorage.setItem('vibe_ai_runtime_overrides', JSON.stringify(tempOverrides));
+              
+              // Retry generation
+              handleGenerateImage(1).finally(() => {
+                // Restore original model
+                if (originalModel) {
+                  const restoredOverrides = { ...runtimeOverrides, ideogramModel: originalModel };
+                  localStorage.setItem('vibe_ai_runtime_overrides', JSON.stringify(restoredOverrides));
+                }
+              });
+            }}
+            onShowExactTextOverlay={() => {
+              const finalText = selectedGeneratedOption || stepTwoText || "";
+              setOriginalTextRequest(finalText);
+              setShowExactTextOverlay(true);
+            }}
+            onRegularRetry={() => handleGenerateImage(1)}
+          />
+        )}
 
         {/* Spelling/Text Quality Overlay */}
         {showSpellingOverlay && (
