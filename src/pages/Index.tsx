@@ -6192,12 +6192,12 @@ const Index = () => {
                                   {isGeneratingSubject ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : "Regenerate"}
                                 </Button>
                               </div>
-                             {visualOptions.length > 0 && visualModel && (
-                               <p className="text-xs text-muted-foreground mb-2">
-                                 Using {visualModel.includes('gpt-5-mini') ? 'gpt-5-mini' : visualModel} • Generated in {((Date.now() - visualGenerationStartTime) / 1000).toFixed(1)}s
-                                 {visualModel === 'fallback' && " • Used fallback"}
-                               </p>
-                             )}
+                              {visualOptions.length > 0 && visualModel && (
+                                <p className="text-xs text-muted-foreground mb-2">
+                                  Using GPT-4.1 • Generated in {((Date.now() - visualGenerationStartTime) / 1000).toFixed(1)}s
+                                  {visualModel === 'fallback' && " • Used fallback"}
+                                </p>
+                              )}
                             {visualModel === 'fallback' && <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 text-xs p-2 rounded-lg mb-3 max-w-md mx-auto">
                                 {getErrorMessage(visualRecommendations?.errorCode)}
                               </div>}

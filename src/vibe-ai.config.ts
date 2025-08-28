@@ -194,34 +194,21 @@ export const DEFAULT_NEGATIVE_PROMPT = "misspellings, distorted letters, extra c
 // Model fallback chains for retry strategy
 export const MODEL_FALLBACK_CHAINS = {
   text: [
-    'gpt-4.1-2025-04-14',
-    'gpt-4.1-mini-2025-04-14'
+    'gpt-4.1-2025-04-14'
   ],
   visual: [
-    'gpt-4.1-2025-04-14',
-    'gpt-4.1-mini-2025-04-14'
+    'gpt-4.1-2025-04-14'
   ]
 };
 
 // Available models for UI
 export const AVAILABLE_MODELS = [
-  { value: 'gpt-5-2025-08-07', label: 'GPT-5 (Flagship)', isRecommended: false },
-  { value: 'gpt-5-mini-2025-08-07', label: 'GPT-5 Mini', isRecommended: true },
-  { value: 'gpt-4.1-2025-04-14', label: 'GPT-4.1', isRecommended: false },
-  { value: 'o4-mini-2025-04-16', label: 'O4 Mini (Fast Reasoning)', isRecommended: false },
-  { value: 'o3-2025-04-16', label: 'O3 (Powerful Reasoning)', isRecommended: false },
+  { value: 'gpt-4.1-2025-04-14', label: 'GPT-4.1', isRecommended: true }
 ];
 
 // Friendly model names for display
 export const MODEL_DISPLAY_NAMES: Record<string, string> = {
-  'gpt-5-2025-08-07': 'GPT-5',
-  'gpt-5-mini-2025-08-07': 'GPT-5 Mini', 
-  'gpt-4.1-2025-04-14': 'GPT-4.1',
-  'gpt-4.1-mini-2025-04-14': 'GPT-4.1 Mini',
-  'o4-mini-2025-04-16': 'O4 Mini',
-  'o3-2025-04-16': 'O3',
-  'gpt-4o-mini': 'GPT-4o Mini (Legacy)',
-  'gpt-4o': 'GPT-4o (Legacy)'
+  'gpt-4.1-2025-04-14': 'GPT-4.1'
 };
 
 export const AI_CONFIG = {
@@ -1236,6 +1223,8 @@ VARIETY RULES:
 - Each concept must be completely different in composition
 - Mix close-ups, wide shots, action scenes, and environmental shots
 - Vary camera angles: high angle, low angle, eye level, dramatic perspectives
+- AVOID CLICHÉS: No generic balloons, confetti, party hats, cake, candles unless explicitly mentioned in the text
+- Focus on creative, specific visual concepts that directly relate to the content rather than generic celebration props
 ${!hasMusicRelevance ? '- DO NOT include singing, concerts, or music themes unless explicitly relevant to the content' : ''}
 
 TEXT PLACEMENT DIRECTIVES:

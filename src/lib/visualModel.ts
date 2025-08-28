@@ -576,8 +576,7 @@ export async function generateVisualRecommendations(
             
             result = await Promise.race([
               openAIService.chatJSON(ultraCompactMessages, {
-                temperature: 0.7,
-                max_tokens: 300,
+                max_completion_tokens: 300,
                 model: finalModel
               }),
               finalTimeoutPromise
@@ -686,7 +685,7 @@ export async function generateVisualRecommendations(
     
     return {
       options: fallbackOptions,
-      model: 'fallback-gpt-4o-mini',
+      model: 'fallback',
       errorCode,
       fallbackReason
     };
