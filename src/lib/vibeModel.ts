@@ -9,7 +9,6 @@ import {
   bannedWords,
   VibeInputs 
 } from './vibeManual';
-import { generateVibes, VibeMakerRequest, VibeMakerResponse, VibeMakerError } from './vibeMakerEngine';
 
 export interface VibeCandidate {
   line: string;
@@ -254,22 +253,6 @@ Return only: {"lines":["option1","option2","option3","option4","option5","option
   }
 }
 
-// New training sheet compliant function
-export async function generateVibeMakerCandidates(inputs: VibeInputs): Promise<VibeMakerResponse | VibeMakerError> {
-  const request: VibeMakerRequest = {
-    category: inputs.category,
-    subcategory: inputs.subcategory,
-    tone: inputs.tone,
-    text_tags: inputs.tags || [],
-    recipient_name: inputs.recipient_name,
-    relationship: inputs.relationship,
-    language: inputs.language
-  };
-
-  return await generateVibes(request);
-}
-
-// Legacy function for backward compatibility
 export async function generateCandidates(inputs: VibeInputs, n: number = 4): Promise<VibeResult> {
   const candidateResults = await generateMultipleCandidates(inputs);
   
