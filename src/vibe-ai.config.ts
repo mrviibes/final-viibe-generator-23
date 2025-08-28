@@ -266,7 +266,7 @@ export const AI_CONFIG = {
   generation: {
     max_candidates: 6,
     temperature: 0.7,
-    max_tokens: 150,
+    max_tokens: 220, // Increased to reduce length truncation errors
     model: 'gpt-5-mini-2025-08-07' // High-quality model for better spelling accuracy
   },
   visual_generation: {

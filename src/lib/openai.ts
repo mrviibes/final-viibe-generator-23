@@ -34,6 +34,7 @@ export class OpenAIService {
   private apiKey: string | null = null;
   private useBackendAPI: boolean = true; // Use Supabase backend by default
   private textSpeed: 'fast' | 'creative' = 'fast'; // Locked to fast
+  private originalRequestedModel?: string; // Track original model to prevent loops
 
   constructor() {
     // Still support localStorage for fallback, but prefer backend
@@ -165,13 +166,23 @@ export class OpenAIService {
     } catch (error) {
       console.error('Backend API call failed:', error);
       
-      // Fallback to frontend if backend fails
-      if (this.apiKey) {
+      // Check if this is already a fallback call to prevent infinite loop
+      const runtimeOverrides = getRuntimeOverrides();
+      const isFallbackCall = options.model && options.model !== this.originalRequestedModel;
+      
+      // Force fallback to stay on frontend to prevent backend re-entry
+      if (this.apiKey && !isFallbackCall) {
         console.log('Falling back to frontend API...');
-        this.useBackendAPI = false;
-        const result = await this.chatJSON(messages, options);
-        this.useBackendAPI = true; // Reset for next call
-        return result;
+        // Store original model to prevent backend re-entry
+        this.originalRequestedModel = options.model;
+        try {
+          const result = await this.attemptChatJSON(messages, options);
+          delete this.originalRequestedModel;
+          return result;
+        } catch (frontendError) {
+          delete this.originalRequestedModel;
+          throw frontendError;
+        }
       }
       
       throw error;
@@ -184,8 +195,20 @@ export class OpenAIService {
     max_completion_tokens?: number;
     model?: string;
   } = {}): Promise<any> {
+    // Check runtime overrides to determine API source
+    const overrides = getRuntimeOverrides();
+    const shouldUseMyKey = overrides.apiSource === 'my_key';
+    
+    // Force backend/frontend based on user preference
+    if (shouldUseMyKey) {
+      if (!this.apiKey) {
+        throw new Error('My OpenAI key selected but no API key provided. Please add your API key in settings.');
+      }
+      return this.attemptChatJSON(messages, options);
+    }
+    
     // Use backend API if available, fallback to frontend
-    if (this.useBackendAPI) {
+    if (this.useBackendAPI && !shouldUseMyKey) {
       return this.callBackendAPI(messages, options);
     }
     
@@ -200,17 +223,15 @@ export class OpenAIService {
       model = 'gpt-5-mini-2025-08-07'
     } = options;
 
-    // Check if user wants strict mode (no fallbacks)
-    const overrides = getRuntimeOverrides();
+    // Get user preferences for strict mode
     const isStrictMode = overrides.strictModel === true;
-    const shouldUseMyKey = overrides.apiSource === 'my_key';
     
     // Use smart fallback chain based on the requested model, but respect strict mode
     const retryModels = isStrictMode ? [model] : getSmartFallbackChain(model, 'text');
     console.log(`📋 Text generation ${isStrictMode ? '(strict mode)' : ''} retry chain: ${retryModels.map(m => MODEL_DISPLAY_NAMES[m] || m).join(' → ')}`);
     
-    // Force backend/frontend based on user preference
-    if (shouldUseMyKey && !this.apiKey) {
+    // Ensure API key is available for frontend mode
+    if (!this.apiKey) {
       throw new Error('My OpenAI key selected but no API key provided. Please add your API key in settings.');
     }
 
@@ -222,13 +243,12 @@ export class OpenAIService {
       
       try {
         // For my_key mode, always use frontend; for server mode, always use backend
-        const result = shouldUseMyKey 
-          ? await this.attemptChatJSON(messages, { temperature, max_tokens, max_completion_tokens, model: tryModel })
-          : await this.callBackendAPI(messages, { temperature, max_tokens, max_completion_tokens, model: tryModel });
+        // Skip redundant API source check since it's already handled in chatJSON
+        const result = await this.attemptChatJSON(messages, { temperature, max_tokens, max_completion_tokens, model: tryModel });
         
         // Store API metadata including the actual model used and fallback reason
         const fallbackReason = retryAttempt > 0 
-          ? (shouldUseMyKey ? 'API key lacks model access' : 'Server retry') 
+          ? 'Model fallback'
           : undefined;
         
         if (result && typeof result === 'object') {

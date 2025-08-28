@@ -4601,6 +4601,13 @@ const Index = () => {
     }
     setIsGenerating(true);
     setTextGenerationStartTime(Date.now());
+    
+    // Add local 25-second guard to ensure spinner clears
+    const localTimeoutId = setTimeout(() => {
+      console.log('🛡️ Local timeout guard triggered - clearing generation spinner');
+      setIsGenerating(false);
+      sonnerToast.error('Text generation timed out. Please try again.');
+    }, 25000);
     try {
       // Map UI selections to vibe model inputs
       let category = '';
@@ -4730,6 +4737,7 @@ const Index = () => {
       console.error('❌ Error generating text:', error);
       sonnerToast.error('Failed to generate text options. Please try again.');
     } finally {
+      clearTimeout(localTimeoutId);
       setIsGenerating(false);
     }
   };
