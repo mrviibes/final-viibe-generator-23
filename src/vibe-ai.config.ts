@@ -166,6 +166,7 @@ export interface OutputSchema {
 // Legacy types for backward compatibility
 export interface VibeInputs extends Partial<UserInputs> {
   // Backward compatibility mappings
+  exactWords?: string; // Specific words that must appear in generated text
 }
 
 export interface VibeCandidate {
@@ -623,7 +624,7 @@ export function postProcessLine(
   line: string, 
   tone: string, 
   tags?: string[], 
-  options?: { allowNewlines?: boolean; format?: 'knockknock' }
+  options?: { allowNewlines?: boolean; format?: 'knockknock'; exactWords?: string }
 ): VibeCandidate {
   // Clean up the line
   let cleaned = line.trim()
@@ -728,6 +729,20 @@ export function postProcessLine(
       blocked: true,
       reason: 'Spelling issues detected'
     };
+  }
+
+  // Exact words requirement check (highest priority)
+  if (options?.exactWords && options.exactWords.trim()) {
+    const requiredWords = options.exactWords.trim().toLowerCase();
+    const lineText = cleaned.toLowerCase();
+    
+    if (!lineText.includes(requiredWords)) {
+      return {
+        line: cleaned,
+        blocked: true,
+        reason: `Missing required exact words: "${options.exactWords.trim()}"`
+      };
+    }
   }
 
   // Tag coverage check
@@ -1222,6 +1237,10 @@ Return only: {"lines":["joke1\\nwith\\nnewlines","joke2\\nwith\\nnewlines","joke
     ? `\n• CRITICAL: Each option must include at least one of these tags (or a clear paraphrase): ${inputs.tags.join(', ')}`
     : '';
 
+  const exactWordsRequirement = inputs.exactWords && inputs.exactWords.trim() 
+    ? `\n• MANDATORY: Every option must include these exact words: "${inputs.exactWords.trim()}"`
+    : '';
+
   const corePrompt = `Generate 4 distinct options, each 8-16 words (28-100 characters) for:
 Category: ${inputs.category} > ${inputs.subcategory}
 Tone: ${inputs.tone}
@@ -1233,7 +1252,7 @@ QUALITY REQUIREMENTS:
 • Make each option distinctly different in structure and wording
 • Use concrete, specific imagery - avoid generic templates
 • NEVER use: "activated", "ready", "mode on/engaged", "incoming", "vibes only", "energy", "laugh track", "funny bone", "punchline ready", "comedy mode"
-${tagRequirement}${specialInstructions}
+${tagRequirement}${exactWordsRequirement}${specialInstructions}
 
 IMPORTANT: Never generate meta phrases like "Short and witty like you asked", "As requested", "Here you go", or any commentary about the request. Only generate direct, usable content lines.
 

@@ -4019,6 +4019,7 @@ const Index = () => {
   const [customHeight, setCustomHeight] = useState<string>("");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState<string>("");
+  const [exactWords, setExactWords] = useState<string>("");
   const [textGenerationStartTime, setTextGenerationStartTime] = useState<number>(0);
   const [visualGenerationStartTime, setVisualGenerationStartTime] = useState<number>(0);
   const [generatedOptions, setGeneratedOptions] = useState<string[]>([]);
@@ -4696,6 +4697,7 @@ const Index = () => {
         subcategory,
         tone: tone as any,
         tags: finalTagsForGeneration,
+        exactWords: exactWords.trim() || undefined,
         recipient_name: selectedPick || "-"
       }, 4);
 
@@ -5851,13 +5853,25 @@ const Index = () => {
                 {/* Show AI Assist form when selected and no options generated yet */}
                 {selectedCompletionOption === "ai-assist" && generatedOptions.length === 0 && <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div className="text-center mb-6">
-                      <p className="text-xl text-muted-foreground">Add relevant tags for content generation</p>
+                      <h3 className="text-xl text-muted-foreground">Generate 4 creative options from your keywords</h3>
+                      <p className="text-sm text-muted-foreground mt-2">AI will create diverse text variations based on your inputs</p>
                     </div>
 
                     <div className="max-w-md mx-auto space-y-6">
                       {/* Tags Input */}
                       <div className="space-y-3">
-                        <Input value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={handleTagInputKeyDown} placeholder="Enter tags (press Enter or comma to add)" className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
+                        <label className="text-sm font-medium">Tags & Keywords</label>
+                        <p className="text-xs text-muted-foreground">
+                          Short words or phrases to inspire the AI. For full sentences, use "Write Myself" option.
+                        </p>
+                        <Input value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={handleTagInputKeyDown} placeholder="e.g. birthday, funny, pizza night, adventure..." className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
+                        
+                        {/* Smart tag detection warning */}
+                        {tagInput.length > 20 && tagInput.includes(' ') && (
+                          <div className="text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-2">
+                            💡 This looks like a full sentence. Consider using "Write Myself" option for exact wording.
+                          </div>
+                        )}
                         
                         {/* Display Tags */}
                         {tags.length > 0 && <div className="flex flex-wrap gap-2 justify-center">
@@ -5866,6 +5880,25 @@ const Index = () => {
                                 <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => removeTag(tag)} />
                               </Badge>)}
                           </div>}
+                      </div>
+
+                      {/* Exact Words Input */}
+                      <div className="space-y-3">
+                        <label className="text-sm font-medium">Exact Words (optional)</label>
+                        <p className="text-xs text-muted-foreground">
+                          Specific words or short phrases that MUST appear in the generated text (80-95 chars ideal, 100 max)
+                        </p>
+                        <Input
+                          value={exactWords}
+                          onChange={(e) => setExactWords(e.target.value)}
+                          placeholder="Required words or phrases to include..."
+                          className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-4 text-base font-medium rounded-lg"
+                        />
+                        {exactWords && (
+                          <div className="text-xs text-muted-foreground text-right">
+                            {exactWords.length}/100 characters
+                          </div>
+                        )}
                       </div>
 
                       {/* Generate Button */}
@@ -5917,21 +5950,52 @@ const Index = () => {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-6">
-                      {generatedOptions.slice(0, 4).map((option, index) => <Card key={index} className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-1 p-4 hover:bg-accent/50" onClick={() => {
-                setSelectedGeneratedOption(option);
-                setSelectedGeneratedIndex(index);
-              }}>
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium text-muted-foreground">
-                                Option {index + 1}
-                              </span>
+                      {generatedOptions.slice(0, 4).map((option, index) => {
+                        // Check which tags are matched in this option
+                        const matchedTags = tags.filter(tag => 
+                          option.toLowerCase().includes(tag.toLowerCase())
+                        );
+                        const hasExactWords = exactWords && exactWords.trim() && 
+                          option.toLowerCase().includes(exactWords.trim().toLowerCase());
+                        
+                        return (
+                          <Card key={index} className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-1 p-4 hover:bg-accent/50" onClick={() => {
+                            setSelectedGeneratedOption(option);
+                            setSelectedGeneratedIndex(index);
+                          }}>
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-muted-foreground">
+                                  Option {index + 1}
+                                </span>
+                                <div className="flex gap-1">
+                                  {hasExactWords && (
+                                    <Badge variant="default" className="text-xs">
+                                      Exact words ✓
+                                    </Badge>
+                                  )}
+                                  {matchedTags.length > 0 && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      {matchedTags.length} tag{matchedTags.length > 1 ? 's' : ''} ✓
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                              <p className="text-sm text-card-foreground leading-relaxed whitespace-pre-line">
+                                {option}
+                              </p>
+                              {/* Show matched elements */}
+                              {(matchedTags.length > 0 || hasExactWords) && (
+                                <div className="text-xs text-muted-foreground">
+                                  {hasExactWords && <span>Contains: "{exactWords.trim()}"</span>}
+                                  {hasExactWords && matchedTags.length > 0 && <span> • </span>}
+                                  {matchedTags.length > 0 && <span>Tags: {matchedTags.join(', ')}</span>}
+                                </div>
+                              )}
                             </div>
-                            <p className="text-sm text-card-foreground leading-relaxed whitespace-pre-line">
-                              {option}
-                            </p>
-                          </div>
-                        </Card>)}
+                          </Card>
+                        );
+                      })}
                     </div>
 
                   </div>}
@@ -5939,17 +6003,22 @@ const Index = () => {
                 {/* Show Write Myself input panel when selected but not confirmed */}
                 {selectedCompletionOption === "write-myself" && !isCustomTextConfirmed && <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div className="text-center mb-6">
-                      <p className="text-xl text-muted-foreground">Write your custom text</p>
+                      <h3 className="text-xl text-muted-foreground">Use your exact text</h3>
+                      <p className="text-sm text-muted-foreground mt-2">Perfect for full sentences or specific wording</p>
                     </div>
 
                     <div className="max-w-md mx-auto space-y-6">
                       {/* Custom Text Input */}
                       <div className="space-y-3">
+                        <label className="text-sm font-medium">Your Text</label>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Enter your exact text (80-95 chars ideal, 100 max for legibility)
+                        </p>
                         <Textarea value={stepTwoText} onChange={e => {
                   if (e.target.value.length <= 100) {
                     setStepTwoText(e.target.value);
                   }
-                }} placeholder="Enter your custom text (100 characters max)" className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 min-h-[120px] text-base font-medium rounded-lg resize-none" />
+                }} placeholder="Write your custom text here..." className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 min-h-[120px] text-base font-medium rounded-lg resize-none" />
                         
                         {/* Character Counter */}
                         <div className="text-center">

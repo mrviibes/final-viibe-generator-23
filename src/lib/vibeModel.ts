@@ -69,8 +69,12 @@ async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: st
     const isKnockKnock = inputs.subcategory?.toLowerCase().includes("knock");
     const postProcessOptions = isKnockKnock ? { allowNewlines: true, format: 'knockknock' as const } : undefined;
     
-    // Post-process each line with tag validation
-    const candidates = lines.map((line: string) => postProcessLine(line, inputs.tone, inputs.tags, postProcessOptions));
+    // Post-process each line with tag validation and exact words requirement
+    const postProcessOptionsWithExactWords = {
+      ...postProcessOptions,
+      exactWords: inputs.exactWords
+    };
+    const candidates = lines.map((line: string) => postProcessLine(line, inputs.tone, inputs.tags, postProcessOptionsWithExactWords));
     
     // Add API metadata to candidates for later extraction
     if (apiMeta && candidates.length > 0) {
