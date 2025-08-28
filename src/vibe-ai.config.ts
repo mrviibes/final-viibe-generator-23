@@ -713,45 +713,6 @@ export function postProcessLine(
     blocked: false
   };
 }
-    
-    if (contentTags.length > 0) {
-      // Create a simple synonyms map for common terms
-      const synonymsMap: Record<string, string[]> = {
-        'work': ['job', 'career', 'office', 'workplace', 'employment'],
-        'job': ['work', 'career', 'employment', 'position'],
-        'career': ['work', 'job', 'profession', 'employment'],
-        'birthday': ['bday', 'birth', 'celebration', 'party'],
-        'party': ['celebration', 'bash', 'gathering', 'event'],
-        'funny': ['hilarious', 'comedy', 'humor', 'joke', 'laughter'],
-        'movie': ['film', 'cinema', 'flick'],
-        'music': ['song', 'album', 'band', 'artist'],
-        'love': ['romance', 'relationship', 'dating', 'crush'],
-        'food': ['eat', 'meal', 'cooking', 'restaurant', 'dining']
-      };
-      
-      // Extract keywords from tags and check for matches with synonyms
-      const hasTagCoverage = contentTags.some(tag => {
-        const lowerTag = tag.toLowerCase();
-        
-        // Direct match
-        if (lowerCleaned.includes(lowerTag)) return true;
-        
-        // Check for synonyms
-        const synonyms = synonymsMap[lowerTag] || [];
-        if (synonyms.some(synonym => lowerCleaned.includes(synonym))) return true;
-        
-        // Check for partial word matches (e.g., "birthday" matches "birth")
-        if (lowerTag.length > 4) {
-          const rootWord = lowerTag.slice(0, -2); // Remove last 2 chars for partial match
-          if (lowerCleaned.includes(rootWord)) return true;
-        }
-        
-        return false;
-      });
-      
-      if (!hasTagCoverage) {
-        // Don't block for tag issues - just mark it
-        return {
 
 // =========================
 // 7) Phrase Generation Rules
