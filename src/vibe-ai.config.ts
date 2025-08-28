@@ -199,7 +199,11 @@ export const AI_CONFIG = {
     max_candidates: 6,
     temperature: 0.7,
     max_tokens: 150,
-    model: 'gpt-4.1-2025-04-14'
+    model: 'gpt-4o-mini' // Faster, more reliable for concept generation
+  },
+  visual_generation: {
+    max_tokens: 450, // Reduced for faster concepts
+    model: 'gpt-4o-mini' // Default to faster model for visual concepts
   }
 };
 
@@ -917,7 +921,8 @@ export const bannedWords = BANNED_WORDS;
 export const AVAILABLE_MODELS = [
   { id: "gpt-5-2025-08-07", name: "GPT-5 (Flagship)", description: "Best performance" },
   { id: "gpt-5-mini-2025-08-07", name: "GPT-5 Mini", description: "Faster, cost-efficient" },
-  { id: "gpt-4.1-2025-04-14", name: "GPT-4.1 (Default)", description: "Reliable results" },
+  { id: "gpt-4.1-2025-04-14", name: "GPT-4.1", description: "Reliable results" },
+  { id: "gpt-4o-mini", name: "GPT-4o Mini (Default)", description: "Fast, optimized for concepts" },
   { id: "o4-mini-2025-04-16", name: "O4 Mini", description: "Fast reasoning" }
 ];
 

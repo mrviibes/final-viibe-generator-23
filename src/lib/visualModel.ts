@@ -302,21 +302,21 @@ export async function generateVisualRecommendations(
     const targetModel = effectiveConfig.generation.model;
     const targetTemperature = isTemperatureSupported(targetModel) ? effectiveConfig.generation.temperature : undefined;
     
-    // Create a timeout promise with reduced timeout
+    // Create a timeout promise with increased primary timeout
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('TIMEOUT')), 12000);
+      setTimeout(() => reject(new Error('TIMEOUT')), 15000); // Increased to 15s
     });
 
-    // Primary attempt with user's preferred model settings
+    // Primary attempt - use faster model for visual concepts
     let result;
     const requestOptions: any = {
-      max_completion_tokens: 600,
-      model: targetModel
+      max_completion_tokens: 450, // Reduced tokens for faster generation
+      model: 'gpt-4o-mini' // Always use fast model for concepts
     };
     
     // Only add temperature for supported models
-    if (targetTemperature !== undefined) {
-      requestOptions.temperature = targetTemperature;
+    if (isTemperatureSupported('gpt-4o-mini')) {
+      requestOptions.temperature = 0.7; // Fixed optimal temperature for concepts
     }
     
     try {
@@ -337,17 +337,43 @@ export async function generateVisualRecommendations(
         
         // Use compact timeout for retry
         const retryTimeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('RETRY_TIMEOUT')), 8000);
+          setTimeout(() => reject(new Error('RETRY_TIMEOUT')), 10000); // Increased to 10s
         });
         
-        result = await Promise.race([
-          openAIService.chatJSON(compactMessages, {
-            temperature: 0.6,
-            max_tokens: 600,
-            model: 'gpt-4o-mini'
-          }),
-          retryTimeoutPromise
-        ]);
+        try {
+          result = await Promise.race([
+            openAIService.chatJSON(compactMessages, {
+              temperature: 0.7,
+              max_tokens: 450,
+              model: 'gpt-4o-mini'
+            }),
+            retryTimeoutPromise
+          ]);
+        } catch (secondError) {
+          // Third attempt with ultra-compact prompt
+          if (secondError instanceof Error && secondError.message.includes('RETRY_TIMEOUT')) {
+            console.log('🔄 Final attempt with ultra-compact prompt...');
+            const ultraCompactMessages = [
+              { role: 'system', content: 'Generate 4 visual concepts as JSON array.' },
+              { role: 'user', content: `${tone} ${category} visuals. JSON only.` }
+            ];
+            
+            const finalTimeoutPromise = new Promise((_, reject) => {
+              setTimeout(() => reject(new Error('FINAL_TIMEOUT')), 6000); // 6s final attempt
+            });
+            
+            result = await Promise.race([
+              openAIService.chatJSON(ultraCompactMessages, {
+                temperature: 0.7,
+                max_tokens: 300,
+                model: 'gpt-4o-mini'
+              }),
+              finalTimeoutPromise
+            ]);
+          } else {
+            throw secondError;
+          }
+        }
       } else {
         throw firstError;
       }
@@ -386,32 +412,44 @@ export async function generateVisualRecommendations(
   } catch (error) {
     console.error('Error generating visual recommendations:', error);
     
-    // Determine specific error type for better user guidance
+    // Determine specific error type for better user guidance with detailed reasons
     let errorCode: 'timeout' | 'unauthorized' | 'network' | 'parse_error' = 'network';
+    let fallbackReason = 'Unknown API error';
     
     if (error instanceof Error) {
-      if (error.message === 'TIMEOUT') {
+      if (error.message.includes('TIMEOUT')) {
         errorCode = 'timeout';
-        console.warn('⚠️ Visual generation timed out after 18s');
+        fallbackReason = 'Primary request timed out (15s)';
+        console.warn('⚠️ Visual generation timed out');
+      } else if (error.message.includes('RETRY_TIMEOUT')) {
+        errorCode = 'timeout';
+        fallbackReason = 'Retry request timed out (10s)';
+        console.warn('⚠️ Visual generation retry timed out');
+      } else if (error.message.includes('FINAL_TIMEOUT')) {
+        errorCode = 'timeout';
+        fallbackReason = 'All attempts timed out (15s + 10s + 6s)';
+        console.warn('⚠️ All visual generation attempts timed out');
       } else if (error.message.includes('401') || error.message.includes('unauthorized')) {
         errorCode = 'unauthorized';
+        fallbackReason = 'Invalid OpenAI API key';
         console.warn('⚠️ API key issue detected');
       } else if (error.message.includes('JSON') || error.message.includes('parse') || error.message.includes('truncated') || error.message.includes('No content')) {
         errorCode = 'parse_error';
+        fallbackReason = 'Invalid AI response format';
         console.warn('⚠️ Response parsing failed or truncated');
+      } else if (error.message.includes('Response truncated')) {
+        errorCode = 'timeout';
+        fallbackReason = 'Request too long, response truncated';
+        console.warn('⚠️ Request was too long');
       }
     }
     
     // Use contextual fallbacks instead of generic ones
     const fallbackOptions = getSlotBasedFallbacks(enrichedInputs);
-
-    const fallbackReason = errorCode === 'timeout' ? 'Timeout' : 
-                          errorCode === 'parse_error' ? 'JSON Error' : 
-                          errorCode === 'unauthorized' ? 'API Key' : 'Network';
     
     return {
       options: fallbackOptions,
-      model: 'fallback',
+      model: 'fallback-gpt-4o-mini',
       errorCode,
       fallbackReason
     };
