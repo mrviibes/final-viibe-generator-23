@@ -6204,7 +6204,14 @@ const Index = () => {
                              {visualModel && visualModel.includes('local presets') && <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 text-xs p-2 rounded-lg mb-3 max-w-md mx-auto">
                                  {getErrorMessage(visualRecommendations?.errorCode)}
                                </div>}
-                           <p className="text-sm text-muted-foreground">Choose one of these AI-generated concepts</p>
+                            <div className="flex items-center gap-2 justify-center mb-2">
+                              <p className="text-sm text-muted-foreground">Choose one of these AI-generated concepts</p>
+                              {visualRecommendations?._seasonalBoost && (
+                                <Badge variant="secondary" className="text-xs">
+                                  Seasonal boost: {visualRecommendations._seasonalBoost}
+                                </Badge>
+                              )}
+                            </div>
                          </div>
                         
                          <div className="grid grid-cols-1 gap-6 max-w-2xl mx-auto">
@@ -6215,9 +6222,16 @@ const Index = () => {
                                <CardHeader className="pb-2">
                                  <div className="flex items-center justify-between">
                                      <CardTitle className="text-base font-semibold text-card-foreground">
-                                       <div className="flex items-center gap-2">
-                                         <span>Option {index + 1} ({option.slot?.replace('-', ' ') || 'Visual'})</span>
-                                         {option.textAligned && (
+                                        <div className="flex items-center gap-2">
+                                          <span>Option {index + 1} ({option.slot?.replace('-', ' ') || 'Visual'})</span>
+                                          {visualRecommendations?._seasonalBoost === 'Christmas' && (() => {
+                                            const christmasKeywords = ['christmas', 'tree', 'ornament', 'festive', 'holiday', 'red and green', 'lights', 'santa', 'winter', 'snow'];
+                                            const fullText = `${option.subject} ${option.background} ${option.prompt}`.toLowerCase();
+                                            return christmasKeywords.some(keyword => fullText.includes(keyword));
+                                          })() && (
+                                            <span className="text-lg">🎄</span>
+                                          )}
+                                          {option.textAligned && (
                                            <TooltipProvider>
                                              <Tooltip>
                                                <TooltipTrigger asChild>

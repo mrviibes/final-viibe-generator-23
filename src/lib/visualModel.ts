@@ -14,6 +14,7 @@ export interface VisualInputs {
   dimensions?: string; // square, 4:5, 9:16, etc.
   targetSlot?: string; // background-only, subject+background, object, singing
   backgroundPreset?: string; // minimal, urban, nature, etc.
+  _seasonalBoost?: string; // Internal seasonal enhancement indicator
 }
 
 export interface VisualOption {
@@ -31,6 +32,7 @@ export interface VisualResult {
   errorCode?: 'timeout' | 'unauthorized' | 'network' | 'parse_error' | 'FAST_TIMEOUT' | 'STRICT_MODE_FAILED';
   fallbackReason?: string;
   _debug?: any;
+  _seasonalBoost?: string; // Seasonal enhancement indicator for UI
 }
 
 const VISUAL_OPTIONS_COUNT = 4;
@@ -41,10 +43,18 @@ const VISUAL_OPTIONS_COUNT = 4;
 function autoEnrichInputs(inputs: VisualInputs): VisualInputs {
   const enriched = { ...inputs };
   
+  // Seasonal detection and enhancement
+  const seasonalBoost = detectSeasonalTheme(inputs);
+  if (seasonalBoost.isChristmas) {
+    console.log('🎄 Christmas theme detected - applying seasonal boost');
+    enriched.tags = [...inputs.tags, ...seasonalBoost.tags].slice(0, 8);
+    enriched._seasonalBoost = 'Christmas';
+  }
+  
   // Auto-extract nouns from finalLine if provided
   if (inputs.finalLine && inputs.tags.length < 5) {
     const extractedNouns = extractNounsFromText(inputs.finalLine);
-    enriched.tags = [...inputs.tags, ...extractedNouns].slice(0, 8); // Max 8 tags
+    enriched.tags = [...enriched.tags, ...extractedNouns].slice(0, 8); // Max 8 tags
   }
   
   // Auto-seed category-specific tags if not provided
@@ -84,10 +94,126 @@ function extractNounsFromText(text: string): string[] {
     .slice(0, 3); // Max 3 extracted nouns
 }
 
+// Add seasonal detection function
+function detectSeasonalTheme(inputs: VisualInputs): { isChristmas: boolean; tags: string[] } {
+  const christmasKeywords = ['christmas', 'holiday', 'santa', 'reindeer', 'tree', 'gifts', 'ornament', 'snow', 'winter', 'festive', 'sleigh', 'elf', 'carol', 'wreath', 'mistletoe'];
+  const lowerText = [
+    inputs.subcategory?.toLowerCase() || '',
+    inputs.tone.toLowerCase(),
+    inputs.finalLine?.toLowerCase() || '',
+    ...inputs.tags.map(tag => tag.toLowerCase())
+  ].join(' ');
+  
+  const isChristmas = christmasKeywords.some(keyword => lowerText.includes(keyword)) || 
+                     inputs.subcategory === 'christmas-day' || 
+                     inputs.subcategory === 'christmas-eve';
+  
+  if (isChristmas) {
+    return {
+      isChristmas: true,
+      tags: ['Christmas tree', 'red and green', 'ornaments', 'festive lights', 'holiday spirit', 'winter wonderland']
+    };
+  }
+  
+  return { isChristmas: false, tags: [] };
+}
+
+// Christmas enhancement enforcement
+function enforceChristmasElements(options: VisualOption[], inputs: VisualInputs): VisualOption[] {
+  console.log('🎄 Enforcing Christmas elements in visual concepts...');
+  
+  let christmasEnforcedCount = 0;
+  const targetChristmasCount = 3; // At least 3 of 4 should have Christmas elements
+  
+  const enhancedOptions = options.map((option, index) => {
+    const hasChristmasAlready = hasChristmasElements(option);
+    
+    if (!hasChristmasAlready && christmasEnforcedCount < targetChristmasCount) {
+      console.log(`🎄 Adding Christmas elements to concept ${index + 1}`);
+      christmasEnforcedCount++;
+      
+      return {
+        ...option,
+        subject: addChristmasToSubject(option.subject),
+        background: addChristmasToBackground(option.background),
+        prompt: addChristmasToPrompt(option.prompt, inputs.tags)
+      };
+    }
+    
+    if (hasChristmasAlready) {
+      christmasEnforcedCount++;
+    }
+    
+    return option;
+  });
+  
+  console.log(`🎄 Christmas enforcement complete: ${christmasEnforcedCount}/${options.length} concepts have Christmas elements`);
+  return enhancedOptions;
+}
+
+function hasChristmasElements(option: VisualOption): boolean {
+  const christmasKeywords = ['christmas', 'tree', 'ornament', 'festive', 'holiday', 'red and green', 'lights', 'santa', 'winter', 'snow'];
+  const fullText = `${option.subject} ${option.background} ${option.prompt}`.toLowerCase();
+  return christmasKeywords.some(keyword => fullText.includes(keyword));
+}
+
+function addChristmasToSubject(subject: string): string {
+  if (!subject || hasChristmasElements({ subject, background: '', prompt: '' })) return subject;
+  
+  const christmasEnhancements = [
+    'with Christmas tree backdrop',
+    'featuring festive red and green accents',
+    'with holiday ornaments',
+    'surrounded by Christmas lights',
+    'with winter holiday atmosphere'
+  ];
+  
+  const enhancement = christmasEnhancements[Math.floor(Math.random() * christmasEnhancements.length)];
+  return `${subject} ${enhancement}`;
+}
+
+function addChristmasToBackground(background: string): string {
+  if (!background || hasChristmasElements({ subject: '', background, prompt: '' })) return background;
+  
+  const christmasBackgrounds = [
+    'with Christmas tree and festive lighting',
+    'featuring red and green holiday colors',
+    'with Christmas ornaments and winter atmosphere',
+    'decorated with holiday lights and festive elements',
+    'showcasing Christmas spirit and winter wonderland'
+  ];
+  
+  const enhancement = christmasBackgrounds[Math.floor(Math.random() * christmasBackgrounds.length)];
+  return `${background} ${enhancement}`;
+}
+
+function addChristmasToPrompt(prompt: string, tags: string[]): string {
+  if (!prompt || hasChristmasElements({ subject: '', background: '', prompt })) return prompt;
+  
+  const christmasPromptAdditions = [
+    ', Christmas tree visible in background, festive red and green color scheme',
+    ', holiday ornaments and Christmas lights creating warm festive atmosphere',
+    ', Christmas decorations and winter holiday spirit throughout',
+    ', festive Christmas elements with red and green accents and holiday lighting',
+    ', Christmas theme with tree, ornaments, and warm holiday atmosphere'
+  ];
+  
+  const addition = christmasPromptAdditions[Math.floor(Math.random() * christmasPromptAdditions.length)];
+  
+  // Insert before any technical instructions like [TAGS:...]
+  const technicalStart = prompt.indexOf('[');
+  if (technicalStart !== -1) {
+    return prompt.slice(0, technicalStart) + addition + ' ' + prompt.slice(technicalStart);
+  } else {
+    return prompt + addition;
+  }
+}
+
 function getCategorySpecificTags(category: string, subcategory: string): string[] {
   const celebrationMap: Record<string, string[]> = {
     'birthday': ['cake', 'candles', 'balloons'],
-    'christmas-day': ['tree', 'gifts', 'ornaments'],
+    'christmas-day': ['Christmas tree', 'red and green', 'ornaments', 'festive lights', 'holiday spirit'],
+    'christmas-eve': ['Christmas tree', 'red and green', 'ornaments', 'festive lights', 'holiday spirit'],
     'halloween': ['pumpkin', 'costume', 'spooky'],
     'wedding': ['rings', 'flowers', 'celebration'],
     'default': ['party', 'festive', 'celebration']
@@ -677,10 +803,16 @@ export async function generateVisualRecommendations(
       localStorage.setItem('last_visual_model', actualModel);
     }
     
+    // Apply Christmas enforcement if seasonal boost is active
+    if (enrichedInputs._seasonalBoost === 'Christmas') {
+      validOptions = enforceChristmasElements(validOptions, enrichedInputs);
+    }
+
     return {
       options: validOptions,
       model: actualModel,
-      modelDisplayName: MODEL_DISPLAY_NAMES[actualModel] || actualModel
+      modelDisplayName: MODEL_DISPLAY_NAMES[actualModel] || actualModel,
+      _seasonalBoost: enrichedInputs._seasonalBoost
     };
   } catch (error) {
     console.error('Error generating visual recommendations:', error);
@@ -725,7 +857,8 @@ export async function generateVisualRecommendations(
       model: targetModel, // Show the user's selected model that failed
       modelDisplayName: MODEL_DISPLAY_NAMES[targetModel] || targetModel,
       errorCode,
-      fallbackReason: `${MODEL_DISPLAY_NAMES[targetModel] || targetModel} failed - using local presets`
+      fallbackReason: `${MODEL_DISPLAY_NAMES[targetModel] || targetModel} failed - using local presets`,
+      _seasonalBoost: enrichedInputs._seasonalBoost
     };
   }
 }

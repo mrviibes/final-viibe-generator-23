@@ -349,8 +349,15 @@ RULES:
 - CRITICAL: Visual concepts MUST relate to the provided text/joke content and tone
 - Provide exactly one background-only concept and 3 distinct subject+background concepts
 - For Pride themes: Include rainbow, drag queens, parades, celebrations, fabulous elements
+- For Christmas themes: MANDATORY - Include Christmas trees, red and green colors, ornaments, festive lighting, holiday spirit, winter atmosphere
 - For jokes: Match the humor and subject matter exactly
 - EXCLUDE music/singing content unless tags explicitly include music, singing, concert, or performance
+
+CHRISTMAS CRITICAL INSTRUCTIONS:
+- When Christmas/holiday themes detected, at least 3 of 4 concepts MUST include explicit Christmas elements
+- Use rich Christmas color palette: deep reds, forest greens, golden accents, warm whites
+- Include traditional elements: Christmas trees, ornaments, lights, garlands, wreaths, snow
+- Create warm, festive atmosphere with holiday spirit and winter wonderland vibes
 
 Format:
 {
