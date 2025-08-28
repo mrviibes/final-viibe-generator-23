@@ -33,6 +33,9 @@ export interface IdeogramGenerateResponse {
     url: string;
     is_image_safe: boolean;
   }>;
+  _fallback_note?: string;
+  endpoint_used?: string;
+  model_used?: string;
 }
 
 export class IdeogramAPIError extends Error {

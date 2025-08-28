@@ -6347,7 +6347,15 @@ const Index = () => {
                 <div className="bg-muted/50 rounded-lg p-8 flex items-center justify-center min-h-[300px] border-2 border-dashed border-muted-foreground/20">
                   {isGeneratingImage ? <div className="flex flex-col items-center gap-4">
                       <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                      <p className="text-muted-foreground text-lg">Generating image with Ideogram Turbo...</p>
+                      <p className="text-muted-foreground text-lg">Generating image...</p>
+                      {(() => {
+                        const runtimeOverrides = getRuntimeOverrides();
+                        const chosenModel = runtimeOverrides.ideogramModel || 'V_2A_TURBO';
+                        if (chosenModel === 'V_3') {
+                          return <p className="text-muted-foreground text-sm">We'll try Ideogram V3 first and automatically use Turbo if V3 is unavailable.</p>;
+                        }
+                        return null;
+                      })()}
                     </div> : generatedImages.length > 0 ? <div className="max-w-full max-h-full">
                       <div className="mb-4">
                         <img src={generatedImages[selectedImageIndex]} alt={`Generated Vibe ${selectedImageIndex + 1}`} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
@@ -6805,8 +6813,17 @@ const Index = () => {
                   const imageUrls = result.data.map(img => img.url);
                   setGeneratedImages(imageUrls);
                   setSelectedImageIndex(0);
-                  const modelDescription = model === 'V_3' ? 'Ideogram V3 (Realistic)' : 'Ideogram Turbo';
-                  sonnerToast.success(`Generated ${imageUrls.length} vibe options with ${modelDescription}! Choose your favorite.`);
+                  // Determine actual model used
+                  let actualModelUsed = model;
+                  let fallbackNote = '';
+                  
+                  if (result._fallback_note) {
+                    actualModelUsed = 'V_2A_TURBO';
+                    fallbackNote = ' (fallback)';
+                  }
+                  
+                  const modelDescription = actualModelUsed === 'V_3' ? 'Ideogram V3 (Realistic)' : 'Ideogram Turbo';
+                  sonnerToast.success(`Generated ${imageUrls.length} vibe options with ${modelDescription}${fallbackNote}! Choose your favorite.`);
                 } else {
                   sonnerToast.error("Failed to generate your vibe. Please try again.");
                 }
