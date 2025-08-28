@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { buildPopCultureSearchPrompt, buildGenerateTextMessages, getEffectiveConfig, MODEL_DISPLAY_NAMES } from "../vibe-ai.config";
+import { buildPopCultureSearchPrompt, buildGenerateTextMessages, getEffectiveConfig, MODEL_DISPLAY_NAMES, getSmartFallbackChain } from "../vibe-ai.config";
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -200,15 +200,9 @@ export class OpenAIService {
       model = 'gpt-5-mini-2025-08-07'
     } = options;
 
-    // Retry strategy based on text speed preference
-    const fastModels = ['gpt-4o-mini', 'gpt-5-mini-2025-08-07', 'gpt-4.1-2025-04-14'];
-    const creativeModels = ['gpt-5-mini-2025-08-07', 'gpt-5-2025-08-07', 'gpt-4.1-2025-04-14'];
-    
-    const preferredModels = this.textSpeed === 'fast' ? fastModels : creativeModels;
-    const retryModels = [
-      model, // Always try the requested model first
-      ...preferredModels.filter(m => m !== model) // Add others based on speed preference
-    ].filter((m, i, arr) => arr.indexOf(m) === i); // Remove duplicates
+    // Use smart fallback chain based on the requested model
+    const retryModels = getSmartFallbackChain(model, 'text');
+    console.log(`📋 Text generation retry chain: ${retryModels.map(m => MODEL_DISPLAY_NAMES[m] || m).join(' → ')}`);
 
     let lastError: Error | null = null;
     let retryAttempt = 0;

@@ -348,14 +348,14 @@ export async function generateVisualRecommendations(
         });
         
         try {
-          // Use next model in chain instead of hardcoded gpt-4o-mini
+          // Use next model in smart fallback chain
           const retryRequestOptions: any = {
             max_completion_tokens: 450,
-            model: nextModel
+            model: nextModel || 'o4-mini-2025-04-16' // Fallback to o4-mini if chain exhausted
           };
           
           // Only add temperature for supported models
-          if (isTemperatureSupported(nextModel)) {
+          if (isTemperatureSupported(nextModel || 'o4-mini-2025-04-16')) {
             retryRequestOptions.temperature = 0.7;
           }
           
@@ -382,7 +382,7 @@ export async function generateVisualRecommendations(
               openAIService.chatJSON(ultraCompactMessages, {
                 temperature: 0.7,
                 max_tokens: 300,
-                model: 'gpt-4o-mini'
+                model: finalModel
               }),
               finalTimeoutPromise
             ]);
