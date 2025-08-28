@@ -5,6 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Search, Loader2, AlertCircle, ArrowLeft, ArrowRight, X, Download, Settings } from "lucide-react";
 import { openAIService, OpenAISearchResult } from "@/lib/openai";
@@ -4057,6 +4058,52 @@ const Index = () => {
     return (stored === 'V_3') ? 'V_3' : 'V_2A_TURBO';
   });
 
+  // Remember choices toggle and load saved choices
+  const [rememberChoices, setRememberChoices] = useState<boolean>(() => {
+    const stored = localStorage.getItem('remember_last_choices');
+    return stored === 'true';
+  });
+
+  // Load saved choices on component mount
+  useEffect(() => {
+    if (rememberChoices) {
+      const savedTextStyle = localStorage.getItem('last_selected_text_style');
+      const savedVisualStyle = localStorage.getItem('last_selected_visual_style');
+      
+      if (savedTextStyle && textStyleOptions.find(opt => opt.id === savedTextStyle)) {
+        setSelectedTextStyle(savedTextStyle);
+      }
+      if (savedVisualStyle && visualStyleOptions.find(opt => opt.id === savedVisualStyle)) {
+        setSelectedVisualStyle(savedVisualStyle);
+      }
+    }
+  }, [rememberChoices]);
+
+  // Save choices to localStorage when they change (if remember is enabled)
+  useEffect(() => {
+    if (rememberChoices && selectedTextStyle) {
+      localStorage.setItem('last_selected_text_style', selectedTextStyle);
+    }
+  }, [selectedTextStyle, rememberChoices]);
+
+  useEffect(() => {
+    if (rememberChoices && selectedVisualStyle) {
+      localStorage.setItem('last_selected_visual_style', selectedVisualStyle);
+    }
+  }, [selectedVisualStyle, rememberChoices]);
+
+  // Handle remember choices toggle
+  const handleRememberChoicesToggle = (checked: boolean) => {
+    setRememberChoices(checked);
+    localStorage.setItem('remember_last_choices', checked.toString());
+    
+    if (!checked) {
+      // Clear saved choices when disabled
+      localStorage.removeItem('last_selected_text_style');
+      localStorage.removeItem('last_selected_visual_style');
+    }
+  };
+
   // Spelling guarantee mode states - default to ON when text is present
   const [spellingGuaranteeMode, setSpellingGuaranteeMode] = useState<boolean>(false);
   const [showTextOverlay, setShowTextOverlay] = useState<boolean>(false);
@@ -4327,6 +4374,24 @@ const Index = () => {
     if (selectedSubjectOption === "no-subject") {
       return !!selectedDimension && (selectedDimension !== "custom" || !!(customWidth && customHeight));
     }
+    return true;
+  };
+
+  // Check if text generation requirements are met
+  const canGenerateText = () => {
+    if (!selectedTextStyle || !selectedCompletionOption) {
+      return false;
+    }
+    return true;
+  };
+
+  // Check if visual generation requirements are met
+  const canGenerateVisuals = () => {
+    if (!selectedVisualStyle || !selectedSubjectOption) return false;
+    // Only require visual style when not using "No Visuals" option
+    const completionObj = completionOptions.find(opt => opt.id === selectedCompletionOption);
+    const isNoVisuals = completionObj?.name.includes("No Visuals") || completionObj?.name.includes("I Don't Want");
+    if (!isNoVisuals && !selectedVisualStyle) return false;
     return true;
   };
 
@@ -5543,7 +5608,20 @@ const Index = () => {
 
         {currentStep === 2 && <>
             <div className="text-center mb-12">
-              <h2 className="text-2xl md:text-3xl font-semibold text-foreground mb-4">Choose Your Text Style</h2>
+              <div className="flex items-center justify-between max-w-6xl mx-auto mb-6">
+                <h2 className="text-2xl md:text-3xl font-semibold text-foreground">Choose Your Text Style</h2>
+                <div className="flex items-center gap-3 text-sm">
+                  <label htmlFor="remember-choices" className="text-muted-foreground cursor-pointer">
+                    Remember my last choices
+                  </label>
+                  <Switch
+                    id="remember-choices"
+                    checked={rememberChoices}
+                    onCheckedChange={handleRememberChoicesToggle}
+                  />
+                </div>
+              </div>
+              
               <p className="text-xl italic">
                 {(() => {
               let breadcrumb = [];
@@ -5583,6 +5661,15 @@ const Index = () => {
             })()}
               </p>
             </div>
+
+            
+            {!selectedTextStyle && (
+              <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg max-w-2xl mx-auto">
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  <strong>Please select a tone:</strong> This determines the style and mood of your generated text.
+                </p>
+              </div>
+            )}
 
             {/* Show style selection grid when no style is selected */}
             {!selectedTextStyle ? <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 justify-items-center max-w-6xl mx-auto">
@@ -5721,8 +5808,22 @@ const Index = () => {
                       </div>
 
                       {/* Generate Button */}
-                      <div className="text-center">
-                        <Button variant="brand" className="px-8 py-3 text-base font-medium rounded-lg" onClick={handleGenerateText} disabled={isGenerating}>
+                      <div className="text-center space-y-3">
+                        {!canGenerateText() && (
+                          <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
+                            <p className="font-medium mb-1">To generate text, please select:</p>
+                            <ul className="text-xs space-y-1">
+                              {!selectedTextStyle && <li>• Text style (tone)</li>}
+                              {!selectedCompletionOption && <li>• Text completion option</li>}
+                            </ul>
+                          </div>
+                        )}
+                        <Button 
+                          variant="brand" 
+                          className="px-8 py-3 text-base font-medium rounded-lg" 
+                          onClick={handleGenerateText} 
+                          disabled={isGenerating || !canGenerateText()}
+                        >
                           {isGenerating ? <>
                               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                               Generating...
@@ -5822,6 +5923,13 @@ const Index = () => {
         {currentStep === 3 && <>
             <div className="text-center mb-12">
               <h2 className="text-2xl md:text-3xl font-semibold text-foreground mb-4">Choose Your Visual Style</h2>
+              {!selectedVisualStyle && (
+                <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg max-w-2xl mx-auto">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    <strong>Please select a visual style:</strong> This determines how your image will look.
+                  </p>
+                </div>
+              )}
               <p className="text-xl text-muted-foreground">
                 {(() => {
               // Show the actual text they chose, or indicate no text
@@ -5896,12 +6004,27 @@ const Index = () => {
                             <Input value={subjectTagInput} onChange={e => setSubjectTagInput(e.target.value)} onKeyDown={handleSubjectTagInputKeyDown} placeholder="Enter tags (press Enter or comma to add)" className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
                             
                             {/* Generate Button - Below the input */}
-                            <div className="flex justify-center">
-                              <Button variant="brand" size="lg" className="px-8 py-3 text-base font-medium rounded-lg" onClick={handleGenerateSubject} disabled={isGeneratingSubject}>
+                            <div className="space-y-3 flex flex-col items-center">
+                              {!canGenerateVisuals() && (
+                                <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-3 mb-3 w-full">
+                                  <p className="font-medium mb-1">To generate visuals, please select:</p>
+                                  <ul className="text-xs space-y-1">
+                                    {!selectedVisualStyle && <li>• Visual style</li>}
+                                    {!selectedSubjectOption && <li>• Subject option</li>}
+                                  </ul>
+                                </div>
+                              )}
+                              <Button 
+                                variant="brand" 
+                                size="lg" 
+                                className="px-8 py-3 text-base font-medium rounded-lg" 
+                                onClick={handleGenerateSubject} 
+                                disabled={isGeneratingSubject || !canGenerateVisuals()}
+                              >
                                 {isGeneratingSubject ? <>
                                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                                     Generating...
-                                  </> : "Generate Visual Now"}
+                                  </> : "Generate Visual Ideas"}
                               </Button>
                             </div>
                             
