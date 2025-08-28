@@ -56,6 +56,8 @@ export function IdeogramErrorDialog({
 
   const getErrorTypeDisplay = () => {
     switch (error.errorType) {
+      case 'MISSING_BACKEND_KEY':
+        return { color: 'destructive', text: 'Backend Configuration' };
       case 'INVALID_API_KEY':
         return { color: 'destructive', text: 'Authentication Error' };
       case 'RATE_LIMIT':
@@ -129,7 +131,9 @@ export function IdeogramErrorDialog({
               <Button
                 onClick={() => {
                   onOpenChange(false);
-                  // The user will need to navigate to settings manually or add a frontend key
+                  // Dispatch custom event to open the API key dialog
+                  const event = new CustomEvent('showIdeogramKeyDialog');
+                  window.dispatchEvent(event);
                 }}
                 className="w-full gap-2"
                 variant="default"

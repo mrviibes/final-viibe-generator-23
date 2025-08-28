@@ -4175,6 +4175,18 @@ const Index = () => {
     }
   }, [currentStep, visualRecommendations]);
 
+  // Listen for custom event to show Ideogram API key dialog
+  useEffect(() => {
+    const handleShowDialog = () => {
+      setShowIdeogramKeyDialog(true);
+    };
+
+    window.addEventListener('showIdeogramKeyDialog', handleShowDialog);
+    return () => {
+      window.removeEventListener('showIdeogramKeyDialog', handleShowDialog);
+    };
+  }, []);
+
   // Visual AI recommendations state
   const [isTestingProxy, setIsTestingProxy] = useState(false);
   const navigate = useNavigate();

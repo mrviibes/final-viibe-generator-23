@@ -467,14 +467,23 @@ async function surfaceBackendError(request: IdeogramGenerateRequest): Promise<Id
           errorData = JSON.parse(errorText);
         } catch {
           // If not JSON, treat as plain text
-          errorData = { message: errorText };
+          errorData = { error: errorText };
         }
         
-        return mapBackendErrorToUserError(response.status, errorData, request);
-      } catch {
-        // Fallback if we can't parse response
+        // Handle the backend's JSON error format: {error: "message"}
+        if (errorData.error) {
+          return mapBackendErrorToUserError(response.status, errorData, request);
+        }
+        
+        // Fallback for other formats
         return new IdeogramAPIError(
-          `Backend error ${response.status}: Unable to process request`,
+          `Backend error ${response.status}: ${errorText}`,
+          response.status
+        );
+      } catch (parseError) {
+        console.log('Failed to parse backend error response:', parseError);
+        return new IdeogramAPIError(
+          `Backend error ${response.status}: Unable to process response`,
           response.status
         );
       }
@@ -495,11 +504,11 @@ function mapBackendErrorToUserError(
   const isExactTextRequest = /EXACT TEXT:/i.test(request.prompt);
   const errorMessage = errorData.message || errorData.error || 'Unknown error';
   
-  // Check for specific error patterns
-  if (errorMessage.includes('IDEOGRAM_API_KEY not configured')) {
+  // Check for specific error patterns - handle both backend formats
+  if (errorMessage.includes('Ideogram API key not configured') || errorMessage.includes('IDEOGRAM_API_KEY not configured')) {
     return new IdeogramAPIError(
       'Ideogram API key is not configured in the backend. Please contact support or set up a frontend API key.',
-      401,
+      500,
       'MISSING_BACKEND_KEY'
     );
   }
