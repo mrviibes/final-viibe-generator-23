@@ -16,37 +16,14 @@ import {
   setRuntimeOverrides, 
   clearRuntimeOverrides,
   AI_CONFIG,
+  AVAILABLE_MODELS,
+  VISUAL_STYLES, 
+  TONES,
+  isTemperatureSupported,
   type AIRuntimeOverrides,
   type VisualStyle,
   type Tone
 } from "@/vibe-ai.config";
-
-const AVAILABLE_MODELS = [
-  { id: "gpt-5-2025-08-07", name: "GPT-5 (Flagship)", description: "Best performance" },
-  { id: "gpt-5-mini-2025-08-07", name: "GPT-5 Mini", description: "Faster, cost-efficient" },
-  { id: "gpt-4.1-2025-04-14", name: "GPT-4.1 (Default)", description: "Reliable results" },
-  { id: "o4-mini-2025-04-16", name: "O4 Mini", description: "Fast reasoning" }
-];
-
-const VISUAL_STYLES = [
-  { id: "Realistic", name: "Realistic" },
-  { id: "Caricature", name: "Caricature" },
-  { id: "Anime", name: "Anime" },
-  { id: "3D Animated", name: "3D Animated" },
-  { id: "Illustrated", name: "Illustrated" },
-  { id: "Pop Art", name: "Pop Art" }
-];
-
-const TONES = [
-  { id: "Humorous", name: "Humorous" },
-  { id: "Savage", name: "Savage" },
-  { id: "Sentimental", name: "Sentimental" },
-  { id: "Nostalgic", name: "Nostalgic" },
-  { id: "Romantic", name: "Romantic" },
-  { id: "Inspirational", name: "Inspirational" },
-  { id: "Playful", name: "Playful" },
-  { id: "Serious", name: "Serious" }
-];
 
 export default function AiSettings() {
   const navigate = useNavigate();
@@ -87,10 +64,7 @@ export default function AiSettings() {
     setHasChanges(true);
   };
 
-  // Helper to check if current model supports temperature
-  const isTemperatureSupported = (modelId: string) => {
-    return !modelId.includes('gpt-5') && !modelId.includes('o3');
-  };
+  // Use centralized temperature support check
 
   const currentModel = overrides.model || AI_CONFIG.generation.model;
   const temperatureSupported = isTemperatureSupported(currentModel);

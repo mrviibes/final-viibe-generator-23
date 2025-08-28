@@ -4,6 +4,7 @@ import {
   TONE_FALLBACKS,
   AI_CONFIG,
   SYSTEM_PROMPTS,
+  buildVibeGeneratorMessages,
   type VibeInputs,
   type VibeCandidate,
   type VibeResult
@@ -32,48 +33,8 @@ function getFallbackVariants(tone: string, category: string, subcategory: string
 
 async function generateMultipleCandidates(inputs: VibeInputs): Promise<VibeCandidate[]> {
   try {
-    const systemPromptUpdated = SYSTEM_PROMPTS.vibe_generator;
-
-    // Enhanced instructions for movie/pop culture + quotes
-    const isMovie = inputs.category === "Pop Culture" && inputs.subcategory?.toLowerCase().includes("movie");
-    const hasQuotes = inputs.tags?.some(tag => tag.toLowerCase().includes("quote")) || false;
-    const hasPersonalRoast = inputs.tags?.some(tag => tag.toLowerCase().includes("making fun") || tag.toLowerCase().includes("bald") || tag.toLowerCase().includes("roast")) || false;
-
-    let specialInstructions = "";
-    if (isMovie && hasQuotes) {
-      specialInstructions = "\n• When creating content about a specific movie with quote tags, reference the movie's iconic characters, themes, or memorable elements\n• Make it sound like it could be dialogue or a reference from that movie's universe";
-    }
-    if (hasPersonalRoast && inputs.recipient_name && inputs.recipient_name !== "-") {
-      specialInstructions += `\n• Incorporate ${inputs.recipient_name} naturally into the content while maintaining the roasting tone`;
-    }
-    
-    // Add stronger recipient targeting for any tone when recipient is specified
-    if (inputs.recipient_name && inputs.recipient_name !== "-" && inputs.tone === "Savage") {
-      specialInstructions += `\n• CRITICAL: Every line must specifically target ${inputs.recipient_name} by name - make fun of them directly, not generic content`;
-    }
-
-    const tagRequirement = inputs.tags && inputs.tags.length > 0 
-      ? `\n• Aim to include or reference these tags naturally (paraphrasing is fine): ${inputs.tags.join(', ')}`
-      : '';
-
-    const corePrompt = `Generate 6 concise options under 100 chars each for:
-Category: ${inputs.category} > ${inputs.subcategory}
-Tone: ${inputs.tone}
-Tags: ${inputs.tags?.join(', ') || 'none'}
-${inputs.recipient_name && inputs.recipient_name !== "-" ? `Target: ${inputs.recipient_name}` : ''}
-
-${tagRequirement}${specialInstructions}
-
-Return only: {"lines":["option1","option2","option3","option4","option5","option6"]}`;
-
-    const systemMessage = inputs.tone === 'Savage' 
-      ? 'Generate short, savage roasts/burns. Make them cutting and direct, NOT joke-like. JSON array only.'
-      : 'Generate short, witty text. JSON array only. No explanations.';
-    
-    const messages = [
-      { role: 'system', content: systemMessage },
-      { role: 'user', content: corePrompt }
-    ];
+    // Use centralized message builder
+    const messages = buildVibeGeneratorMessages(inputs);
     
     const result = await openAIService.chatJSON(messages, {
       max_tokens: AI_CONFIG.generation.max_tokens,

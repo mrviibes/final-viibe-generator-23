@@ -874,3 +874,169 @@ export const systemPrompt = SYSTEM_PROMPTS.vibe_maker;
 export const fallbackByTone = TONE_FALLBACKS;
 export const bannedPatterns = BANNED_PATTERNS;
 export const bannedWords = BANNED_WORDS;
+
+// =====================================================================
+// ADDITIONAL EXPORTS - UI Constants and Helpers
+// =====================================================================
+
+// Available Models for dropdown selection
+export const AVAILABLE_MODELS = [
+  { id: "gpt-5-2025-08-07", name: "GPT-5 (Flagship)", description: "Best performance" },
+  { id: "gpt-5-mini-2025-08-07", name: "GPT-5 Mini", description: "Faster, cost-efficient" },
+  { id: "gpt-4.1-2025-04-14", name: "GPT-4.1 (Default)", description: "Reliable results" },
+  { id: "o4-mini-2025-04-16", name: "O4 Mini", description: "Fast reasoning" }
+];
+
+export const VISUAL_STYLES = [
+  { id: "Realistic", name: "Realistic" },
+  { id: "Caricature", name: "Caricature" },
+  { id: "Anime", name: "Anime" },
+  { id: "3D Animated", name: "3D Animated" },
+  { id: "Illustrated", name: "Illustrated" },
+  { id: "Pop Art", name: "Pop Art" }
+];
+
+export const TONES = [
+  { id: "Humorous", name: "Humorous" },
+  { id: "Savage", name: "Savage" },
+  { id: "Sentimental", name: "Sentimental" },
+  { id: "Nostalgic", name: "Nostalgic" },
+  { id: "Romantic", name: "Romantic" },
+  { id: "Inspirational", name: "Inspirational" },
+  { id: "Playful", name: "Playful" },
+  { id: "Serious", name: "Serious" }
+];
+
+// Helper function to check if current model supports temperature
+export const isTemperatureSupported = (modelId: string): boolean => {
+  return !modelId.includes('gpt-5') && !modelId.includes('o3');
+};
+
+// =====================================================================
+// MESSAGE BUILDERS - Centralized prompt construction
+// =====================================================================
+
+// Helper to get style keywords for visual prompts
+export function getStyleKeywords(visualStyle?: string): string {
+  const styles: Record<string, string> = {
+    'realistic': 'photographic, detailed, natural lighting',
+    'illustrated': 'clean illustration, vibrant colors', 
+    '3d-animated': 'clean 3D animation, smooth surfaces',
+    'minimalist': 'simple, clean, minimal design'
+  };
+  return styles[visualStyle || '3d-animated'] || 'modern visual style';
+}
+
+// Builder for vibe generator chat messages
+export function buildVibeGeneratorMessages(inputs: VibeInputs): Array<{role: string; content: string}> {
+  const isMovie = inputs.category === "Pop Culture" && inputs.subcategory?.toLowerCase().includes("movie");
+  const hasQuotes = inputs.tags?.some(tag => tag.toLowerCase().includes("quote")) || false;
+  const hasPersonalRoast = inputs.tags?.some(tag => 
+    tag.toLowerCase().includes("making fun") || 
+    tag.toLowerCase().includes("bald") || 
+    tag.toLowerCase().includes("roast")
+  ) || false;
+
+  let specialInstructions = "";
+  if (isMovie && hasQuotes) {
+    specialInstructions = "\n• When creating content about a specific movie with quote tags, reference the movie's iconic characters, themes, or memorable elements\n• Make it sound like it could be dialogue or a reference from that movie's universe";
+  }
+  if (hasPersonalRoast && inputs.recipient_name && inputs.recipient_name !== "-") {
+    specialInstructions += `\n• Incorporate ${inputs.recipient_name} naturally into the content while maintaining the roasting tone`;
+  }
+  
+  if (inputs.recipient_name && inputs.recipient_name !== "-" && inputs.tone === "Savage") {
+    specialInstructions += `\n• CRITICAL: Every line must specifically target ${inputs.recipient_name} by name - make fun of them directly, not generic content`;
+  }
+
+  const tagRequirement = inputs.tags && inputs.tags.length > 0 
+    ? `\n• Aim to include or reference these tags naturally (paraphrasing is fine): ${inputs.tags.join(', ')}`
+    : '';
+
+  const corePrompt = `Generate 6 concise options under 100 chars each for:
+Category: ${inputs.category} > ${inputs.subcategory}
+Tone: ${inputs.tone}
+Tags: ${inputs.tags?.join(', ') || 'none'}
+${inputs.recipient_name && inputs.recipient_name !== "-" ? `Target: ${inputs.recipient_name}` : ''}
+
+${tagRequirement}${specialInstructions}
+
+Return only: {"lines":["option1","option2","option3","option4","option5","option6"]}`;
+
+  const systemMessage = inputs.tone === 'Savage' 
+    ? 'Generate short, savage roasts/burns. Make them cutting and direct, NOT joke-like. JSON array only.'
+    : 'Generate short, witty text. JSON array only. No explanations.';
+  
+  return [
+    { role: 'system', content: systemMessage },
+    { role: 'user', content: corePrompt }
+  ];
+}
+
+// Builder for visual generator chat messages  
+export function buildVisualGeneratorMessages(inputs: any): Array<{role: string; content: string}> {
+  const { category, subcategory, tone, tags, visualStyle, finalLine } = inputs;
+
+  const userPrompt = `${category}>${subcategory}, ${tone}, ${visualStyle || '3d-animated'}
+Tags: ${tags.slice(0, 4).join(', ')}
+${finalLine ? `JOKE/TEXT: "${finalLine}" - VISUAL CONCEPTS MUST MATCH THIS CONTENT AND TONE` : ''}
+
+IMPORTANT: Visual concepts must directly relate to the joke/text content above. For Pride themes, include rainbow colors, drag queens, parades, celebration elements.
+
+4 concepts. Each 40-60 words. Include [TAGS: ${tags.slice(0, 3).join(', ')}] [TEXT_SAFE_ZONE: center 60x35]
+
+JSON only.`;
+
+  return [
+    { role: 'system', content: SYSTEM_PROMPTS.visual_generator },
+    { role: 'user', content: userPrompt }
+  ];
+}
+
+// Builder for pop culture search prompts
+export function buildPopCultureSearchPrompt(category: string, searchTerm: string): string {
+  return `Generate exactly 5 creative and relevant ${category.toLowerCase()} suggestions related to "${searchTerm}". Focus on popular, well-known entries that would be engaging for users. Keep descriptions concise (1-2 sentences).
+
+Return as a JSON object with this exact format:
+{
+  "suggestions": [
+    {"title": "Suggestion Title", "description": "Brief description"}
+  ]
+}`;
+}
+
+// Builder for general text generation
+export function buildGenerateTextMessages(params: {
+  tone: string;
+  category?: string;
+  subtopic?: string;
+  pick?: string;
+  tags?: string[];
+  characterLimit: number;
+}): Array<{role: string; content: string}> {
+  const { tone, category, subtopic, pick, tags = [], characterLimit } = params;
+  
+  let contextParts = [];
+  if (category) contextParts.push(`Category: ${category}`);
+  if (subtopic) contextParts.push(`Topic: ${subtopic}`);
+  if (pick) contextParts.push(`Specific focus: ${pick}`);
+  
+  const context = contextParts.join(', ');
+  
+  let prompt = `Generate exactly 4 short ${tone.toLowerCase()} text options for: ${context}.`;
+  
+  if (tags.length > 0) {
+    prompt += ` IMPORTANT: Each option MUST include ALL of these exact words/tags: ${tags.join(', ')}.`;
+  }
+  
+  prompt += ` Each option must be ${characterLimit} characters or fewer. Be creative and engaging.
+
+Return as a JSON object with this exact format:
+{
+  "options": ["text option 1", "text option 2", "text option 3", "text option 4"]
+}`;
+
+  return [
+    { role: 'user', content: prompt }
+  ];
+}

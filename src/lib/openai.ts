@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { buildPopCultureSearchPrompt, buildGenerateTextMessages } from "../vibe-ai.config";
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -347,14 +348,7 @@ export class OpenAIService {
   }
 
   async searchPopCulture(category: string, searchTerm: string): Promise<OpenAISearchResult[]> {
-    const prompt = `Generate exactly 5 creative and relevant ${category.toLowerCase()} suggestions related to "${searchTerm}". Focus on popular, well-known entries that would be engaging for users. Keep descriptions concise (1-2 sentences).
-
-Return as a JSON object with this exact format:
-{
-  "suggestions": [
-    {"title": "Suggestion Title", "description": "Brief description"}
-  ]
-}`;
+    const prompt = buildPopCultureSearchPrompt(category, searchTerm);
 
     try {
       const result = await this.chatJSON([
@@ -404,32 +398,11 @@ Return as a JSON object with this exact format:
   }
 
   async generateShortTexts(params: GenerateTextParams): Promise<string[]> {
-    const { tone, category, subtopic, pick, tags = [], characterLimit } = params;
-    
-    let contextParts = [];
-    if (category) contextParts.push(`Category: ${category}`);
-    if (subtopic) contextParts.push(`Topic: ${subtopic}`);
-    if (pick) contextParts.push(`Specific focus: ${pick}`);
-    
-    const context = contextParts.join(', ');
-    
-    let prompt = `Generate exactly 4 short ${tone.toLowerCase()} text options for: ${context}.`;
-    
-    if (tags.length > 0) {
-      prompt += ` IMPORTANT: Each option MUST include ALL of these exact words/tags: ${tags.join(', ')}.`;
-    }
-    
-    prompt += ` Each option must be ${characterLimit} characters or fewer. Be creative and engaging.
-
-Return as a JSON object with this exact format:
-{
-  "options": ["text option 1", "text option 2", "text option 3", "text option 4"]
-}`;
+    const { tone, category, characterLimit } = params;
+    const messages = buildGenerateTextMessages(params);
 
     try {
-      const result = await this.chatJSON([
-        { role: 'user', content: prompt }
-      ], {
+      const result = await this.chatJSON(messages, {
         max_completion_tokens: this.textSpeed === 'fast' ? 200 : 300,
         model: this.textSpeed === 'fast' ? 'gpt-4o-mini' : 'gpt-5-mini-2025-08-07'
       });

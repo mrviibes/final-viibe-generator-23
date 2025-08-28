@@ -1,5 +1,5 @@
 import { openAIService } from './openai';
-import { SYSTEM_PROMPTS } from '../vibe-ai.config';
+import { SYSTEM_PROMPTS, buildVisualGeneratorMessages, getStyleKeywords } from '../vibe-ai.config';
 
 export interface VisualInputs {
   category: string;
@@ -256,27 +256,8 @@ export async function generateVisualRecommendations(
   const enrichedInputs = autoEnrichInputs(inputs);
   const { category, subcategory, tone, tags, visualStyle, finalLine, specificEntity, subjectOption, dimensions } = enrichedInputs;
   
-const systemPrompt = SYSTEM_PROMPTS.visual_generator;
-
-function getStyleKeywords(visualStyle?: string): string {
-  const styles: Record<string, string> = {
-    'realistic': 'photographic, detailed, natural lighting',
-    'illustrated': 'clean illustration, vibrant colors', 
-    '3d-animated': 'clean 3D animation, smooth surfaces',
-    'minimalist': 'simple, clean, minimal design'
-  };
-  return styles[visualStyle || '3d-animated'] || 'modern visual style';
-}
-
-  const userPrompt = `${category}>${subcategory}, ${tone}, ${visualStyle || '3d-animated'}
-Tags: ${tags.slice(0, 4).join(', ')}
-${finalLine ? `JOKE/TEXT: "${finalLine}" - VISUAL CONCEPTS MUST MATCH THIS CONTENT AND TONE` : ''}
-
-IMPORTANT: Visual concepts must directly relate to the joke/text content above. For Pride themes, include rainbow colors, drag queens, parades, celebration elements.
-
-4 concepts. Each 40-60 words. Include [TAGS: ${tags.slice(0, 3).join(', ')}] [TEXT_SAFE_ZONE: center 60x35]
-
-JSON only.`;
+    // Use centralized message builder
+    const messages = buildVisualGeneratorMessages(enrichedInputs);
 
   try {
     const startTime = Date.now();
@@ -291,10 +272,7 @@ JSON only.`;
     let result;
     try {
         result = await Promise.race([
-          openAIService.chatJSON([
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-          ], {
+          openAIService.chatJSON(messages, {
             temperature: 0.7,
             max_tokens: 600,
             model: 'gpt-4o-mini'
@@ -307,11 +285,13 @@ JSON only.`;
         console.log('🔄 Retrying with compact prompt...');
         const compactUserPrompt = `${category}>${subcategory}, ${tone}. 4 visual JSON concepts.`;
         
+        const compactMessages = [
+          { role: 'system', content: SYSTEM_PROMPTS.visual_generator },
+          { role: 'user', content: compactUserPrompt }
+        ];
+        
         result = await Promise.race([
-          openAIService.chatJSON([
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: compactUserPrompt }
-          ], {
+          openAIService.chatJSON(compactMessages, {
             temperature: 0.6,
             max_tokens: 600,
             model: 'gpt-4o-mini'
