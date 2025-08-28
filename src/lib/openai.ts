@@ -233,85 +233,88 @@ export class OpenAIService {
     }
   }
 
-  private async callBackendAPIWithHedging(messages: Array<{role: string; content: string}>, options: {
-    temperature?: number;
-    max_tokens?: number;
-    max_completion_tokens?: number;
-    model?: string;
-  }): Promise<any> {
-    const {
-      model = 'gpt-5-mini-2025-08-07'
-    } = options;
-
-    console.log(`🔄 Starting hedged backend API call - Primary: ${model}`);
-    const startTime = Date.now();
-
-    // Primary call promise
-    const primaryPromise = this.callBackendAPI(messages, options);
-
-    // Hedge promise - start a faster model after 700ms if primary hasn't resolved
-    const hedgePromise = new Promise<any>((resolve, reject) => {
-      const hedgeTimer = setTimeout(async () => {
-        try {
-          console.log(`⚡ Hedging with faster model after 700ms - Primary: ${model}`);
-          const fastModel = 'o4-mini-2025-04-16'; // Fastest reasoning model
-          const hedgeResult = await this.callBackendAPI(messages, {
-            ...options,
-            model: fastModel
-          });
-          
-          // Mark as hedged for audit
-          if (hedgeResult && typeof hedgeResult === 'object') {
-            hedgeResult._apiMeta = {
-              ...hedgeResult._apiMeta,
-              hedged: true,
-              hedgeModel: fastModel,
-              originalModel: model
-            };
-          }
-          
-          resolve(hedgeResult);
-        } catch (error) {
-          reject(error);
+  private async callBackendAPIWithHedging(messages: Array<{role: string; content: string}>, options: any = {}): Promise<any> {
+    const isVeryFastModel = ['gpt-4o-mini', 'gpt-5-mini-2025-08-07', 'o4-mini-2025-04-16'].includes(options.model || 'gpt-4o-mini');
+    const userModel = options.model || 'gpt-4o-mini';
+    
+    console.log(`🏃‍♂️ Backend generation: User model ${MODEL_DISPLAY_NAMES[userModel] || userModel} ${isVeryFastModel ? '(Very Fast)' : '(Standard)'}`);
+    
+    // Create a primary call with user's selected model
+    const primaryCall = this.callBackendAPI(messages, options);
+    
+    // Start the timeout timer
+    const totalTimeout = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Total API timeout (8s)')), 8000)
+    );
+    
+    if (isVeryFastModel) {
+      // For fast models, just use them directly with timeout
+      try {
+        return await Promise.race([primaryCall, totalTimeout]);
+      } catch (error) {
+        console.warn(`Fast model ${MODEL_DISPLAY_NAMES[userModel] || userModel} failed, falling back to frontend API if available`);
+        if (this.apiKey) {
+          return this.chatJSON(messages, options);
         }
-      }, 700);
-
-      // Clean up timer if primary resolves first
-      primaryPromise.then(() => clearTimeout(hedgeTimer)).catch(() => clearTimeout(hedgeTimer));
-    });
-
-    // Race primary vs hedge with 8s total timeout
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Total request timeout after 8 seconds')), 8000);
-    });
-
-    try {
-      const result = await Promise.race([primaryPromise, hedgePromise, timeoutPromise]);
-      const elapsedMs = Date.now() - startTime;
-      
-      console.log(`✅ Hedged backend API completed - Elapsed: ${elapsedMs}ms`);
-      
-      // Add timing metadata
-      if (result && typeof result === 'object') {
-        result._apiMeta = {
-          ...result._apiMeta,
-          elapsedMs,
-          backendUsed: true
-        };
+        throw error;
       }
+    }
+    
+    // For slower models, implement hedging but prioritize user's model choice
+    const hedgingDelay = new Promise(resolve => setTimeout(resolve, 700));
+    
+    try {
+      // Race the primary call against the hedging delay
+      const primaryResult = await Promise.race([primaryCall, hedgingDelay]);
       
-      return result;
+      // If primary resolved, return it
+      if (primaryResult !== undefined) {
+        console.log(`✅ User model ${MODEL_DISPLAY_NAMES[userModel] || userModel} completed in <700ms`);
+        return primaryResult;
+      }
     } catch (error) {
-      const elapsedMs = Date.now() - startTime;
-      console.error(`❌ Hedged backend API failed after ${elapsedMs}ms:`, error);
+      // Primary failed quickly, continue to hedging
+      console.warn(`User model ${MODEL_DISPLAY_NAMES[userModel] || userModel} failed:`, error);
+    }
+    
+    // Only hedge if user didn't select GPT-4.1 - respect their choice
+    if (userModel === 'gpt-4.1-2025-04-14') {
+      console.log('🔒 User selected GPT-4.1 - respecting choice, no hedging');
+      try {
+        return await Promise.race([primaryCall, totalTimeout]);
+      } catch (error) {
+        console.warn('GPT-4.1 failed, falling back to frontend API if available');
+        if (this.apiKey) {
+          return this.chatJSON(messages, options);
+        }
+        throw error;
+      }
+    }
+    
+    // Start hedging call with O4 Mini (fastest) for other models
+    console.log('🏃‍♂️ Starting hedged call with O4 Mini after 700ms delay');
+    const hedgingCall = this.callBackendAPI(messages, {
+      ...options,
+      model: 'o4-mini-2025-04-16'
+    });
+    
+    try {
+      // Race the (potentially still running) primary call, hedging call, and total timeout
+      const result = await Promise.race([
+        primaryCall,
+        hedgingCall,
+        totalTimeout
+      ]);
       
-      // Fallback to frontend if available
+      console.log(`✅ Backend generation completed`);
+      return result;
+      
+    } catch (error) {
+      console.warn('Both primary and hedging calls failed, falling back to frontend API if available');
+      
+      // Final fallback to frontend API if available
       if (this.apiKey) {
-        console.log('🔄 Falling back to frontend API...');
-        this.useBackendAPI = false;
-        const result = await this.chatJSON(messages, options);
-        this.useBackendAPI = true;
-        return result;
+        return this.chatJSON(messages, options);
       }
       
       throw error;
@@ -339,27 +342,6 @@ export class OpenAIService {
       max_completion_tokens,
       model = 'gpt-5-mini-2025-08-07'
     } = options;
-
-    // Check if strict mode is enabled - only use the user's selected model
-    const { strictModelEnabled } = getRuntimeOverrides();
-    
-    if (strictModelEnabled) {
-      console.log(`🔒 Strict mode enabled - using only selected model: ${MODEL_DISPLAY_NAMES[model] || model}`);
-      const result = await this.attemptChatJSON(messages, options);
-      
-      // Add metadata about the API call
-      if (result && typeof result === 'object') {
-        result._apiMeta = {
-          modelUsed: model,
-          retryAttempt: 0,
-          originalModel: model,
-          textSpeed: this.textSpeed,
-          strictMode: true
-        };
-      }
-      
-      return result;
-    }
 
     // Use smart fallback chain based on the requested model
     const retryModels = getSmartFallbackChain(model, 'text');

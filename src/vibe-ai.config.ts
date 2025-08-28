@@ -206,26 +206,26 @@ export interface IdeogramHandoff {
 
 // Fixed negative prompt applied to all image generations
 export const DEFAULT_NEGATIVE_PROMPT = "misspellings, distorted letters, extra characters, typos, random symbols, unreadable fonts, cartoon style, flat colors, empty background, isolated subject, small text, hidden text";
-// Model fallback chains for retry strategy - prioritize fast models
+// Model fallback chains for retry strategy - prioritize GPT-4.1 for quality
 export const MODEL_FALLBACK_CHAINS = {
   text: [
-    'o4-mini-2025-04-16',      // Fastest reasoning model
-    'gpt-5-mini-2025-08-07',   // Fast and efficient
-    'gpt-4.1-2025-04-14'       // Reliable fallback
+    'gpt-4.1-2025-04-14',      // High quality, reliable
+    'o4-mini-2025-04-16',      // Fast reasoning model
+    'gpt-5-mini-2025-08-07'    // Fast and efficient
   ],
   visual: [
-    'o4-mini-2025-04-16',      // Fastest reasoning model
-    'gpt-5-mini-2025-08-07',   // Fast and efficient  
-    'gpt-4.1-2025-04-14'       // Reliable fallback
+    'gpt-4.1-2025-04-14',      // High quality for visuals
+    'o4-mini-2025-04-16',      // Fast reasoning model
+    'gpt-5-mini-2025-08-07'    // Fast and efficient
   ]
 };
 
 // Available models for UI
 export const AVAILABLE_MODELS = [
-  { value: 'gpt-4o-mini', label: 'GPT-4o Mini (Fast)', isRecommended: true },
+  { value: 'gpt-4.1-2025-04-14', label: 'GPT-4.1 (Recommended)', isRecommended: true },
+  { value: 'gpt-4o-mini', label: 'GPT-4o Mini (Fast)', isRecommended: false },
   { value: 'gpt-5-mini-2025-08-07', label: 'GPT-5 Mini', isRecommended: false },
   { value: 'gpt-5-2025-08-07', label: 'GPT-5 (Flagship)', isRecommended: false },
-  { value: 'gpt-4.1-2025-04-14', label: 'GPT-4.1', isRecommended: false },
   { value: 'o4-mini-2025-04-16', label: 'O4 Mini (Fast Reasoning)', isRecommended: false },
   { value: 'o3-2025-04-16', label: 'O3 (Powerful Reasoning)', isRecommended: false },
 ];
@@ -273,12 +273,12 @@ export const AI_CONFIG = {
     max_candidates: 4, // Reduced from 6 to 4 for faster generation
     temperature: 0.7,
     max_tokens: 120, // Kept at 120 for quality
-    model: 'gpt-4o-mini' // Fast mini model by default
+    model: 'gpt-4.1-2025-04-14' // GPT-4.1 as default for quality
   },
   visual_generation: {
     max_tokens: 450, // Reduced for faster concepts
     fast_max_tokens: 160, // For ultra-fast 3-4.5s generation
-    model: 'gpt-4o-mini' // Fast mini model by default
+    model: 'gpt-4.1-2025-04-14' // GPT-4.1 as default for quality
   }
 };
 
