@@ -99,6 +99,28 @@ async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: st
   }
 }
 
+// Helper function to generate tone-specific phrase candidates
+function phraseCandidates(tone: string, tags?: string[]): string[] {
+  const firstTag = tags && tags.length > 0 ? tags[0] : '';
+  const tagSuffix = firstTag ? ` ${firstTag}` : '';
+  
+  const toneMap: Record<string, string[]> = {
+    humorous: ['Hilarious vibes only', 'Comedy gold incoming', 'Laugh track ready', 'Funny bone activated'],
+    sarcastic: ['Oh, absolutely perfect', 'Well, this is fantastic', 'Clearly the best choice', 'Obviously brilliant'],
+    savage: ['No mercy shown', 'Brutally honest moment', 'Savage mode activated', 'Zero chill detected'],
+    witty: ['Clever comeback ready', 'Sharp wit engaged', 'Smartly crafted', 'Intelligence on display'],
+    playful: ['Fun times ahead', 'Playful energy activated', 'Good vibes flowing', 'Cheerful moment incoming'],
+    romantic: ['Love in the air', 'Heart eyes activated', 'Romance mode on', 'Sweetness overload'],
+    motivational: ['Success mindset engaged', 'Determination activated', 'Victory mode on', 'Champions only'],
+    nostalgic: ['Memory lane vibes', 'Throwback feels', 'Classic moment', 'Vintage energy'],
+    mysterious: ['Secrets revealed slowly', 'Mystery mode activated', 'Enigma engaged', 'Curiosity sparked'],
+    confident: ['Boss energy activated', 'Confidence on full', 'Self-assured vibes', 'Power mode engaged']
+  };
+  
+  const basePhrases = toneMap[tone.toLowerCase()] || toneMap.humorous;
+  return basePhrases.map(phrase => `${phrase}${tagSuffix}`);
+}
+
 export async function generateCandidates(inputs: VibeInputs, n: number = 4): Promise<VibeResult> {
   const candidateResults = await generateMultipleCandidates(inputs);
   
@@ -121,6 +143,7 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
   let reason: string | undefined;
   let retryAttempt = 0;
   let originalModel: string | undefined;
+  let topUpUsed = false;
   
   // Get the effective config to check if strict mode is enabled
   const config = getEffectiveConfig();
@@ -170,6 +193,28 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
     finalCandidates = [...uniqueValidLines];
   }
   
+  // Fast top-up retry if we still don't have 4 unique valid options
+  if (finalCandidates.length < 4 && !topUpUsed) {
+    console.log(`🔄 Fast top-up: only ${finalCandidates.length} valid lines, attempting quick retry...`);
+    
+    try {
+      const config = getEffectiveConfig();
+      const topUpResults = await generateMultipleCandidates(inputs, config.generation.model);
+      const topUpValidCandidates = topUpResults.filter(c => !c.blocked);
+      const newUniqueLines = topUpValidCandidates
+        .map(c => c.line)
+        .filter(line => !finalCandidates.includes(line));
+      
+      if (newUniqueLines.length > 0) {
+        finalCandidates.push(...newUniqueLines);
+        topUpUsed = true;
+        console.log(`✅ Fast top-up added ${newUniqueLines.length} new options`);
+      }
+    } catch (error) {
+      console.warn('Fast top-up failed:', error);
+    }
+  }
+  
   if (finalCandidates.length > 0) {
     // Check if we have any lines that were blocked only for tag coverage
     const tagOnlyBlocked = candidateResults.filter(c => 
@@ -204,21 +249,16 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
       finalCandidates = [...taggedCandidates.slice(0, 2), ...untaggedCandidates.slice(0, 2)];
     }
     
-    // Ensure we have exactly 4 options by adding fallbacks if needed
+    // Ensure we have exactly 4 options - use tone-specific phrases instead of generic fallbacks
     while (finalCandidates.length < 4) {
-      const fallbackVariants = getFallbackVariants(inputs.tone, inputs.category, inputs.subcategory);
-      let nextFallback = fallbackVariants[finalCandidates.length % fallbackVariants.length];
+      const phraseCandidatesList = phraseCandidates(inputs.tone, inputs.tags);
+      let nextCandidate = phraseCandidatesList[finalCandidates.length % phraseCandidatesList.length];
       
-      // Blend first tag into fallbacks if available
-      const firstTag = inputs.tags && inputs.tags.length > 0 ? inputs.tags[0] : null;
-      if (firstTag && finalCandidates.length < 2) {
-        nextFallback = `${nextFallback} ${firstTag}`;
-      }
-      
-      if (!finalCandidates.includes(nextFallback)) {
-        finalCandidates.push(nextFallback);
+      if (!finalCandidates.includes(nextCandidate)) {
+        finalCandidates.push(nextCandidate);
       } else {
-        finalCandidates.push(`${nextFallback} ${finalCandidates.length}`);
+        // Add variation to avoid exact duplicates
+        finalCandidates.push(`${nextCandidate} energy`);
       }
     }
     
@@ -255,17 +295,9 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
       usedFallback = false;
       reason = 'Used model output with partial tag coverage';
     } else {
-      // Genuine blocks (banned words, etc.) - use tone-based fallbacks with tag blending
-      const fallbackVariants = getFallbackVariants(inputs.tone, inputs.category, inputs.subcategory);
-      const firstTag = inputs.tags && inputs.tags.length > 0 ? inputs.tags[0] : null;
-      
-      finalCandidates = fallbackVariants.map((variant, index) => {
-        // Blend first tag into the first two fallbacks
-        if (firstTag && index < 2) {
-          return `${variant} ${firstTag}`;
-        }
-        return variant;
-      });
+      // Genuine blocks (banned words, etc.) - use tone-specific phrases instead of generic fallbacks
+      const phraseCandidatesList = phraseCandidates(inputs.tone, inputs.tags);
+      finalCandidates = phraseCandidatesList;
       
       picked = finalCandidates[0];
       usedFallback = true;
@@ -292,7 +324,8 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
       retryAttempt,
       originalModel,
       originalModelDisplayName: originalModel ? MODEL_DISPLAY_NAMES[originalModel] || originalModel : undefined,
-      spellingFiltered
+      spellingFiltered,
+      topUpUsed
     }
   };
 }
