@@ -176,13 +176,15 @@ export async function generateIdeogramImage(request: IdeogramGenerateRequest): P
       });
 
       if (error) {
+        console.error('Backend Ideogram API error:', error);
+        
         // Surface real backend error by making a direct fetch to get JSON response
         const backendError = await surfaceBackendError(requestWithModel);
         if (backendError) {
           throw backendError;
         }
         
-        console.error('Backend Ideogram API error:', error);
+        // Fallback to generic error if surfacing fails
         throw new IdeogramAPIError(`Backend API error: ${error.message}`);
       }
 
