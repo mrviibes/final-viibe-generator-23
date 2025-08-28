@@ -4899,7 +4899,7 @@ const Index = () => {
       console.error('Image generation failed:', error);
       if (error instanceof IdeogramAPIError) {
         // Handle specific errors with enhanced UX
-        if (error.errorType === 'V3_UNAVAILABLE' && error.shouldShowExactTextOverlay) {
+        if (error.errorType === 'V3_UNAVAILABLE_FOR_EXACT_TEXT' && error.shouldShowExactTextOverlay) {
           // Auto-trigger exact text overlay for V3 unavailable with exact text
           setIdeogramError(error);
           setShowExactTextOverlay(true);
@@ -4909,6 +4909,11 @@ const Index = () => {
             { duration: 4000 }
           );
           return; // Exit early, don't show error dialog
+        } else if (error.errorType === 'V3_UNAVAILABLE' && error.shouldRetryWithTurbo) {
+          // V3 unavailable without exact text - offer turbo retry
+          setIdeogramError(error);
+          setShowIdeogramErrorDialog(true);
+          setImageGenerationError('V3 model temporarily unavailable. Try Turbo model for reliable generation.');
         } else if (error.message === 'CORS_DEMO_REQUIRED') {
           setShowCorsRetryDialog(true);
           setImageGenerationError('CORS proxy needs activation. Click "Enable CORS Proxy" button below, then try again.');
@@ -4922,9 +4927,11 @@ const Index = () => {
           // Show the enhanced error dialog for all other IdeogramAPIErrors
           setIdeogramError(error);
           setShowIdeogramErrorDialog(true);
-          // For V3_UNAVAILABLE errors, show a more user-friendly message in the card
-          if (error.errorType === 'V3_UNAVAILABLE') {
+          // For specific error types, show more helpful messages in the card
+          if (error.errorType === 'V3_UNAVAILABLE' || error.errorType === 'V3_UNAVAILABLE_FOR_EXACT_TEXT') {
             setImageGenerationError('V3 model temporarily unavailable. Click "Show Details" for options.');
+          } else if (error.errorType === 'MISSING_BACKEND_KEY') {
+            setImageGenerationError('Backend API key not configured. Click "Show Details" to set frontend key.');
           } else {
             setImageGenerationError(error.message);
           }

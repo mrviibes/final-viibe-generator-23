@@ -498,109 +498,110 @@ async function surfaceBackendError(request: IdeogramGenerateRequest): Promise<Id
 }
 
 // Map backend errors to user-friendly messages with specific actions
-function mapBackendErrorToUserError(
-  status: number, 
-  errorData: any, 
-  request: IdeogramGenerateRequest
-): IdeogramAPIError {
+function mapBackendErrorToUserError(status: number, errorData: any, request: IdeogramGenerateRequest): IdeogramAPIError {
   const isExactTextRequest = /EXACT TEXT:/i.test(request.prompt);
-  const errorMessage = errorData.message || errorData.error || 'Unknown error';
   
-  console.log('Mapping backend error:', { status, errorMessage, isExactTextRequest, errorData });
-  
-  // Handle pre-constructed errorType from surfaceBackendError
-  if (errorData.errorType === 'V3_UNAVAILABLE') {
-    const error = new IdeogramAPIError(
-      'Ideogram V3 is temporarily unavailable. You can retry with Turbo model or use the caption overlay for perfect text.',
-      404,
-      'V3_UNAVAILABLE'
-    );
-    error.shouldRetryWithTurbo = true;
-    error.shouldShowExactTextOverlay = isExactTextRequest;
-    return error;
-  }
-  
-  // Check for specific error patterns - handle both backend formats
-  if (errorMessage.includes('Ideogram API key not configured') || errorMessage.includes('IDEOGRAM_API_KEY not configured')) {
+  // Handle specific V3 unavailable scenarios
+  if (errorData.errorType === 'V3_UNAVAILABLE' || (status === 404 && request.model === 'V_3')) {
     return new IdeogramAPIError(
-      'Ideogram API key is not configured in the backend. Please contact support or set up a frontend API key.',
-      500,
-      'MISSING_BACKEND_KEY'
+      isExactTextRequest 
+        ? 'V3 model is temporarily unavailable. Use Caption Overlay for guaranteed text accuracy or try Turbo model.'
+        : 'V3 model is temporarily unavailable. Try the Turbo model for reliable generation.',
+      status,
+      'V3_UNAVAILABLE_FOR_EXACT_TEXT',
+      true, // shouldRetryWithTurbo
+      isExactTextRequest // shouldShowExactTextOverlay
     );
   }
   
-  // Check for V3 endpoint unavailability (404 errors with V3 mentions)
-  if (status === 404 && (errorMessage.includes('V_3 failed') || errorMessage.includes('V3') || isExactTextRequest)) {
-    const error = new IdeogramAPIError(
-      'Ideogram V3 is temporarily unavailable for exact text requests. You can retry with Turbo model or use the caption overlay feature.',
-      404,
-      'V3_UNAVAILABLE'
-    );
-    error.shouldRetryWithTurbo = true;
-    error.shouldShowExactTextOverlay = true;
-    return error;
-  }
-  
-  switch (status) {
-    case 401:
-      return new IdeogramAPIError(
-        'Invalid API key. Please check your Ideogram API key in settings.',
-        401,
-        'INVALID_API_KEY'
-      );
-      
-    case 429:
-      return new IdeogramAPIError(
-        'Rate limit exceeded. Please wait a moment before trying again.',
-        429,
-        'RATE_LIMIT',
-        request.model !== 'V_2A_TURBO' // Suggest turbo if not already using it
-      );
-      
-    case 503:
-      if (errorMessage.includes('V3')) {
+  // Handle other specific error types
+  if (errorData.errorType) {
+    switch (errorData.errorType) {
+      case 'MISSING_BACKEND_KEY':
         return new IdeogramAPIError(
-          isExactTextRequest 
-            ? 'V3 is temporarily unavailable. Use the caption overlay for guaranteed text accuracy.'
-            : 'V3 is temporarily unavailable. Try Turbo model for faster generation.',
-          503,
-          'V3_UNAVAILABLE',
-          !isExactTextRequest, // Only suggest turbo for non-exact-text
-          isExactTextRequest   // Suggest overlay for exact text
+          'Ideogram API key not configured in backend. Set a frontend API key to continue.',
+          status,
+          'MISSING_BACKEND_KEY'
         );
-      }
-      return new IdeogramAPIError(
-        'Ideogram service temporarily unavailable. Please try again in a moment.',
-        503,
-        'SERVICE_UNAVAILABLE',
-        request.model !== 'V_2A_TURBO'
-      );
-      
-    case 400:
-      if (errorMessage.includes('content policy')) {
+      case 'RATE_LIMIT':
         return new IdeogramAPIError(
-          'Content violates policy. Try rephrasing your prompt with different words.',
-          400,
+          'Rate limit exceeded. Please wait a moment before trying again.',
+          status,
+          'RATE_LIMIT'
+        );
+      case 'CONTENT_POLICY':
+        return new IdeogramAPIError(
+          'Content policy violation. Please modify your prompt and try again.',
+          status,
           'CONTENT_POLICY'
         );
-      }
+      default:
+        return new IdeogramAPIError(
+          errorData.message || 'Ideogram API error',
+          status,
+          errorData.errorType
+        );
+    }
+  }
+  
+  // Handle HTTP status codes
+  switch (status) {
+    case 503:
       return new IdeogramAPIError(
-        `Invalid request: ${errorMessage}`,
-        400,
-        'INVALID_REQUEST'
-      );
-      
-    default:
-      return new IdeogramAPIError(
-        `Backend error: ${errorMessage}`,
+        'Ideogram service temporarily unavailable. Please try again in a moment.',
         status,
-        'BACKEND_ERROR',
-        request.model !== 'V_2A_TURBO'
+        'SERVICE_UNAVAILABLE',
+        true // Allow retry with turbo
+      );
+    case 401:
+      return new IdeogramAPIError(
+        'Invalid API key. Please check your API key configuration.',
+        status,
+        'INVALID_API_KEY'
+      );
+    case 429:
+      return new IdeogramAPIError(
+        'Rate limit exceeded. Please wait before trying again.',
+        status,
+        'RATE_LIMIT'
+      );
+    default:
+      const message = errorData.error || errorData.message || `HTTP ${status} error`;
+      return new IdeogramAPIError(
+        message,
+        status,
+        'UNKNOWN_ERROR',
+        status >= 500 // Retry on server errors
       );
   }
 }
 
 // Test Ideogram backend connectivity
+// Test V3 endpoint connectivity specifically
+export async function testV3Endpoint(): Promise<{ success: boolean; error?: string }> {
+  try {
+    const testRequest: IdeogramGenerateRequest = {
+      prompt: "EXACT TEXT: \"Test\"",
+      aspect_ratio: 'ASPECT_1_1',
+      model: 'V_3',
+      magic_prompt_option: 'OFF',
+      count: 1
+    };
+    
+    const result = await surfaceBackendError(testRequest);
+    if (result?.errorType === 'V3_UNAVAILABLE' || result?.errorType === 'V3_UNAVAILABLE_FOR_EXACT_TEXT') {
+      return { success: false, error: 'V3 endpoint currently unavailable' };
+    }
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    if (errorMessage.includes('404') || errorMessage.includes('V3')) {
+      return { success: false, error: 'V3 endpoint unavailable' };
+    }
+    return { success: false, error: errorMessage };
+  }
+}
+
 export async function testIdeogramBackend(): Promise<{ success: boolean; error?: string; latency?: number }> {
   const startTime = Date.now();
   

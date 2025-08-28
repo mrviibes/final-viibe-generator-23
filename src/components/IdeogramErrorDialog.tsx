@@ -63,6 +63,7 @@ export function IdeogramErrorDialog({
       case 'RATE_LIMIT':
         return { color: 'secondary', text: 'Rate Limited' };
       case 'V3_UNAVAILABLE':
+      case 'V3_UNAVAILABLE_FOR_EXACT_TEXT':
         return { color: 'secondary', text: 'V3 Unavailable' };
       case 'CONTENT_POLICY':
         return { color: 'destructive', text: 'Content Policy' };

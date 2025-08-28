@@ -417,6 +417,7 @@ export default function AiSettings() {
                   onCheckedChange={(checked) => updateOverride('magicPromptEnabled', checked)}
                 />
               </div>
+
             </CardContent>
           </Card>
 
