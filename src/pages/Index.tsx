@@ -6011,12 +6011,12 @@ const Index = () => {
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                               <label className="text-sm font-medium text-foreground">Background Style</label>
-                              <Select value={backgroundPreset || ''} onValueChange={setBackgroundPreset}>
+                              <Select value={backgroundPreset || 'auto'} onValueChange={(value) => setBackgroundPreset(value === 'auto' ? null : value)}>
                                 <SelectTrigger className="w-full">
                                   <SelectValue placeholder="Select style" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="">Auto (default)</SelectItem>
+                                  <SelectItem value="auto">Auto (default)</SelectItem>
                                   {BACKGROUND_PRESETS.map(preset => (
                                     <SelectItem key={preset.id} value={preset.id}>
                                       {preset.name}
@@ -6028,12 +6028,12 @@ const Index = () => {
                             
                             <div className="space-y-2">
                               <label className="text-sm font-medium text-foreground">Focus</label>
-                              <Select value={targetSlot || ''} onValueChange={setTargetSlot}>
+                              <Select value={targetSlot || 'mixed'} onValueChange={(value) => setTargetSlot(value === 'mixed' ? null : value)}>
                                 <SelectTrigger className="w-full">
                                   <SelectValue placeholder="Select focus" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="">Mixed (default)</SelectItem>
+                                  <SelectItem value="mixed">Mixed (default)</SelectItem>
                                   <SelectItem value="background-only">Background Only</SelectItem>
                                   <SelectItem value="subject+background">Subject + Background</SelectItem>
                                   <SelectItem value="object">Objects/Props</SelectItem>
