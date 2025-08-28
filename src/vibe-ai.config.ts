@@ -240,18 +240,18 @@ Always output valid JSON only.`,
 RULES:
 - Return ONLY valid JSON - no markdown, no extra text
 - Each prompt: 40-60 words maximum
-- 4 slots: "background-only", "subject+background", "object", "singing"
+- Generate exactly 4 diverse visual concepts
 - CRITICAL: Visual concepts MUST relate to the provided text/joke content and tone
+- Provide exactly one background-only concept and 3 distinct subject+background concepts
 - For Pride themes: Include rainbow, drag queens, parades, celebrations, fabulous elements
 - For jokes: Match the humor and subject matter exactly
-- SINGING SLOT: Always include musical/performance elements in the 4th option
+- EXCLUDE music/singing content unless tags explicitly include music, singing, concert, or performance
 
 Format:
 {
   "options": [
     {
-      "slot": "background-only",
-      "subject": "brief description",
+      "subject": "brief description (optional for background-only)",
       "background": "brief description", 
       "prompt": "concise prompt (40-60 words)"
     }
@@ -731,7 +731,7 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   parts.push(`Background: ${background}.`);
   
   // PEOPLE INCLUSION (when recommended)
-  const peopleKeywords = ['friends', 'crowd', 'people', 'group', 'party', 'audience', 'performers', 'celebrating'];
+  const peopleKeywords = ['friends', 'crowd', 'people', 'group', 'party', 'audience', 'performers', 'celebrating', 'family', 'parents', 'kids', 'children'];
   const needsPeople = peopleKeywords.some(keyword => 
     handoff.chosen_visual?.toLowerCase().includes(keyword) || 
     handoff.rec_subject?.toLowerCase().includes(keyword) ||

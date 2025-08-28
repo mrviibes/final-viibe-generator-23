@@ -32,6 +32,8 @@ export interface VisualResult {
 
 const VISUAL_OPTIONS_COUNT = 4;
 
+// No longer enforce specific slots - allow flexible recommendations
+
 // Auto-enrichment functions
 function autoEnrichInputs(inputs: VisualInputs): VisualInputs {
   const enriched = { ...inputs };
@@ -126,88 +128,56 @@ function hasVagueFillers(text: string): boolean {
 }
 
 function validateVisualOptions(options: VisualOption[], inputs: VisualInputs): VisualOption[] {
-  const validOptions: VisualOption[] = [];
-  const seenCompositions = new Set<string>();
+  if (!options || options.length === 0) return [];
   
-  return options.filter(option => {
-    // Reject options with vague fillers
-    if (hasVagueFillers(option.subject) || hasVagueFillers(option.background)) {
-      console.warn('🚫 Rejected vague option:', option.subject);
+  const validOptions = options.filter(opt => {
+    // Reject if prompt is too short or vague
+    if (!opt.prompt || opt.prompt.length < 15) {
+      console.log(`Rejecting option with short prompt: ${opt.prompt}`);
       return false;
     }
     
-    // Ensure minimum detail in prompts
-    if (option.prompt.length < 100) {
-      console.warn('🚫 Rejected short prompt:', option.prompt.substring(0, 50));
+    // Check for vague or filler content
+    if (hasVagueFillers(opt.prompt)) {
+      console.log(`Rejecting option with vague content: ${opt.prompt}`);
       return false;
     }
     
-    // Check for required objects based on subcategory
-    if (inputs.subcategory === 'Ice Hockey') {
-      const hasRequiredObjects = option.subject.toLowerCase().includes('hockey stick') || 
-                                option.subject.toLowerCase().includes('puck') ||
-                                option.prompt.toLowerCase().includes('hockey stick') ||
-                                option.prompt.toLowerCase().includes('puck');
-      if (!hasRequiredObjects) {
-        console.warn('🚫 Rejected hockey option missing required objects:', option.subject);
-        return false;
-      }
-    }
+    // Filter out music/singing content unless relevant tags present
+    const hasMusicTags = inputs.tags?.some(tag => 
+      ['music', 'singing', 'song', 'concert', 'performance', 'karaoke', 'band', 'choir'].includes(tag.toLowerCase())
+    ) || false;
     
-    // Filter out off-topic music content unless relevant
-    const musicKeywords = ['singing', 'concert', 'music', 'band', 'album', 'song', 'lyrics'];
-    const hasMusic = musicKeywords.some(keyword => 
-      option.subject.toLowerCase().includes(keyword) ||
-      option.background.toLowerCase().includes(keyword) ||
-      option.prompt.toLowerCase().includes(keyword)
-    );
-    
-    if (hasMusic) {
-      const musicRelevant = inputs.tags.some(tag => 
-        musicKeywords.some(keyword => tag.toLowerCase().includes(keyword))
-      ) || (inputs.finalLine && musicKeywords.some(keyword => inputs.finalLine.toLowerCase().includes(keyword)));
-      
-      if (!musicRelevant) {
-        console.warn('🚫 Rejected off-topic music option:', option.subject);
-        return false;
-      }
-    }
-    
-    // Check for composition variety (avoid duplicates) - improved deduplication
-    const compositionKey = `${option.prompt.substring(0, 40)}-${option.subject.substring(0, 20)}`;
-    if (seenCompositions.has(compositionKey)) {
-      console.warn('🚫 Rejected duplicate composition:', option.subject);
-      return false;
-    }
-    seenCompositions.add(compositionKey);
-    
-    // Pride/theme relevance check - reject if completely off-topic
-    if (inputs.finalLine) {
-      const prideKeywords = ['pride', 'parade', 'rainbow', 'gay', 'lesbian', 'drag', 'queens', 'queer', 'lgbtq'];
-      const hasPrideTheme = prideKeywords.some(keyword => 
-        inputs.finalLine!.toLowerCase().includes(keyword) || 
-        inputs.tone.toLowerCase().includes(keyword)
+    if (!hasMusicTags) {
+      const musicKeywords = ['singing', 'song', 'music', 'concert', 'performance', 'karaoke', 'band', 'choir', 'microphone', 'stage'];
+      const containsMusic = musicKeywords.some(keyword => 
+        opt.subject?.toLowerCase().includes(keyword) || 
+        opt.background?.toLowerCase().includes(keyword) ||
+        opt.prompt.toLowerCase().includes(keyword)
       );
       
-      if (hasPrideTheme) {
-        const isRelevant = prideKeywords.some(keyword => 
-          option.subject.toLowerCase().includes(keyword) ||
-          option.background.toLowerCase().includes(keyword) ||
-          option.prompt.toLowerCase().includes(keyword) ||
-          option.subject.toLowerCase().includes('rainbow') ||
-          option.subject.toLowerCase().includes('colorful') ||
-          option.background.toLowerCase().includes('celebration')
-        );
-        
-        if (!isRelevant) {
-          console.warn('🚫 Rejected off-topic Pride option:', option.subject);
-          return false;
-        }
+      if (containsMusic) {
+        console.log(`Rejecting music content without music tags: ${opt.prompt}`);
+        return false;
       }
     }
     
     return true;
   });
+  
+  // Strong deduplication by subject + background combination + prompt start
+  const dedupedOptions: VisualOption[] = [];
+  const seenCombos = new Set<string>();
+  
+  for (const opt of validOptions) {
+    const dedupeKey = `${opt.subject?.toLowerCase() || ''}-${opt.background?.toLowerCase() || ''}-${opt.prompt.slice(0, 40)}`;
+    if (!seenCombos.has(dedupeKey)) {
+      seenCombos.add(dedupeKey);
+      dedupedOptions.push(opt);
+    }
+  }
+  
+  return dedupedOptions.slice(0, 4); // Ensure max 4 options
 }
 
 function getSlotBasedFallbacks(inputs: VisualInputs): VisualOption[] {
@@ -221,26 +191,22 @@ function getSlotBasedFallbacks(inputs: VisualInputs): VisualOption[] {
       {
         subject: "Professional hockey player with stick in action pose",
         background: "ice rink arena with dramatic lighting and crowd in background",
-        prompt: `Professional hockey player mid-swing with hockey stick, puck visible in frame, ${tone} energy, ice rink arena with dramatic stadium lighting, cheering crowd in blurred background, action sports photography style, dynamic composition with negative space in upper area for text placement, high contrast lighting`,
-        slot: "action-sports"
+        prompt: `Professional hockey player mid-swing with hockey stick, puck visible in frame, ${tone} energy, ice rink arena with dramatic stadium lighting, cheering crowd in blurred background, action sports photography style, dynamic composition with negative space in upper area for text placement, high contrast lighting`
       },
       {
         subject: "Close-up of hockey stick and puck on ice surface",
         background: "ice rink with goal net and arena lights",
-        prompt: `Detailed close-up of professional hockey stick and black puck on pristine ice surface, goal net visible in background, ice rink arena lighting creating dramatic shadows, ${tone} mood, sports equipment photography, clean composition with clear space at top for text, reflective ice surface`,
-        slot: "equipment-detail"
+        prompt: `Detailed close-up of professional hockey stick and black puck on pristine ice surface, goal net visible in background, ice rink arena lighting creating dramatic shadows, ${tone} mood, sports equipment photography, clean composition with clear space at top for text, reflective ice surface`
       },
       {
         subject: "Hockey team celebration with sticks raised",
         background: "ice rink with victory lighting and cheering fans",
-        prompt: `Hockey team players celebrating victory with sticks raised high, multiple hockey sticks visible, ice rink setting with bright victory lighting, cheering fans in background stands, ${tone} celebration energy, group sports photography, wide shot with space on sides for text placement`,
-        slot: "team-celebration"
+        prompt: `Hockey team players celebrating victory with sticks raised high, multiple hockey sticks visible, ice rink setting with bright victory lighting, cheering fans in background stands, ${tone} celebration energy, group sports photography, wide shot with space on sides for text placement`
       },
       {
         subject: "Vintage hockey stick and puck with championship trophies",
         background: "classic ice rink with warm nostalgic lighting",
-        prompt: `Vintage wooden hockey stick and classic puck displayed with championship trophies, classic ice rink environment with warm nostalgic lighting, ${tone} sentimental mood, still life sports photography, traditional composition with clear background space for text overlay`,
-        slot: "nostalgic-display"
+        prompt: `Vintage wooden hockey stick and classic puck displayed with championship trophies, classic ice rink environment with warm nostalgic lighting, ${tone} sentimental mood, still life sports photography, traditional composition with clear background space for text overlay`
       }
     ];
   }
@@ -270,25 +236,21 @@ function getSlotBasedFallbacks(inputs: VisualInputs): VisualOption[] {
   if (specificEntity && tags.some(tag => tag.toLowerCase().includes('jail'))) {
     return [
       {
-        slot: "background-only",
         subject: "Prison bars texture overlay",
         background: `Dark jail cell background with dramatic ${tone} lighting`,
         prompt: `Dark jail cell background with prison bars, dramatic ${tone} lighting, no text or typography [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: dark] [NEGATIVE_PROMPT: busy patterns, high-frequency texture, harsh shadows in center] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: light text]`
       },
       {
-        slot: "subject+background",
         subject: `${entity}${needsPeople ? ` ${peopleContext}` : ''} silhouette behind bars`,
         background: `Prison setting with atmospheric lighting`,
         prompt: `${entity}${needsPeople ? ` ${peopleContext}` : ''} silhouette behind prison bars positioned on left third, dramatic jail setting, ${tone} mood lighting [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: faces crossing center, busy patterns in center] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: light text]`
       },
       {
-        slot: "object",
         subject: "Handcuffs and judge gavel symbols",
         background: `Minimal courtroom or legal backdrop`,
         prompt: `Legal symbols like handcuffs and gavel anchored bottom third, minimal courtroom backdrop, ${tone} style [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: busy patterns, reflective glare in center] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: dark text]`
       },
       {
-        slot: "tone-twist",
         subject: `${entity}${needsPeople ? ` ${peopleContext}` : ''} iconic moment reimagined`,
         background: `Stylized setting reflecting personality`,
         prompt: `${entity}${needsPeople ? ` ${peopleContext}` : ''} iconic moment with ${tone} interpretation positioned off-center, stylized background reflecting their known traits [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: limbs crossing center, harsh shadows in safe zone] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: light text]`
@@ -394,17 +356,17 @@ export async function generateVisualRecommendations(
     const duration = Date.now() - startTime;
     console.log(`✅ Visual generation completed in ${duration}ms`);
 
-    // Validate the response structure and slots
-    if (!result?.options || !Array.isArray(result.options) || result.options.length !== 4) {
-      throw new Error('Invalid response format from AI - expected exactly 4 options');
+    // Validate the response structure
+    if (!result?.options || !Array.isArray(result.options)) {
+      throw new Error('Invalid response format from AI - expected options array');
     }
 
-    const expectedSlots = ['background-only', 'subject+background', 'object', 'singing'];
     let validOptions = result.options
-      .filter((opt: any) => opt.subject && opt.background && opt.prompt && opt.slot)
-      .map((opt: any, index: number) => ({
-        ...opt,
-        slot: opt.slot || expectedSlots[index] // Ensure slot is present
+      .filter((opt: any) => opt.background && opt.prompt)
+      .map((opt: any) => ({
+        subject: opt.subject || "",
+        background: opt.background,
+        prompt: opt.prompt
       }));
 
     // Apply quality validation to reject vague options

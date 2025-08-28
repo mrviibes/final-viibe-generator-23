@@ -4804,14 +4804,9 @@ const Index = () => {
         rec_background: recBackground
       });
 
-      // Use direct prompt if provided, otherwise use selected recommendation prompt, otherwise build from structured inputs
-      let prompt = directPrompt.trim();
-      if (!prompt && selectedRecommendation !== null && visualRecommendations) {
-        prompt = visualRecommendations.options[selectedRecommendation].prompt;
-      }
-      if (!prompt) {
-        prompt = buildIdeogramPrompt(ideogramPayload);
-      }
+      // ALWAYS use deterministic EXACT TEXT prompt builder
+      console.log('ideogram: using EXACT TEXT builder');
+      const prompt = buildIdeogramPrompt(ideogramPayload);
       const aspectForIdeogram = getAspectRatioForIdeogram(aspectRatio);
       const styleForIdeogram = getStyleTypeForIdeogram(visualStyle);
       // Use user-selected model instead of automatic selection
