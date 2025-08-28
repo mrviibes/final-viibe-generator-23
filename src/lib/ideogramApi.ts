@@ -441,16 +441,15 @@ async function generateIdeogramImageFrontend(request: IdeogramGenerateRequest): 
 // Surface real backend error by making direct fetch to get JSON details
 async function surfaceBackendError(request: IdeogramGenerateRequest): Promise<IdeogramAPIError | null> {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return null;
-
-    // Use the known project URL format
+    console.log('Surfacing backend error for request:', { prompt: request.prompt.substring(0, 100) + '...' });
+    
+    // Create a direct fetch call with anon key to get the actual backend error
     const functionUrl = `https://qdigssobxfgoeuvkejpo.supabase.co/functions/v1/ideogram-generate`;
     
     const response = await fetch(functionUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${session.access_token}`,
+        'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkaWdzc29ieGZnb2V1dmtlanBvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ5NzI0OTgsImV4cCI6MjA3MDU0ODQ5OH0.TfV0LEBdE6fFoCT8Xz0jgV53XC4Exf0YVq_15z8Lfnw`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(request)
@@ -459,7 +458,7 @@ async function surfaceBackendError(request: IdeogramGenerateRequest): Promise<Id
     if (!response.ok) {
       try {
         const errorText = await response.text();
-        console.log('Backend error response:', response.status, errorText);
+        console.log('Raw backend response:', { status: response.status, text: errorText });
         
         // Try to parse as JSON first
         let errorData;
@@ -470,16 +469,7 @@ async function surfaceBackendError(request: IdeogramGenerateRequest): Promise<Id
           errorData = { error: errorText };
         }
         
-        // Handle the backend's JSON error format: {error: "message"}
-        if (errorData.error) {
-          return mapBackendErrorToUserError(response.status, errorData, request);
-        }
-        
-        // Fallback for other formats
-        return new IdeogramAPIError(
-          `Backend error ${response.status}: ${errorText}`,
-          response.status
-        );
+        return mapBackendErrorToUserError(response.status, errorData, request);
       } catch (parseError) {
         console.log('Failed to parse backend error response:', parseError);
         return new IdeogramAPIError(
@@ -504,6 +494,8 @@ function mapBackendErrorToUserError(
   const isExactTextRequest = /EXACT TEXT:/i.test(request.prompt);
   const errorMessage = errorData.message || errorData.error || 'Unknown error';
   
+  console.log('Mapping backend error:', { status, errorMessage, isExactTextRequest });
+  
   // Check for specific error patterns - handle both backend formats
   if (errorMessage.includes('Ideogram API key not configured') || errorMessage.includes('IDEOGRAM_API_KEY not configured')) {
     return new IdeogramAPIError(
@@ -511,6 +503,18 @@ function mapBackendErrorToUserError(
       500,
       'MISSING_BACKEND_KEY'
     );
+  }
+  
+  // Check for V3 endpoint unavailability (404 errors with V3 mentions)
+  if (status === 404 && (errorMessage.includes('V_3 failed') || errorMessage.includes('V3') || isExactTextRequest)) {
+    const error = new IdeogramAPIError(
+      'Ideogram V3 is temporarily unavailable for exact text requests. You can retry with Turbo model or use the caption overlay feature.',
+      404,
+      'V3_UNAVAILABLE'
+    );
+    error.shouldRetryWithTurbo = true;
+    error.shouldShowExactTextOverlay = true;
+    return error;
   }
   
   switch (status) {

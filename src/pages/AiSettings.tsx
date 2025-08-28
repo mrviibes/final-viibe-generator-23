@@ -121,9 +121,24 @@ export default function AiSettings() {
           description: `Connection OK (${result.latency}ms)`
         });
       } else {
+        // Provide more specific error messaging based on the actual backend response
+        let errorMessage = result.error || 'Backend test failed';
+        let toastDescription = result.error || 'Unknown error';
+        
+        if (errorMessage.includes('IDEOGRAM_API_KEY not configured')) {
+          toastDescription = 'Ideogram API key is not configured in the backend. Please contact support or use frontend API key mode.';
+        } else if (errorMessage.includes('V_3 failed') || errorMessage.includes('404')) {
+          toastDescription = 'Ideogram V3 endpoint is currently unavailable. This is a temporary Ideogram service issue.';
+        } else if (errorMessage.includes('rate limit')) {
+          toastDescription = 'Rate limit exceeded. Please wait before testing again.';
+        } else if (errorMessage.includes('Backend error:')) {
+          // Keep the original backend error message if it's already formatted
+          toastDescription = errorMessage;
+        }
+        
         toast({
           title: "Backend Test Failed",
-          description: result.error,
+          description: toastDescription,
           variant: "destructive"
         });
       }

@@ -63,7 +63,7 @@ export function IdeogramErrorDialog({
       case 'RATE_LIMIT':
         return { color: 'secondary', text: 'Rate Limited' };
       case 'V3_UNAVAILABLE':
-        return { color: 'secondary', text: 'Service Unavailable' };
+        return { color: 'secondary', text: 'V3 Unavailable' };
       case 'CONTENT_POLICY':
         return { color: 'destructive', text: 'Content Policy' };
       case 'SERVICE_UNAVAILABLE':
@@ -123,7 +123,8 @@ export function IdeogramErrorDialog({
                 variant="secondary"
               >
                 <Zap className="h-4 w-4" />
-                {isRetrying ? "Retrying..." : "Retry with Turbo"}
+                {isRetrying ? "Retrying..." : 
+                 error.errorType === 'V3_UNAVAILABLE' ? "Retry with Turbo Model" : "Retry with Turbo"}
               </Button>
             )}
 
