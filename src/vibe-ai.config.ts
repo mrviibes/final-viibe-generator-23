@@ -448,6 +448,10 @@ export const META_BANNED_PHRASES = [
   /made.*for you/i
 ];
 
+// Quality-specific banned patterns for short/templated content
+export const QUALITY_BANNED_SUFFIXES = /(activated|ready|mode(?: on| engaged)?|incoming|engaged|vibes only|energy)\.?$/i;
+export const QUALITY_BANNED_PHRASES = /(laugh track|punchline ready|comedy mode|funny bone)/i;
+
 export const BANNED_WORDS = [
   'assistant',
   'ai',
@@ -467,14 +471,14 @@ export const BANNED_WORDS = [
 ];
 
 export const TONE_FALLBACKS: Record<string, string> = {
-  humorous: "Short and witty like you asked",
-  savage: "Bold and direct as requested",
-  sentimental: "Heartfelt message coming right up",
-  nostalgic: "Memory lane vibes activated",
-  romantic: "Sweet words in progress",
-  inspirational: "Motivational mode engaged",
-  playful: "Fun and light as ordered",
-  serious: "Thoughtful message loading"
+  humorous: "Life's too short not to laugh at this situation",
+  savage: "Sometimes the truth hits differently than expected",
+  sentimental: "These moments remind us what really matters most",
+  nostalgic: "Taking you back to when things felt simpler somehow",
+  romantic: "When words capture feelings the heart already knows",
+  inspirational: "Every step forward counts more than you realize",
+  playful: "Bringing out the fun side that's been hiding lately",
+  serious: "Worth considering from every possible angle before deciding"
 };
 
 // =========================
@@ -663,6 +667,34 @@ export function postProcessLine(
     };
   }
 
+  // Quality gates - check length and word count
+  const wordCount = cleaned.split(/\s+/).filter(Boolean).length;
+  if (cleaned.length < 28 || wordCount < 5) {
+    return {
+      line: cleaned,
+      blocked: true,
+      reason: 'Content too short - must be at least 28 characters and 5 words'
+    };
+  }
+
+  // Check for quality-banned suffixes (templated endings)
+  if (QUALITY_BANNED_SUFFIXES.test(cleaned)) {
+    return {
+      line: cleaned,
+      blocked: true,
+      reason: 'Content contains templated/generic endings'
+    };
+  }
+
+  // Check for quality-banned phrases (low-effort phrases)
+  if (QUALITY_BANNED_PHRASES.test(cleaned)) {
+    return {
+      line: cleaned,
+      blocked: true,
+      reason: 'Content contains low-quality templated phrases'
+    };
+  }
+
   // Spelling and quality checks
   const commonMisspellings = [
     { wrong: /\brecieve\b/gi, right: 'receive' },
@@ -731,69 +763,71 @@ function getFallbackVariants(tone: string, category: string, subcategory: string
   return variations;
 }
 
-function phraseCandidates(u: UserInputs): string[] {
-  // minimal, deterministic templates per tone
+export function phraseCandidates(u: UserInputs): string[] {
+  // Richer, contextual templates per tone - no generic templated endings
   const base: Record<Tone, string[]> = {
     Humorous: [
-      "Adding years, not wisdom, apparently.",
-      "Proof you survived another lap around the sun.",
-      "Cake first, decisions later.",
-      "Aging like a meme from 2016."
+      "Another year closer to becoming that person who tells cashiers about coupons",
+      "Celebrating another successful orbit around the sun without major incident",
+      "Age happens when you're busy making other questionable decisions",
+      "Growing older but definitely not growing up anytime soon"
     ],
     Savage: [
-      "Another year, same excuses.",
-      "You call those goals? Cute.",
-      "Age is a number, discipline is not.",
-      "Legends train, tourists post."
+      "Still waiting for that character development arc to kick in",
+      "Another year of perfecting the art of disappointment",
+      "Age brings wisdom, but apparently not to everyone",
+      "Time keeps moving but some people clearly don't"
     ],
     Sentimental: [
-      "Your story keeps getting better.",
-      "Grateful for your light.",
-      "Small moments, big meaning.",
-      "Today, you matter most."
+      "Every moment matters when you're creating memories this special",
+      "Time moves fast but these feelings stay with us forever",
+      "Some days remind you exactly why life is worth celebrating",
+      "Building a collection of moments that money can't buy"
     ],
     Nostalgic: [
-      "Back when plans were simple.",
-      "Save the playlist, keep the memories.",
-      "Old jokes, new laughs.",
-      "Yesterday called, it misses you."
+      "Remember when everything felt possible and nothing hurt this much",
+      "Taking you back to when music had real lyrics and phones had buttons",
+      "Those were the days when problems were smaller and dreams were bigger",
+      "Vintage vibes from a time when life felt more genuine"
     ],
     Romantic: [
-      "Meet me where the sparks are.",
-      "Your smile reroutes the day.",
-      "Hands, heartbeat, home.",
-      "Two tickets to always."
+      "When someone makes your heart skip beats you didn't know existed",
+      "Finding home in someone else's smile and staying there forever",
+      "Love letters written in shared glances and stolen moments",
+      "Two hearts discovering they speak the same secret language"
     ],
     Inspirational: [
-      "Small steps, loud results.",
-      "Progress loves consistency.",
-      "Start now, fix fast.",
-      "Do the boring reps."
+      "Every small step forward counts more than you realize today",
+      "Building dreams one determined decision at a time",
+      "Progress isn't always pretty but it's always worth pursuing",
+      "Champions are made during the moments nobody's watching"
     ],
     Playful: [
-      "Chaos with extra sprinkles.",
-      "Try it, then brag.",
-      "Snack now, plan later.",
-      "Vibes set to mischievous."
+      "Bringing chaos to perfectly organized situations since day one",
+      "Turning ordinary moments into adventures worth remembering",
+      "Life's too short for serious faces and sensible decisions",
+      "Adding sparkle and mischief wherever the day takes us"
     ],
     Serious: [
-      "Decide, then execute.",
-      "Remove noise, keep signal.",
-      "Respect the process.",
-      "Outcomes beat opinions."
+      "Actions speak louder than words and results speak loudest",
+      "Focus on what matters and let everything else fade away",
+      "Building something meaningful requires patience and dedication",
+      "Quality decisions lead to quality outcomes every single time"
     ]
   };
 
   let candidates = [...base[u.tone]];
 
-  // Light context seasoning
+  // Context-aware customization
   if (u.category === "Pop Culture" && u.search_term) {
-    candidates = [...candidates];
-    candidates[0] = `${u.search_term}: scene-stealer energy.`;
+    candidates[0] = `${u.search_term} brings out the kind of ${u.tone.toLowerCase()} energy we all need right now`;
   }
-  if (u.tags && u.tags.length) {
-    candidates = [...candidates];
-    candidates[1] = `${base[u.tone][1]} #${u.tags[0].replace(/\s+/g, "-")}`;
+  if (u.tags && u.tags.length && u.recipient_name) {
+    const firstTag = u.tags[0];
+    candidates[1] = `When ${u.recipient_name} gets into ${firstTag}, things get interesting fast`;
+  } else if (u.tags && u.tags.length) {
+    const firstTag = u.tags[0];
+    candidates[1] = `${firstTag} moments that remind you why life gets exciting`;
   }
 
   return candidates.slice(0, AI_CONFIG.limits.max_phrases);
@@ -1181,12 +1215,17 @@ Return only: {"lines":["joke1\\nwith\\nnewlines","joke2\\nwith\\nnewlines","joke
     ? `\n• CRITICAL: Each option must include at least one of these tags (or a clear paraphrase): ${inputs.tags.join(', ')}`
     : '';
 
-  const corePrompt = `Generate 6 concise options under 100 chars each for:
+  const corePrompt = `Generate 6 distinct options, each 8-16 words (28-100 characters) for:
 Category: ${inputs.category} > ${inputs.subcategory}
 Tone: ${inputs.tone}
 Tags: ${inputs.tags?.join(', ') || 'none'}
 ${inputs.recipient_name && inputs.recipient_name !== "-" ? `Target: ${inputs.recipient_name}` : ''}
 
+QUALITY REQUIREMENTS:
+• Each option must be 8-16 words and 28-100 characters
+• Make each option distinctly different in structure and wording
+• Use concrete, specific imagery - avoid generic templates
+• NEVER use: "activated", "ready", "mode on/engaged", "incoming", "vibes only", "energy", "laugh track", "funny bone", "punchline ready", "comedy mode"
 ${tagRequirement}${specialInstructions}
 
 IMPORTANT: Never generate meta phrases like "Short and witty like you asked", "As requested", "Here you go", or any commentary about the request. Only generate direct, usable content lines.

@@ -99,26 +99,20 @@ async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: st
   }
 }
 
-// Helper function to generate tone-specific phrase candidates
-function phraseCandidates(tone: string, tags?: string[]): string[] {
-  const firstTag = tags && tags.length > 0 ? tags[0] : '';
-  const tagSuffix = firstTag ? ` ${firstTag}` : '';
-  
-  const toneMap: Record<string, string[]> = {
-    humorous: ['Hilarious vibes only', 'Comedy gold incoming', 'Laugh track ready', 'Funny bone activated'],
-    sarcastic: ['Oh, absolutely perfect', 'Well, this is fantastic', 'Clearly the best choice', 'Obviously brilliant'],
-    savage: ['No mercy shown', 'Brutally honest moment', 'Savage mode activated', 'Zero chill detected'],
-    witty: ['Clever comeback ready', 'Sharp wit engaged', 'Smartly crafted', 'Intelligence on display'],
-    playful: ['Fun times ahead', 'Playful energy activated', 'Good vibes flowing', 'Cheerful moment incoming'],
-    romantic: ['Love in the air', 'Heart eyes activated', 'Romance mode on', 'Sweetness overload'],
-    motivational: ['Success mindset engaged', 'Determination activated', 'Victory mode on', 'Champions only'],
-    nostalgic: ['Memory lane vibes', 'Throwback feels', 'Classic moment', 'Vintage energy'],
-    mysterious: ['Secrets revealed slowly', 'Mystery mode activated', 'Enigma engaged', 'Curiosity sparked'],
-    confident: ['Boss energy activated', 'Confidence on full', 'Self-assured vibes', 'Power mode engaged']
-  };
-  
-  const basePhrases = toneMap[tone.toLowerCase()] || toneMap.humorous;
-  return basePhrases.map(phrase => `${phrase}${tagSuffix}`);
+// Import the enhanced phrase candidates from config
+import {
+  phraseCandidates as configPhraseCandidates,
+  QUALITY_BANNED_SUFFIXES,
+  QUALITY_BANNED_PHRASES
+} from '../vibe-ai.config';
+
+// Quality utility function
+function isGood(line: string): boolean {
+  const wordCount = line.split(/\s+/).filter(Boolean).length;
+  return line.length >= 28 && 
+         wordCount >= 5 && 
+         !QUALITY_BANNED_SUFFIXES.test(line) && 
+         !QUALITY_BANNED_PHRASES.test(line);
 }
 
 export async function generateCandidates(inputs: VibeInputs, n: number = 4): Promise<VibeResult> {
@@ -249,16 +243,54 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
       finalCandidates = [...taggedCandidates.slice(0, 2), ...untaggedCandidates.slice(0, 2)];
     }
     
-    // Ensure we have exactly 4 options - use tone-specific phrases instead of generic fallbacks
-    while (finalCandidates.length < 4) {
-      const phraseCandidatesList = phraseCandidates(inputs.tone, inputs.tags);
-      let nextCandidate = phraseCandidatesList[finalCandidates.length % phraseCandidatesList.length];
+    // Filter final candidates by quality
+    finalCandidates = finalCandidates.filter(isGood);
+    
+    // If we still don't have 4 after quality filtering, try one more quick top-up
+    if (finalCandidates.length < 4) {
+      console.log(`🔄 Quality top-up: only ${finalCandidates.length} passed quality gates, attempting additional retry...`);
       
-      if (!finalCandidates.includes(nextCandidate)) {
-        finalCandidates.push(nextCandidate);
+      try {
+        const config = getEffectiveConfig();
+        const qualityTopUpResults = await generateMultipleCandidates(inputs, config.generation.model);
+        const qualityValidCandidates = qualityTopUpResults.filter(c => !c.blocked && isGood(c.line));
+        const newQualityLines = qualityValidCandidates
+          .map(c => c.line)
+          .filter(line => !finalCandidates.includes(line));
+        
+        if (newQualityLines.length > 0) {
+          finalCandidates.push(...newQualityLines);
+          console.log(`✅ Quality top-up added ${newQualityLines.length} high-quality options`);
+        }
+      } catch (error) {
+        console.warn('Quality top-up failed:', error);
+      }
+    }
+    
+    // Ensure we have exactly 4 options - use enhanced phrase candidates as last resort
+    while (finalCandidates.length < 4) {
+      const phraseCandidatesList = configPhraseCandidates(inputs as any);
+      const goodCandidates = phraseCandidatesList.filter(isGood);
+      
+      if (goodCandidates.length > 0) {
+        let nextCandidate = goodCandidates[finalCandidates.length % goodCandidates.length];
+        
+        if (!finalCandidates.includes(nextCandidate)) {
+          finalCandidates.push(nextCandidate);
+        } else {
+          // Create minor variation while maintaining quality
+          const variation = nextCandidate.replace(/\.$/, ' that catches everyone off guard.');
+          if (isGood(variation) && !finalCandidates.includes(variation)) {
+            finalCandidates.push(variation);
+          } else {
+            // Fallback - just take the candidate even if duplicate
+            finalCandidates.push(nextCandidate);
+          }
+        }
       } else {
-        // Add variation to avoid exact duplicates
-        finalCandidates.push(`${nextCandidate} energy`);
+        // Last resort fallback - shouldn't happen with new system
+        finalCandidates.push("Sometimes the best moments happen when you least expect them");
+        break;
       }
     }
     
@@ -295,9 +327,10 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
       usedFallback = false;
       reason = 'Used model output with partial tag coverage';
     } else {
-      // Genuine blocks (banned words, etc.) - use tone-specific phrases instead of generic fallbacks
-      const phraseCandidatesList = phraseCandidates(inputs.tone, inputs.tags);
-      finalCandidates = phraseCandidatesList;
+      // Genuine blocks (banned words, etc.) - use enhanced phrase candidates instead of generic fallbacks
+      const phraseCandidatesList = configPhraseCandidates(inputs as any);
+      const goodCandidates = phraseCandidatesList.filter(isGood);
+      finalCandidates = goodCandidates.length >= 4 ? goodCandidates : phraseCandidatesList;
       
       picked = finalCandidates[0];
       usedFallback = true;
