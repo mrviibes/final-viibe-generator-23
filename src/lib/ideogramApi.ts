@@ -439,12 +439,11 @@ async function generateIdeogramImageFrontend(request: IdeogramGenerateRequest): 
 // Surface real backend error by making direct fetch to get JSON details
 async function surfaceBackendError(request: IdeogramGenerateRequest): Promise<IdeogramAPIError | null> {
   try {
-    // Get the project reference to build the function URL
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return null;
 
-    // Use the hardcoded Supabase URL for function calls
-    const functionUrl = `${process.env.NODE_ENV === 'development' ? 'http://127.0.0.1:54321' : 'https://qdigssobxfgoeuvkejpo.supabase.co'}/functions/v1/ideogram-generate`;
+    // Use the known project URL format
+    const functionUrl = `https://qdigssobxfgoeuvkejpo.supabase.co/functions/v1/ideogram-generate`;
     
     const response = await fetch(functionUrl, {
       method: 'POST',
@@ -457,10 +456,21 @@ async function surfaceBackendError(request: IdeogramGenerateRequest): Promise<Id
 
     if (!response.ok) {
       try {
-        const errorData = await response.json();
+        const errorText = await response.text();
+        console.log('Backend error response:', response.status, errorText);
+        
+        // Try to parse as JSON first
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          // If not JSON, treat as plain text
+          errorData = { message: errorText };
+        }
+        
         return mapBackendErrorToUserError(response.status, errorData, request);
       } catch {
-        // Fallback if we can't parse JSON
+        // Fallback if we can't parse response
         return new IdeogramAPIError(
           `Backend error ${response.status}: Unable to process request`,
           response.status
@@ -481,6 +491,16 @@ function mapBackendErrorToUserError(
   request: IdeogramGenerateRequest
 ): IdeogramAPIError {
   const isExactTextRequest = /EXACT TEXT:/i.test(request.prompt);
+  const errorMessage = errorData.message || errorData.error || 'Unknown error';
+  
+  // Check for specific error patterns
+  if (errorMessage.includes('IDEOGRAM_API_KEY not configured')) {
+    return new IdeogramAPIError(
+      'Ideogram API key is not configured in the backend. Please contact support or set up a frontend API key.',
+      401,
+      'MISSING_BACKEND_KEY'
+    );
+  }
   
   switch (status) {
     case 401:
@@ -499,7 +519,7 @@ function mapBackendErrorToUserError(
       );
       
     case 503:
-      if (errorData.message?.includes('V3')) {
+      if (errorMessage.includes('V3')) {
         return new IdeogramAPIError(
           isExactTextRequest 
             ? 'V3 is temporarily unavailable. Use the caption overlay for guaranteed text accuracy.'
@@ -518,7 +538,7 @@ function mapBackendErrorToUserError(
       );
       
     case 400:
-      if (errorData.message?.includes('content policy')) {
+      if (errorMessage.includes('content policy')) {
         return new IdeogramAPIError(
           'Content violates policy. Try rephrasing your prompt with different words.',
           400,
@@ -526,16 +546,16 @@ function mapBackendErrorToUserError(
         );
       }
       return new IdeogramAPIError(
-        `Invalid request: ${errorData.message || 'Please check your prompt and try again.'}`,
+        `Invalid request: ${errorMessage}`,
         400,
         'INVALID_REQUEST'
       );
       
     default:
       return new IdeogramAPIError(
-        `Ideogram API error (${status}): ${errorData.message || 'Please try again.'}`,
+        `Backend error: ${errorMessage}`,
         status,
-        'UNKNOWN_ERROR',
+        'BACKEND_ERROR',
         request.model !== 'V_2A_TURBO'
       );
   }

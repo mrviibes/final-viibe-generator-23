@@ -125,6 +125,20 @@ export function IdeogramErrorDialog({
               </Button>
             )}
 
+            {error.errorType === 'MISSING_BACKEND_KEY' && (
+              <Button
+                onClick={() => {
+                  onOpenChange(false);
+                  // The user will need to navigate to settings manually or add a frontend key
+                }}
+                className="w-full gap-2"
+                variant="default"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Set Frontend API Key
+              </Button>
+            )}
+
             {error.errorType === 'INVALID_API_KEY' && (
               <Button
                 onClick={() => {
