@@ -15,6 +15,7 @@ import { ProxySettingsDialog } from "@/components/ProxySettingsDialog";
 import { CorsRetryDialog } from "@/components/CorsRetryDialog";
 import { StepProgress } from "@/components/StepProgress";
 import { StackedSelectionCard } from "@/components/StackedSelectionCard";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigate } from "react-router-dom";
 import { generateCandidates, VibeResult } from "@/lib/vibeModel";
 import { buildIdeogramHandoff } from "@/lib/ideogram";
@@ -6097,12 +6098,24 @@ const Index = () => {
                      {/* Visual AI recommendations - always show if available */}
                      {selectedSubjectOption === "ai-assist" && visualOptions.length > 0 && selectedVisualIndex === null && <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                          <div className="text-center mb-6">
-                             <div className="flex items-center justify-center gap-3 mb-2">
-                               <h3 className="text-xl font-semibold text-foreground">Visual AI recommendations</h3>
-                               <Button variant="outline" size="sm" onClick={handleGenerateSubject} disabled={isGeneratingSubject} className="text-xs">
-                                 {isGeneratingSubject ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : "Regenerate"}
-                               </Button>
-                             </div>
+                              <div className="flex items-center justify-center gap-3 mb-2">
+                                <h3 className="text-xl font-semibold text-foreground">Visual AI recommendations</h3>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <div className="inline-flex items-center gap-1 text-xs text-muted-foreground cursor-help">
+                                        🎯 <span className="underline decoration-dotted">What does this mean?</span>
+                                      </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p className="text-sm max-w-xs">Bullseye (🎯) indicates options that closely match your typed message content</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                                <Button variant="outline" size="sm" onClick={handleGenerateSubject} disabled={isGeneratingSubject} className="text-xs">
+                                  {isGeneratingSubject ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : "Regenerate"}
+                                </Button>
+                              </div>
                              {visualOptions.length > 0 && visualModel && (
                                <p className="text-xs text-muted-foreground mb-2">
                                  Using {visualModel.includes('gpt-5-mini') ? 'gpt-5-mini' : visualModel} • Generated in {((Date.now() - visualGenerationStartTime) / 1000).toFixed(1)}s
@@ -6122,9 +6135,23 @@ const Index = () => {
                 }}>
                                <CardHeader className="pb-2">
                                  <div className="flex items-center justify-between">
-                                    <CardTitle className="text-base font-semibold text-card-foreground">
-                                      Option {index + 1} ({option.slot?.replace('-', ' ') || 'Visual'}){option.textAligned ? ' 🎯' : ''}
-                                    </CardTitle>
+                                     <CardTitle className="text-base font-semibold text-card-foreground">
+                                       <div className="flex items-center gap-2">
+                                         <span>Option {index + 1} ({option.slot?.replace('-', ' ') || 'Visual'})</span>
+                                         {option.textAligned && (
+                                           <TooltipProvider>
+                                             <Tooltip>
+                                               <TooltipTrigger asChild>
+                                                 <span className="cursor-help">🎯</span>
+                                               </TooltipTrigger>
+                                               <TooltipContent>
+                                                 <p className="text-sm">Closest match to your message</p>
+                                               </TooltipContent>
+                                             </Tooltip>
+                                           </TooltipProvider>
+                                         )}
+                                       </div>
+                                     </CardTitle>
                                    {visualModel === 'fallback' && (
                                      <Badge variant="secondary" className="text-xs">
                                        {visualRecommendations?.errorCode === 'timeout' ? 'Timeout' : 

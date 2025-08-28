@@ -1214,8 +1214,11 @@ ${finalLine ? `JOKE/TEXT: "${finalLine}" - VISUAL CONCEPTS MUST MATCH THIS CONTE
 TEXT ALIGNMENT REQUIREMENTS (CRITICAL):
 ${finalLine ? `- AT LEAST TWO concepts must directly reflect the exact content/semantics of: "${finalLine}"
 - Avoid unrelated gag props (rubber chickens, potatoes, random animals) unless the text mentions them
-- For award/Oscar references, emphasize documentary/poster-like interpretations
-- For LGBTQ/pride themes, include appropriate visual cues (rainbow accents, wardrobe elements)` : ''}
+- For award/Oscar references, emphasize documentary/poster-like interpretations with award symbols
+- For LGBTQ/pride themes, include explicit visual cues: rainbow flags, male couples, pride parades, drag elements, wardrobe/mirror scenes
+- For "came out" or similar phrases, show supportive relationship scenes or pride celebration contexts
+- For cross-dressing themes, include wardrobe elements, mirrors, makeup, or tasteful costume details
+- Visual concepts MUST NOT be subtle - make the connection obvious and direct` : ''}
 
 REQUIRED OBJECTS/SUBJECTS (must be visible in each concept):
 - ${subcategory === 'Ice Hockey' ? 'hockey stick and puck' : 'relevant category objects'}

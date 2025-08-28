@@ -129,6 +129,36 @@ function hasVagueFillers(text: string): boolean {
   return vaguePatterns.some(pattern => pattern.test(text));
 }
 
+function getSemanticKeywords(text: string): string[] {
+  // Map concepts to semantic synonyms for better matching
+  const semanticMap: Record<string, string[]> = {
+    'gay': ['queer', 'lgbtq', 'homosexual', 'same-sex', 'pride'],
+    'came out': ['coming out', 'revealed', 'disclosed'],
+    'boyfriend': ['partner', 'male partner', 'husband'],
+    'drag': ['queens', 'performers', 'costume', 'fabulous'],
+    'rainbow': ['pride flag', 'colorful', 'spectrum'],
+    'cross': ['dress', 'dressing', 'wardrobe'],
+    'oscar': ['award', 'trophy', 'documentary', 'film'],
+    'parade': ['march', 'celebration', 'festival']
+  };
+  
+  const keywords = new Set<string>();
+  const lowerText = text.toLowerCase();
+  
+  // Add direct matches
+  const directWords = extractKeywordsFromText(text);
+  directWords.forEach(word => keywords.add(word));
+  
+  // Add semantic matches
+  for (const [concept, synonyms] of Object.entries(semanticMap)) {
+    if (lowerText.includes(concept)) {
+      synonyms.forEach(synonym => keywords.add(synonym));
+    }
+  }
+  
+  return Array.from(keywords).slice(0, 12);
+}
+
 function extractKeywordsFromText(text: string): string[] {
   // Extract meaningful keywords from the user's text
   const words = text.toLowerCase()
@@ -146,32 +176,66 @@ function extractKeywordsFromText(text: string): string[] {
 function computeTextAlignmentScore(option: VisualOption, finalLine: string): number {
   if (!finalLine) return 0;
   
-  const keywords = extractKeywordsFromText(finalLine);
+  const semanticKeywords = getSemanticKeywords(finalLine);
   const fullText = `${option.subject || ''} ${option.background || ''} ${option.prompt}`.toLowerCase();
+  const lowerFinalLine = finalLine.toLowerCase();
   
   let score = 0;
+  let reasons = [];
   
-  // Check for exact keyword matches (weighted heavily)
-  keywords.forEach(keyword => {
-    if (fullText.includes(keyword)) {
+  // Check for semantic keyword matches (weighted heavily)
+  semanticKeywords.forEach(keyword => {
+    if (fullText.includes(keyword.toLowerCase())) {
       score += 3;
+      reasons.push(`keyword: ${keyword}`);
     }
   });
   
-  // Check for semantic concepts
-  if (finalLine.toLowerCase().includes('oscar') && fullText.includes('award')) score += 2;
-  if (finalLine.toLowerCase().includes('documentary') && (fullText.includes('poster') || fullText.includes('film'))) score += 2;
-  if ((finalLine.toLowerCase().includes('gay') || finalLine.toLowerCase().includes('pride')) && fullText.includes('rainbow')) score += 2;
-  if (finalLine.toLowerCase().includes('cross') && fullText.includes('dress')) score += 2;
+  // Enhanced LGBTQ+ semantic matching
+  const lgbtqPhrases = ['came out', 'coming out', 'gay', 'queer', 'lgbt', 'lgbtq', 'pride', 'boyfriend', 'husband', 'male partner', 'same-sex', 'two men', 'drag', 'drag queens'];
+  const lgbtqVisualCues = ['rainbow', 'pride flag', 'two men', 'couple', 'holding hands', 'parade', 'drag', 'fabulous', 'wardrobe', 'mirror', 'makeup'];
+  
+  if (lgbtqPhrases.some(phrase => lowerFinalLine.includes(phrase))) {
+    lgbtqVisualCues.forEach(cue => {
+      if (fullText.includes(cue)) {
+        score += 4;
+        reasons.push(`LGBTQ+ cue: ${cue}`);
+      }
+    });
+  }
+  
+  // Award/Documentary semantic matching
+  if (lowerFinalLine.includes('oscar') || lowerFinalLine.includes('award') || lowerFinalLine.includes('documentary')) {
+    const awardCues = ['award', 'trophy', 'poster', 'film', 'documentary', 'oscar', 'silhouette'];
+    awardCues.forEach(cue => {
+      if (fullText.includes(cue)) {
+        score += 3;
+        reasons.push(`award cue: ${cue}`);
+      }
+    });
+  }
+  
+  // Cross-dressing theme enhancement
+  if (lowerFinalLine.includes('cross') || lowerFinalLine.includes('dress')) {
+    const dressingCues = ['dress', 'wardrobe', 'mirror', 'heels', 'lipstick', 'makeup', 'blazer'];
+    dressingCues.forEach(cue => {
+      if (fullText.includes(cue)) {
+        score += 3;
+        reasons.push(`dressing cue: ${cue}`);
+      }
+    });
+  }
   
   // Penalize unrelated gag props
   const gagProps = ['potato', 'chicken', 'rubber', 'banana', 'whoopee', 'gnome'];
   gagProps.forEach(prop => {
-    if (fullText.includes(prop) && !finalLine.toLowerCase().includes(prop)) {
+    if (fullText.includes(prop) && !lowerFinalLine.includes(prop)) {
       score -= 2;
+      reasons.push(`-gag prop: ${prop}`);
     }
   });
   
+  console.log(`🎯 Alignment score for "${option.subject?.substring(0, 30)}...": ${score} (${reasons.join(', ')})`);
   return Math.max(0, score);
 }
 
@@ -257,15 +321,18 @@ function getSlotBasedFallbacks(inputs: VisualInputs): VisualOption[] {
   const primaryTags = tags.slice(0, 3).join(', ') || 'dynamic energy';
   const occasion = subcategory || 'general';
   
-  // Text-aware fallbacks if finalLine exists
+  // Enhanced text-aware fallbacks if finalLine exists
   if (finalLine) {
-    const keywords = extractKeywordsFromText(finalLine);
-    console.log('🎯 Generating text-aware fallbacks for keywords:', keywords);
+    const semanticKeywords = getSemanticKeywords(finalLine);
+    console.log('🎯 Generating text-aware fallbacks for semantic keywords:', semanticKeywords);
+    console.log('📝 Detected LGBTQ+ cues:', finalLine.toLowerCase().match(/(gay|queer|lgbt|lgbtq|pride|came out|coming out|boyfriend|drag)/gi) || 'none');
+    console.log('📝 Detected award cues:', finalLine.toLowerCase().match(/(oscar|award|documentary)/gi) || 'none');
     
     const textAwareFallbacks: VisualOption[] = [];
+    const lowerFinalLine = finalLine.toLowerCase();
     
     // Documentary/Award theme fallback
-    if (finalLine.toLowerCase().includes('oscar') || finalLine.toLowerCase().includes('award')) {
+    if (lowerFinalLine.includes('oscar') || lowerFinalLine.includes('award') || lowerFinalLine.includes('documentary')) {
       textAwareFallbacks.push({
         subject: "Documentary poster motif with Oscar silhouette and subtle rainbow accents",
         background: "Realistic studio or festival wall with soft vignette and empty central space",
@@ -274,12 +341,30 @@ function getSlotBasedFallbacks(inputs: VisualInputs): VisualOption[] {
       });
     }
     
-    // Cross-dressing/Pride theme fallback
-    if (finalLine.toLowerCase().includes('gay') || finalLine.toLowerCase().includes('cross') || finalLine.toLowerCase().includes('pride')) {
+    // Enhanced LGBTQ+/Pride theme fallbacks
+    const lgbtqPhrases = ['gay', 'queer', 'lgbt', 'lgbtq', 'pride', 'came out', 'coming out', 'boyfriend', 'drag'];
+    if (lgbtqPhrases.some(phrase => lowerFinalLine.includes(phrase))) {
+      textAwareFallbacks.push({
+        subject: "Male couple holding hands with subtle rainbow pride accents",
+        background: "Urban setting or park with soft natural lighting and clear text space",
+        prompt: `Two men holding hands or embracing, subtle rainbow pride flag accents in background, warm natural lighting, urban or park setting with clear negative space for text [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [TEXT_HINT: dark text]`,
+        textAligned: true
+      });
+      
       textAwareFallbacks.push({
         subject: "Wardrobe and mirror scene with cross-dressing elements and rainbow accents",
         background: "Clean dressing room with soft lighting, leaving open area for text",
         prompt: `Realistic dressing room scene with tasteful wardrobe cues (heels, blazer-over-dress on hanger, lipstick on vanity), subtle rainbow color accents, uncluttered background with clear negative space for text [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [TEXT_HINT: dark text]`,
+        textAligned: true
+      });
+    }
+    
+    // Cross-dressing specific fallback
+    if (lowerFinalLine.includes('cross') && !textAwareFallbacks.some(f => f.subject.includes('Wardrobe'))) {
+      textAwareFallbacks.push({
+        subject: "Elegant wardrobe with mixed clothing styles and mirror reflection",
+        background: "Sophisticated dressing room with warm lighting",
+        prompt: `Elegant wardrobe with mix of masculine and feminine clothing, mirror with soft reflection, sophisticated dressing room atmosphere, warm lighting with clear text placement area [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [TEXT_HINT: dark text]`,
         textAligned: true
       });
     }
