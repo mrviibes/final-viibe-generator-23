@@ -402,14 +402,15 @@ function truncateIfNeeded(s: string, limit = AI_CONFIG.limits.phrase_char_limit)
 }
 
 function spellcheck(s: string): string[] {
-  if (!AI_CONFIG.spellcheck.enabled) return [];
+  const config = getEffectiveConfig();
+  if (!config.spellcheck.enabled) return [];
   // naive check, replace with real spellchecker as needed
   const tokens = s.split(/[^A-Za-z0-9']/).filter(Boolean);
   const issues: string[] = [];
   for (const t of tokens) {
     const looksWord = /[A-Za-z]{3,}/.test(t);
     if (!looksWord) continue;
-    const ok = AI_CONFIG.spellcheck.allowlist.includes(t) || /^[A-Za-z][a-z]+$/.test(t);
+    const ok = config.spellcheck.allowlist.includes(t) || /^[A-Za-z][a-z]+$/.test(t);
     if (!ok) issues.push(`possible spelling issue: ${t}`);
   }
   return issues;
@@ -942,7 +943,9 @@ export const TONES = [
 
 // Helper function to check if current model supports temperature
 export const isTemperatureSupported = (modelId: string): boolean => {
-  return !modelId.includes('gpt-5') && !modelId.includes('o3');
+  // Only GPT-5 models and O3 models don't support temperature
+  // GPT-4.1 and O4 models DO support temperature
+  return !modelId.includes('gpt-5') && !modelId.startsWith('o3');
 };
 
 // =====================================================================
@@ -1009,6 +1012,25 @@ Return only: {"lines":["option1","option2","option3","option4","option5","option
 // Builder for visual generator chat messages  
 export function buildVisualGeneratorMessages(inputs: any): Array<{role: string; content: string}> {
   const { category, subcategory, tone, tags, visualStyle, finalLine } = inputs;
+  const config = getEffectiveConfig();
+  const overrides = getRuntimeOverrides();
+
+  // Check for AI settings overrides
+  const cleanBackground = overrides.cleanBackgroundDefault ?? false;
+  const magicPrompt = overrides.magicPromptEnabled ?? false;
+  const spellingGuarantee = overrides.spellingGuaranteeDefault ?? false;
+  
+  // Build additional requirements based on settings
+  let additionalRequirements = '';
+  if (cleanBackground) {
+    additionalRequirements += '\n- CLEAN BACKGROUND: Use minimal, uncluttered backgrounds that won\'t compete with text overlay';
+  }
+  if (magicPrompt) {
+    additionalRequirements += '\n- ENHANCED CREATIVITY: Add unexpected creative elements, unique perspectives, or artistic flair';
+  }
+  if (spellingGuarantee) {
+    additionalRequirements += '\n- SPELLING ACCURACY: Ensure all visible text elements are spelled correctly';
+  }
 
   // Add variety and creativity requirements
   const userPrompt = `${category}>${subcategory}, ${tone}, ${visualStyle || '3d-animated'}
@@ -1017,7 +1039,7 @@ ${finalLine ? `JOKE/TEXT: "${finalLine}" - VISUAL CONCEPTS MUST MATCH THIS CONTE
 
 REQUIRED OBJECTS/SUBJECTS (must be visible in each concept):
 - ${subcategory === 'Ice Hockey' ? 'hockey stick and puck' : 'relevant category objects'}
-- Specific, tangible items matching the theme
+- Specific, tangible items matching the theme${additionalRequirements}
 
 VARIETY RULES:
 - Each concept must be completely different in composition

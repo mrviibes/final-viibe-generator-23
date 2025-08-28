@@ -262,8 +262,16 @@ export class OpenAIService {
     } = options;
 
     const isGPT5Model = model?.startsWith('gpt-5');
+    const isO3Model = model?.startsWith('o3');
+    const isGPT41OrO4 = model?.startsWith('gpt-4.1') || model?.startsWith('o4');
+    
     const tokenLimit = max_completion_tokens || max_tokens;
-    const tokenParameter = isGPT5Model ? 'max_completion_tokens' : 'max_tokens';
+    
+    // Use appropriate token parameter based on model
+    let tokenParameter = 'max_tokens';
+    if (isGPT5Model || isGPT41OrO4) {
+      tokenParameter = 'max_completion_tokens';
+    }
 
     // Build request body
     const requestBody: any = {
@@ -272,9 +280,12 @@ export class OpenAIService {
       [tokenParameter]: tokenLimit
     };
 
-    // Always add response_format for JSON, and temperature for non-GPT5 models
+    // Always add response_format for JSON
     requestBody.response_format = { type: "json_object" };
-    if (!isGPT5Model) {
+    
+    // Only GPT-5 and O3 models don't support temperature
+    // GPT-4.1 and O4 models DO support temperature
+    if (!isGPT5Model && !isO3Model) {
       requestBody.temperature = temperature;
     }
 

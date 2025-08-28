@@ -24,7 +24,7 @@ import { buildIdeogramPrompt, getAspectRatioForIdeogram, getStyleTypeForIdeogram
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
 import { normalizeTypography, suggestContractions, isTextMisspelled } from "@/lib/textUtils";
-import { BACKGROUND_PRESETS } from "../vibe-ai.config";
+import { BACKGROUND_PRESETS, getRuntimeOverrides, TONES, VISUAL_STYLES } from "../vibe-ai.config";
 const styleOptions = [{
   id: "celebrations",
   name: "Celebrations",
@@ -4067,15 +4067,45 @@ const Index = () => {
 
   // Load saved choices on component mount
   useEffect(() => {
+    const overrides = getRuntimeOverrides();
+    
     if (rememberChoices) {
       const savedTextStyle = localStorage.getItem('last_selected_text_style');
       const savedVisualStyle = localStorage.getItem('last_selected_visual_style');
       
       if (savedTextStyle && textStyleOptions.find(opt => opt.id === savedTextStyle)) {
         setSelectedTextStyle(savedTextStyle);
+      } else if (overrides.defaultTone) {
+        // Use runtime override default tone if no saved choice
+        const defaultToneOption = textStyleOptions.find(opt => opt.name === overrides.defaultTone);
+        if (defaultToneOption) {
+          setSelectedTextStyle(defaultToneOption.id);
+        }
       }
+      
       if (savedVisualStyle && visualStyleOptions.find(opt => opt.id === savedVisualStyle)) {
         setSelectedVisualStyle(savedVisualStyle);
+      } else if (overrides.defaultVisualStyle) {
+        // Use runtime override default visual style if no saved choice
+        const defaultVisualOption = visualStyleOptions.find(opt => opt.name === overrides.defaultVisualStyle);
+        if (defaultVisualOption) {
+          setSelectedVisualStyle(defaultVisualOption.id);
+        }
+      }
+    } else {
+      // If not remembering choices, use runtime overrides as defaults
+      if (overrides.defaultTone) {
+        const defaultToneOption = textStyleOptions.find(opt => opt.name === overrides.defaultTone);
+        if (defaultToneOption) {
+          setSelectedTextStyle(defaultToneOption.id);
+        }
+      }
+      
+      if (overrides.defaultVisualStyle) {
+        const defaultVisualOption = visualStyleOptions.find(opt => opt.name === overrides.defaultVisualStyle);
+        if (defaultVisualOption) {
+          setSelectedVisualStyle(defaultVisualOption.id);
+        }
       }
     }
   }, [rememberChoices]);

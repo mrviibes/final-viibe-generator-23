@@ -3,6 +3,7 @@ import {
   postProcessLine,
   TONE_FALLBACKS,
   AI_CONFIG,
+  getEffectiveConfig,
   SYSTEM_PROMPTS,
   buildVibeGeneratorMessages,
   type VibeInputs,
@@ -33,13 +34,18 @@ function getFallbackVariants(tone: string, category: string, subcategory: string
 
 async function generateMultipleCandidates(inputs: VibeInputs): Promise<VibeCandidate[]> {
   try {
+    // Use effective config with runtime overrides
+    const config = getEffectiveConfig();
+    
     // Use centralized message builder
     const messages = buildVibeGeneratorMessages(inputs);
     
+    console.log(`Generating candidates with model: ${config.generation.model}, temperature: ${config.generation.temperature}`);
+    
     const result = await openAIService.chatJSON(messages, {
-      max_tokens: AI_CONFIG.generation.max_tokens,
-      temperature: AI_CONFIG.generation.temperature,
-      model: AI_CONFIG.generation.model
+      max_tokens: config.generation.max_tokens,
+      temperature: config.generation.temperature,
+      model: config.generation.model
     });
     
     // Store the API metadata for later use

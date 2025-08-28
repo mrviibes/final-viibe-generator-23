@@ -42,10 +42,18 @@ serve(async (req) => {
 
     console.log(`OpenAI API call - Model: ${model}, Messages: ${messages.length}`);
 
-    // Determine if this is a GPT-5 model for parameter handling
+    // Determine if this is a GPT-5 or O3 model for parameter handling
     const isGPT5Model = model?.startsWith('gpt-5');
+    const isO3Model = model?.startsWith('o3');
+    const isGPT41OrO4 = model?.startsWith('gpt-4.1') || model?.startsWith('o4');
+    
     const tokenLimit = max_completion_tokens || max_tokens;
-    const tokenParameter = isGPT5Model ? 'max_completion_tokens' : 'max_tokens';
+    
+    // Use appropriate token parameter based on model
+    let tokenParameter = 'max_tokens';
+    if (isGPT5Model || isGPT41OrO4) {
+      tokenParameter = 'max_completion_tokens';
+    }
 
     // Build request body
     const requestBody: any = {
@@ -59,10 +67,13 @@ serve(async (req) => {
       requestBody.response_format = response_format;
     }
 
-    // Only add temperature for non-GPT5 models
-    if (!isGPT5Model) {
+    // Only GPT-5 and O3 models don't support temperature
+    // GPT-4.1 and O4 models DO support temperature
+    if (!isGPT5Model && !isO3Model) {
       requestBody.temperature = temperature;
     }
+    
+    console.log(`OpenAI request parameters - Model: ${model}, Token param: ${tokenParameter}, Temperature: ${(!isGPT5Model && !isO3Model) ? temperature : 'not supported'}`);
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
