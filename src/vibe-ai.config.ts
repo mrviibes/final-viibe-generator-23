@@ -199,7 +199,7 @@ export const AI_CONFIG = {
     max_candidates: 6,
     temperature: 0.7,
     max_tokens: 150,
-    model: 'gpt-4o-mini'
+    model: 'gpt-4.1-2025-04-14'
   }
 };
 
