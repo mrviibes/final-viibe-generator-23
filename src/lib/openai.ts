@@ -89,9 +89,14 @@ export class OpenAIService {
     } = options;
 
     console.log(`Calling OpenAI backend API - Model: ${model}, Messages: ${messages.length}`);
+    const startTime = Date.now();
 
     try {
-      const { data, error } = await supabase.functions.invoke('openai-chat', {
+      // Create AbortController for 5-second timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      const invokePromise = supabase.functions.invoke('openai-chat', {
         body: {
           messages,
           options: {
@@ -103,6 +108,20 @@ export class OpenAIService {
           }
         }
       });
+
+      // Race between the API call and timeout
+      const { data, error } = await Promise.race([
+        invokePromise,
+        new Promise<never>((_, reject) => {
+          controller.signal.addEventListener('abort', () => {
+            reject(new Error('Request timed out after 5 seconds'));
+          });
+        })
+      ]);
+
+      clearTimeout(timeoutId);
+      const elapsed = Date.now() - startTime;
+      console.log(`Backend API completed - Model: ${model}, Elapsed: ${elapsed}ms`);
 
       if (error) {
         console.error('Backend API error:', error);
@@ -419,10 +438,17 @@ export class OpenAIService {
       const effectiveConfig = getEffectiveConfig();
       const searchModel = strictModelEnabled ? effectiveConfig.generation.model : 'gpt-4.1-2025-04-14';
       
+      // Use shorter prompt and token limit for GPT-4.1 fast path
+      const isGPT41 = searchModel.includes('gpt-4.1');
+      const maxTokens = isGPT41 ? 220 : 500;
+      const fastPrompt = isGPT41 ? 
+        `Find 5 ${category} items related to "${searchTerm}". JSON format: {"suggestions":[{"title":"","description":""}]}` : 
+        prompt;
+
       const result = await this.chatJSON([
-        { role: 'user', content: prompt }
+        { role: 'user', content: fastPrompt }
       ], {
-        max_completion_tokens: 500,
+        max_completion_tokens: maxTokens,
         model: searchModel
       });
 

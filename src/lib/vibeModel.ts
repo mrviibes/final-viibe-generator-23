@@ -46,8 +46,8 @@ async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: st
     // Use centralized message builder
     const messages = buildVibeGeneratorMessages(inputs);
     
-    // Use smaller token budget for faster generation with mini models
-    const maxTokens = targetModel === 'gpt-4o-mini' ? 120 : config.generation.max_tokens;
+    // Use fast token budget (120) for all models in fast mode
+    const maxTokens = 120;
     
     const result = await openAIService.chatJSON(messages, {
       max_completion_tokens: maxTokens,
