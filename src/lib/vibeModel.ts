@@ -1,38 +1,21 @@
 import { openAIService } from './openai';
-import { normalizeTypography } from './textUtils';
 import { 
-  systemPrompt, 
-  buildDeveloperPrompt, 
-  fewShotAnchors, 
-  fallbackByTone, 
-  bannedPatterns, 
-  bannedWords,
-  VibeInputs 
-} from './vibeManual';
+  postProcessLine,
+  TONE_FALLBACKS,
+  AI_CONFIG,
+  SYSTEM_PROMPTS,
+  type VibeInputs,
+  type VibeCandidate,
+  type VibeResult
+} from '../vibe-ai.config';
 
-export interface VibeCandidate {
-  line: string;
-  blocked: boolean;
-  reason?: string;
-}
+// Re-export types for backward compatibility
+export type { VibeCandidate, VibeResult } from '../vibe-ai.config';
 
-export interface VibeResult {
-  candidates: string[];
-  picked: string;
-  audit: {
-    model: string;
-    textSpeed?: string;
-    usedFallback: boolean;
-    blockedCount: number;
-    candidateCount: number;
-    reason?: string;
-    retryAttempt?: number;
-    originalModel?: string;
-  };
-}
+// Interfaces now imported from centralized config
 
 function getFallbackVariants(tone: string, category: string, subcategory: string): string[] {
-  const baseFallback = fallbackByTone[tone.toLowerCase()] || fallbackByTone.humorous;
+  const baseFallback = TONE_FALLBACKS[tone.toLowerCase()] || TONE_FALLBACKS.humorous;
   
   // Create 4 distinct variations based on tone and context
   const variations = [
@@ -45,139 +28,14 @@ function getFallbackVariants(tone: string, category: string, subcategory: string
   return variations;
 }
 
-function postProcess(line: string, tone: string, requiredTags?: string[]): VibeCandidate {
-  // Trim spaces
-  let cleaned = line.trim();
-  
-  // Remove banned patterns (emojis, hashtags, quotes, newlines)
-  for (const pattern of bannedPatterns) {
-    cleaned = cleaned.replace(pattern, '');
-  }
-  
-  // Apply text normalization from textUtils
-  cleaned = normalizeTypography(cleaned);
-  
-  // Fix common text generation errors
-  // Remove duplicate words (e.g., "to beance to become" -> "to become")
-  cleaned = cleaned.replace(/\b(\w+)\s+\w*\1/gi, '$1');
-  
-  // Fix repeated "to" patterns specifically
-  cleaned = cleaned.replace(/\bto\s+\w*to\b/gi, 'to');
-  
-  // Fix common spelling errors specific to generation
-  cleaned = cleaned.replace(/\basement\b/gi, 'basement')
-    .replace(/\bcarrer\b/gi, 'career')
-    .replace(/\bskils\b/gi, 'skills');
-  
-  // Remove double spaces and clean up
-  cleaned = cleaned.replace(/\s+/g, ' ').trim();
-  
-  // Hard truncate to 100 characters
-  if (cleaned.length > 100) {
-    cleaned = cleaned.slice(0, 100);
-  }
-  
-  // Check for banned words
-  const lowerCleaned = cleaned.toLowerCase();
-  for (const word of bannedWords) {
-    if (lowerCleaned.includes(word)) {
-      return {
-        line: fallbackByTone[tone.toLowerCase()] || fallbackByTone.humorous,
-        blocked: true,
-        reason: `Contains banned word: ${word}`
-      };
-    }
-  }
-  
-  // Check if empty after cleaning
-  if (!cleaned || cleaned.length === 0) {
-    return {
-      line: fallbackByTone[tone.toLowerCase()] || fallbackByTone.humorous,
-      blocked: true,
-      reason: 'Empty after cleaning'
-    };
-  }
-  
-  // Enforce savage tone quality - block joke-like content for savage
-  if (tone.toLowerCase() === 'savage') {
-    // Block obvious joke patterns that don't fit savage tone
-    if (cleaned.match(/^(why did|what do you call|knock knock)/i) || 
-        cleaned.match(/\?\!*$/i) ||
-        cleaned.match(/\bhaha\b|\blol\b|\bmeh\b/i)) {
-      return {
-        line: fallbackByTone.savage,
-        blocked: true,
-        reason: 'Not savage enough - too joke-like'
-      };
-    }
-  }
-  
-  // Check tag coverage for important tags (skip visual-only tags) - relaxed approach
-  if (requiredTags && requiredTags.length > 0) {
-    const visualOnlyTags = ['person', 'people', 'group', 'man', 'woman', 'male', 'female'];
-    const contentTags = requiredTags.filter(tag => !visualOnlyTags.includes(tag.toLowerCase()));
-    
-    if (contentTags.length > 0) {
-      // Create a simple synonyms map for common terms
-      const synonymsMap: Record<string, string[]> = {
-        'work': ['job', 'career', 'office', 'workplace', 'employment'],
-        'job': ['work', 'career', 'employment', 'position'],
-        'career': ['work', 'job', 'profession', 'employment'],
-        'birthday': ['bday', 'birth', 'celebration', 'party'],
-        'party': ['celebration', 'bash', 'gathering', 'event'],
-        'funny': ['hilarious', 'comedy', 'humor', 'joke', 'laughter'],
-        'movie': ['film', 'cinema', 'flick'],
-        'music': ['song', 'album', 'band', 'artist'],
-        'love': ['romance', 'relationship', 'dating', 'crush'],
-        'food': ['eat', 'meal', 'cooking', 'restaurant', 'dining']
-      };
-      
-      // Extract keywords from tags and check for matches with synonyms
-      const hasTagCoverage = contentTags.some(tag => {
-        const lowerTag = tag.toLowerCase();
-        
-        // Direct match
-        if (lowerCleaned.includes(lowerTag)) return true;
-        
-        // Check for synonyms
-        const synonyms = synonymsMap[lowerTag] || [];
-        if (synonyms.some(synonym => lowerCleaned.includes(synonym))) return true;
-        
-        // Check for partial word matches (e.g., "birthday" matches "birth")
-        if (lowerTag.length > 4) {
-          const rootWord = lowerTag.slice(0, -2); // Remove last 2 chars for partial match
-          if (lowerCleaned.includes(rootWord)) return true;
-        }
-        
-        return false;
-      });
-      
-      if (!hasTagCoverage) {
-        // Don't block for tag issues - just mark it
-        return {
-          line: cleaned,
-          blocked: false,
-          reason: `Partial tag coverage: ${contentTags.join(', ')}`
-        };
-      }
-    }
-  }
-  
-  return {
-    line: cleaned,
-    blocked: false
-  };
-}
+// Post-processing now handled by centralized config
 
 async function generateMultipleCandidates(inputs: VibeInputs): Promise<VibeCandidate[]> {
   try {
-    const systemPromptUpdated = `You are a witty, creative copywriter specializing in short-form content. 
-Your task is to write 6 distinct options that vary significantly in structure, theme, and wording while maintaining the specified tone.
-Make each option distinctly different - avoid repeating similar phrases, structures, or concepts.
-Always output valid JSON only.`;
+    const systemPromptUpdated = SYSTEM_PROMPTS.vibe_generator;
 
     // Enhanced instructions for movie/pop culture + quotes
-    const isMovie = inputs.category === "pop culture" && inputs.subcategory?.toLowerCase().includes("movie");
+    const isMovie = inputs.category === "Pop Culture" && inputs.subcategory?.toLowerCase().includes("movie");
     const hasQuotes = inputs.tags?.some(tag => tag.toLowerCase().includes("quote")) || false;
     const hasPersonalRoast = inputs.tags?.some(tag => tag.toLowerCase().includes("making fun") || tag.toLowerCase().includes("bald") || tag.toLowerCase().includes("roast")) || false;
 
@@ -190,7 +48,7 @@ Always output valid JSON only.`;
     }
     
     // Add stronger recipient targeting for any tone when recipient is specified
-    if (inputs.recipient_name && inputs.recipient_name !== "-" && inputs.tone === "savage") {
+    if (inputs.recipient_name && inputs.recipient_name !== "-" && inputs.tone === "Savage") {
       specialInstructions += `\n• CRITICAL: Every line must specifically target ${inputs.recipient_name} by name - make fun of them directly, not generic content`;
     }
 
@@ -208,7 +66,7 @@ ${tagRequirement}${specialInstructions}
 
 Return only: {"lines":["option1","option2","option3","option4","option5","option6"]}`;
 
-    const systemMessage = inputs.tone === 'savage' 
+    const systemMessage = inputs.tone === 'Savage' 
       ? 'Generate short, savage roasts/burns. Make them cutting and direct, NOT joke-like. JSON array only.'
       : 'Generate short, witty text. JSON array only. No explanations.';
     
@@ -218,9 +76,9 @@ Return only: {"lines":["option1","option2","option3","option4","option5","option
     ];
     
     const result = await openAIService.chatJSON(messages, {
-      max_tokens: 150,
-      temperature: 0.7, // Reduced from 0.9 to reduce joke drift
-      model: 'gpt-4o-mini'
+      max_tokens: AI_CONFIG.generation.max_tokens,
+      temperature: AI_CONFIG.generation.temperature,
+      model: AI_CONFIG.generation.model
     });
     
     // Store the API metadata for later use
@@ -233,7 +91,7 @@ Return only: {"lines":["option1","option2","option3","option4","option5","option
     }
     
     // Post-process each line with tag validation
-    const candidates = lines.map((line: string) => postProcess(line, inputs.tone, inputs.tags));
+    const candidates = lines.map((line: string) => postProcessLine(line, inputs.tone, inputs.tags));
     
     // Add API metadata to candidates for later extraction
     if (apiMeta && candidates.length > 0) {

@@ -1,4 +1,5 @@
 import { openAIService } from './openai';
+import { SYSTEM_PROMPTS } from '../vibe-ai.config';
 
 export interface VisualInputs {
   category: string;
@@ -255,28 +256,7 @@ export async function generateVisualRecommendations(
   const enrichedInputs = autoEnrichInputs(inputs);
   const { category, subcategory, tone, tags, visualStyle, finalLine, specificEntity, subjectOption, dimensions } = enrichedInputs;
   
-const systemPrompt = `Generate 4 visual concepts for graphics that MUST align with the provided text and tone. Be concise.
-
-RULES:
-- Return ONLY valid JSON - no markdown, no extra text
-- Each prompt: 40-60 words maximum
-- 4 slots: "background-only", "subject+background", "object", "singing"
-- CRITICAL: Visual concepts MUST relate to the provided text/joke content and tone
-- For Pride themes: Include rainbow, drag queens, parades, celebrations, fabulous elements
-- For jokes: Match the humor and subject matter exactly
-- SINGING SLOT: Always include musical/performance elements in the 4th option
-
-Format:
-{
-  "options": [
-    {
-      "slot": "background-only",
-      "subject": "brief description",
-      "background": "brief description", 
-      "prompt": "concise prompt (40-60 words)"
-    }
-  ]
-}`;
+const systemPrompt = SYSTEM_PROMPTS.visual_generator;
 
 function getStyleKeywords(visualStyle?: string): string {
   const styles: Record<string, string> = {

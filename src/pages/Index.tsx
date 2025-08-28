@@ -4575,9 +4575,9 @@ const Index = () => {
         finalTagsForGeneration = [...tags];
       }
       const vibeResult: VibeResult = await generateCandidates({
-        category,
+        category: category as any,
         subcategory,
-        tone: tone.toLowerCase(),
+        tone: tone as any,
         tags: finalTagsForGeneration,
         recipient_name: selectedPick || "-"
       }, 4);
