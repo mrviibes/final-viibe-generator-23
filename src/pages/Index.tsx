@@ -6007,41 +6007,6 @@ const Index = () => {
                         </div>
 
                         <div className="max-w-lg mx-auto space-y-6">
-                          {/* Background Style and Focus Selectors */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <label className="text-sm font-medium text-foreground">Background Style</label>
-                              <Select value={backgroundPreset || 'auto'} onValueChange={(value) => setBackgroundPreset(value === 'auto' ? null : value)}>
-                                <SelectTrigger className="w-full">
-                                  <SelectValue placeholder="Select style" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="auto">Auto (default)</SelectItem>
-                                  {BACKGROUND_PRESETS.map(preset => (
-                                    <SelectItem key={preset.id} value={preset.id}>
-                                      {preset.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            
-                            <div className="space-y-2">
-                              <label className="text-sm font-medium text-foreground">Focus</label>
-                              <Select value={targetSlot || 'mixed'} onValueChange={(value) => setTargetSlot(value === 'mixed' ? null : value)}>
-                                <SelectTrigger className="w-full">
-                                  <SelectValue placeholder="Select focus" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="mixed">Mixed (default)</SelectItem>
-                                  <SelectItem value="background-only">Background Only</SelectItem>
-                                  <SelectItem value="subject+background">Subject + Background</SelectItem>
-                                  <SelectItem value="object">Objects/Props</SelectItem>
-                                  <SelectItem value="singing">Musical/Performance</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
 
                           {/* Tag Input */}
                           <div className="space-y-4">
