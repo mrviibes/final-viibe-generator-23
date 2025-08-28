@@ -169,10 +169,11 @@ export async function generateIdeogramImage(request: IdeogramGenerateRequest): P
         throw new IdeogramAPIError('No data received from backend API');
       }
 
-      // Check for fallback notification
+      // Check for fallback notification and log V3 status
       if (data._fallback_note) {
-        console.log('⚠️ Backend used fallback:', data._fallback_note);
-        // You could show a toast here if needed
+        console.log('⚠️ V3 unavailable, used fallback:', data._fallback_note);
+      } else if (data.endpoint_used && data.endpoint_used.startsWith('v3')) {
+        console.log(`✅ V3 endpoint working (${data.endpoint_used})`);
       }
 
       const modelUsed = data._fallback_note ? 'V_2A_TURBO (fallback)' : request.model;

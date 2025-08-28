@@ -10,6 +10,7 @@ const corsHeaders = {
 
 const IDEOGRAM_API_BASE = 'https://api.ideogram.ai/generate';
 const IDEOGRAM_API_V3_BASE = 'https://api.ideogram.ai/v3/images';
+const IDEOGRAM_API_V3_ALT_BASE = 'https://api.ideogram.ai/v3/images/text-to-image';
 
 interface IdeogramGenerateRequest {
   prompt: string;
@@ -48,9 +49,11 @@ serve(async (req) => {
     // Use requested model, with fallback logic for V_3 if needed
     let modelToUse = request.model;
     let shouldRetryWithTurbo = false;
+    let v3Attempts = 0;
+    let endpointUsed = '';
 
     const count = request.count || 1;
-    console.log(`Ideogram API call - Model: ${modelToUse}, Count: ${count}, Prompt: ${request.prompt.substring(0, 50)}...`);
+    console.log(`Ideogram API call - Model: ${modelToUse}, Count: ${count}, Prompt: EXACT TEXT: "${request.prompt.substring(0, 80)}..."`);
 
     if (count === 1) {
       // Single image generation with V3 endpoint support
@@ -60,8 +63,10 @@ serve(async (req) => {
       let headers: Record<string, string>;
 
       if (modelToUse === 'V_3') {
-        // Use V3 endpoint with multipart/form-data
+        // Try V3 endpoint with enhanced fallback logic
         console.log('Using V3 endpoint for V_3 model');
+        endpointUsed = 'v3-primary';
+        
         const formData = new FormData();
         formData.append('prompt', request.prompt);
         formData.append('resolution', mapAspectRatioToResolution(request.aspect_ratio));
@@ -78,15 +83,31 @@ serve(async (req) => {
           'Api-Key': ideogramApiKey,
         };
         requestBody = formData;
+        v3Attempts++;
 
         response = await fetch(IDEOGRAM_API_V3_BASE, {
           method: 'POST',
           headers,
           body: requestBody,
         });
+
+        // If primary V3 fails with 404, try alternate V3 endpoint
+        if (!response.ok && response.status === 404 && v3Attempts === 1) {
+          console.log('⚠️ Primary V3 endpoint returned 404, trying alternate V3 route');
+          endpointUsed = 'v3-alternate';
+          v3Attempts++;
+          
+          response = await fetch(IDEOGRAM_API_V3_ALT_BASE, {
+            method: 'POST',
+            headers,
+            body: requestBody,
+          });
+        }
       } else {
         // Use legacy endpoint for other models
         console.log('Using legacy endpoint for model:', modelToUse);
+        endpointUsed = 'legacy';
+        
         payload = {
           prompt: request.prompt,
           aspect_ratio: request.aspect_ratio,
@@ -117,11 +138,17 @@ serve(async (req) => {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`Ideogram API error (${response.status}):`, errorText);
+        console.error(`Ideogram API error (${response.status}) from ${endpointUsed}:`, errorText);
         
-        // If V_3 fails with certain errors, try fallback to Turbo
-        if (modelToUse === 'V_3' && (response.status === 400 || response.status === 500)) {
-          console.log('⚠️ V_3 failed, attempting fallback to V_2A_TURBO');
+        // Enhanced fallback conditions for V_3
+        if (modelToUse === 'V_3' && (
+          response.status === 404 || 
+          response.status === 400 || 
+          response.status === 500 || 
+          response.status === 502 || 
+          response.status === 503
+        )) {
+          console.log(`⚠️ V_3 failed with ${response.status} after ${v3Attempts} attempt(s), attempting fallback to V_2A_TURBO`);
           shouldRetryWithTurbo = true;
         } else {
           let errorMessage = `HTTP ${response.status}`;
@@ -139,11 +166,15 @@ serve(async (req) => {
             errorMessage = 'Rate limit exceeded. Please try again later.';
           } else if (response.status === 401) {
             errorMessage = 'Invalid API key. Please check your Ideogram API key.';
+          } else if (response.status === 404 && modelToUse === 'V_3') {
+            errorMessage = 'V3 endpoint not found. Ideogram V3 may be temporarily unavailable.';
           }
 
           return new Response(JSON.stringify({ 
             error: errorMessage,
-            status: response.status 
+            status: response.status,
+            endpoint_used: endpointUsed,
+            v3_attempts: v3Attempts
           }), {
             status: response.status,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
