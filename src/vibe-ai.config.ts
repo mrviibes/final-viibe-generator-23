@@ -184,8 +184,11 @@ export interface IdeogramHandoff {
 }
 
 // =========================
-// 2) Feature Flags and Constants
+// 2) Feature Flags and Constants  
 // =========================
+
+// Fixed negative prompt applied to all image generations
+export const DEFAULT_NEGATIVE_PROMPT = "misspellings, distorted letters, extra characters, typos, random symbols, unreadable fonts, cartoon style, flat colors, empty background, isolated subject, small text, hidden text";
 // Model fallback chains for retry strategy
 export const MODEL_FALLBACK_CHAINS = {
   text: [
@@ -852,26 +855,21 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     avoidList.push("small text", "hidden text", "subtle typography");
   }
   
-  // ADD USER'S NEGATIVE PROMPT (tokenized and deduplicated)
-  if (handoff.negative_prompt && handoff.negative_prompt.trim()) {
-    // For spelling guarantee mode with background-only, don't append negative prompt to avoid conflicts
-    if (!cleanBackground || !handoff.negative_prompt.toLowerCase().includes('negative prompts:')) {
-      // Tokenize the negative prompt by common delimiters
-      const negativeItems = handoff.negative_prompt
-        .split(/[,;|\n]+/)
-        .map(item => item.trim())
-        .filter(item => item.length > 0);
-      
-      console.log('🚫 Parsed negative prompt items:', negativeItems);
-      
-      // Add to avoid list (avoiding duplicates)
-      negativeItems.forEach(item => {
-        if (!avoidList.some(existing => existing.toLowerCase() === item.toLowerCase())) {
-          avoidList.push(item);
-        }
-      });
+  // ADD DEFAULT NEGATIVE PROMPT (always applied, tokenized and deduplicated)
+  // Tokenize the default negative prompt by common delimiters
+  const negativeItems = DEFAULT_NEGATIVE_PROMPT
+    .split(/[,;|\n]+/)
+    .map(item => item.trim())
+    .filter(item => item.length > 0);
+  
+  console.log('🚫 Parsed negative prompt items:', negativeItems);
+  
+  // Add to avoid list (avoiding duplicates)
+  negativeItems.forEach(item => {
+    if (!avoidList.some(existing => existing.toLowerCase() === item.toLowerCase())) {
+      avoidList.push(item);
     }
-  }
+  });
   
   parts.push(`Avoid: ${avoidList.join(', ')}.`);
   
