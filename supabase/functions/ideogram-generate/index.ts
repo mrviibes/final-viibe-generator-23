@@ -156,7 +156,13 @@ serve(async (req) => {
             status: response.status,
             endpoint_used: endpointUsed,
             v3_attempts: v3Attempts,
-            suggestion: 'V3 model is temporarily unavailable. You can try again later or use client-side caption overlay for guaranteed text accuracy.'
+            suggestion: 'V3 model is temporarily unavailable. You can try again later or use client-side caption overlay for guaranteed text accuracy.',
+            userActions: {
+              canRetryWithTurbo: true,
+              canUseCaption: true,
+              retryMessage: 'Try Turbo model (may have lower text quality)',
+              captionMessage: 'Use Caption Overlay (perfect text, different style)'
+            }
           }), {
             status: 503,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -173,6 +179,26 @@ serve(async (req) => {
         )) {
           console.log(`⚠️ V_3 failed with ${response.status} after ${v3Attempts} attempt(s), attempting fallback to V_2A_TURBO`);
           shouldRetryWithTurbo = true;
+          
+          // For non-exact text, provide V3_UNAVAILABLE error type
+          if (!shouldRetryWithTurbo) {
+            return new Response(JSON.stringify({ 
+              error: 'V3 model is temporarily unavailable',
+              errorType: 'V3_UNAVAILABLE',
+              status: response.status,
+              endpoint_used: endpointUsed,
+              v3_attempts: v3Attempts,
+              suggestion: 'V3 model is temporarily unavailable. Try the Turbo model for reliable generation.',
+              userActions: {
+                canRetryWithTurbo: true,
+                canUseCaption: false,
+                retryMessage: 'Try Turbo model for reliable generation'
+              }
+            }), {
+              status: 503,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
         } else {
           let errorMessage = `HTTP ${response.status}`;
           try {
