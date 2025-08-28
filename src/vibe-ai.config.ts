@@ -22,7 +22,7 @@ export interface AIRuntimeOverrides {
   defaultTone?: Tone;
   magicPromptEnabled?: boolean;
   ideogramModel?: 'V_2A_TURBO' | 'V_3';
-  typographyStyle?: 'poster' | 'negative_space';
+  typographyStyle?: 'poster' | 'negative_space' | 'subtle_caption';
   strictModelEnabled?: boolean;
   fastVisualsEnabled?: boolean;
 }
@@ -894,8 +894,10 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   
   // TYPOGRAPHY STYLE PLACEMENT (if present)
   if (handoff.key_line && handoff.key_line.trim()) {
-    if (typographyStyle !== 'poster') {
+    if (typographyStyle === 'negative_space') {
       parts.push("Place text in natural negative space areas like sky, walls, or empty backgrounds. Use TOP, BOTTOM, LEFT, or RIGHT zones rather than always centering. Ensure high contrast and avoid overlapping with faces or main subjects.");
+    } else if (typographyStyle === 'subtle_caption') {
+      parts.push("Render text as small caption: 8-12% of image width, positioned in corners/edges or clear negative space. Strong contrast required. Never cover faces or key subjects. Use corner placement, edge margins, or unobtrusive clear zones.");
     }
   }
   

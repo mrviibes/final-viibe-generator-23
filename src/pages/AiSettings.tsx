@@ -340,7 +340,7 @@ export default function AiSettings() {
                 <Label>Typography Style</Label>
                 <Select
                   value={overrides.typographyStyle || 'poster'}
-                  onValueChange={(value) => updateOverride('typographyStyle', value as 'poster' | 'negative_space')}
+                  onValueChange={(value) => updateOverride('typographyStyle', value as 'poster' | 'negative_space' | 'subtle_caption')}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -356,6 +356,12 @@ export default function AiSettings() {
                       <div className="space-y-1">
                         <div className="font-medium">Negative Space</div>
                         <div className="text-sm text-muted-foreground">Text in empty areas</div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="subtle_caption">
+                      <div className="space-y-1">
+                        <div className="font-medium">Subtle Caption (Small)</div>
+                        <div className="text-sm text-muted-foreground">Small, unobtrusive text with flexible placement</div>
                       </div>
                     </SelectItem>
                   </SelectContent>
