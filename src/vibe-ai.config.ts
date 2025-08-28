@@ -21,13 +21,26 @@ export interface AIRuntimeOverrides {
   defaultVisualStyle?: VisualStyle;
   defaultTone?: Tone;
   magicPromptEnabled?: boolean;
+  ideogramModel?: 'V_2A_TURBO' | 'V_3';
 }
 
 // Get runtime overrides from localStorage
 export function getRuntimeOverrides(): AIRuntimeOverrides {
   try {
     const stored = localStorage.getItem('ai-runtime-overrides');
-    return stored ? JSON.parse(stored) : {};
+    let overrides: AIRuntimeOverrides = stored ? JSON.parse(stored) : {};
+    
+    // Migrate legacy ideogram model setting
+    if (!overrides.ideogramModel) {
+      const legacyModel = localStorage.getItem('ideogram_selected_model');
+      if (legacyModel === 'V_3') {
+        overrides.ideogramModel = 'V_3';
+        setRuntimeOverrides({ ideogramModel: 'V_3' });
+        localStorage.removeItem('ideogram_selected_model');
+      }
+    }
+    
+    return overrides;
   } catch {
     return {};
   }

@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-import { ArrowLeft, RotateCcw, Settings, AlertTriangle, Info } from "lucide-react";
+import { ArrowLeft, RotateCcw, Settings, AlertTriangle, Info, ImageIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -382,6 +382,49 @@ export default function AiSettings() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Image Generation */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ImageIcon className="h-5 w-5" />
+                Image Generation
+              </CardTitle>
+              <CardDescription>
+                Configure image generation model and settings.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Image Model</Label>
+                <Select
+                  value={overrides.ideogramModel || 'V_2A_TURBO'}
+                  onValueChange={(value) => updateOverride('ideogramModel', value as 'V_2A_TURBO' | 'V_3')}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="V_2A_TURBO">
+                      <div className="space-y-1">
+                        <div className="font-medium">Turbo (Default)</div>
+                        <div className="text-sm text-muted-foreground">Fast and reliable</div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="V_3">
+                      <div className="space-y-1">
+                        <div className="font-medium">V3 (Premium)</div>
+                        <div className="text-sm text-muted-foreground">Higher quality, auto-fallback to Turbo if unavailable</div>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground">
+                  V3 provides higher quality but may cost more and occasionally fallback to Turbo.
+                </p>
               </div>
             </CardContent>
           </Card>

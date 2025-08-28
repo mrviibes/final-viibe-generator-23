@@ -4053,11 +4053,6 @@ const Index = () => {
   const [proxySettings, setLocalProxySettings] = useState(() => getProxySettings());
   const [proxyApiKey, setProxyApiKey] = useState('');
   
-  // Ideogram model selection state - default to Turbo (recommended)
-  const [ideogramModel, setIdeogramModel] = useState<'V_2A_TURBO' | 'V_3'>(() => {
-    const stored = localStorage.getItem('ideogram_selected_model');
-    return (stored === 'V_3') ? 'V_3' : 'V_2A_TURBO';
-  });
 
   // Remember choices toggle and load saved choices
   const [rememberChoices, setRememberChoices] = useState<boolean>(() => {
@@ -4814,8 +4809,9 @@ const Index = () => {
       const prompt = buildIdeogramPrompt(ideogramPayload);
       const aspectForIdeogram = getAspectRatioForIdeogram(aspectRatio);
       const styleForIdeogram = getStyleTypeForIdeogram(visualStyle);
-      // Use user-selected model instead of automatic selection
-      const chosenModel = ideogramModel;
+      // Get model from runtime overrides
+      const runtimeOverrides = getRuntimeOverrides();
+      const chosenModel = runtimeOverrides.ideogramModel || 'V_2A_TURBO';
       console.log('=== Ideogram Generation Debug ===');
       console.log('Direct prompt provided:', !!directPrompt.trim());
       console.log('Final prompt:', prompt);
@@ -6516,46 +6512,6 @@ const Index = () => {
                   </div>
                 </div>}
 
-              {/* Image Model Settings */}
-              <div className="bg-muted/30 rounded-lg p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-md font-medium text-foreground">Image Model</h4>
-                </div>
-                
-                <p className="text-sm text-muted-foreground">
-                  Choose which Ideogram model to use for image generation. Turbo is recommended for speed and cost.
-                </p>
-                
-                <div className="space-y-3">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Model Selection</label>
-                    <Select value={ideogramModel} onValueChange={(value: 'V_2A_TURBO' | 'V_3') => {
-                      setIdeogramModel(value);
-                      localStorage.setItem('ideogram_selected_model', value);
-                      toast({
-                        title: "Model Updated",
-                        description: `Switched to ${value === 'V_2A_TURBO' ? 'Turbo (recommended)' : 'V3 (beta)'}`
-                      });
-                    }}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="V_2A_TURBO">Turbo (V_2A_TURBO) - Recommended</SelectItem>
-                        <SelectItem value="V_3">V3 (Beta) - Higher quality, experimental</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
-                    <p className="text-sm text-blue-800 dark:text-blue-200">
-                      <strong>Cost:</strong> Turbo ≈ $0.03/image • V3 ≈ $0.08/image
-                      <br />
-                      <strong>Note:</strong> Higher counts multiply the cost. V3 may fallback to Turbo if connection issues occur.
-                    </p>
-                  </div>
-                </div>
-              </div>
 
               {/* Design Summary */}
               <div className="space-y-4">
