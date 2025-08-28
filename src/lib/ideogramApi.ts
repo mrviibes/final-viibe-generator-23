@@ -147,9 +147,13 @@ export async function generateIdeogramImage(request: IdeogramGenerateRequest): P
   // Use the model specified in the request (no automatic override)
   const requestWithModel: IdeogramGenerateRequest = { ...request };
   
-  // Try backend API first if enabled
-  if (useBackendAPI) {
-    console.log(`Calling Ideogram backend API - Model: ${request.model}, Style: ${request.style_type || 'AUTO'}, Prompt: ${request.prompt.substring(0, 50)}...`);
+  // Always use backend API for V_3 model to ensure proper V3 endpoint usage
+  const forceBackend = requestWithModel.model === 'V_3';
+  
+  // Try backend API first if enabled or if V_3 model
+  if (useBackendAPI || forceBackend) {
+    const apiPath = forceBackend ? 'backend (V3 model)' : 'backend';
+    console.log(`Calling Ideogram ${apiPath} - Model: ${request.model}, Style: ${request.style_type || 'AUTO'}, Prompt: ${request.prompt.substring(0, 50)}...`);
     
     try {
       const { data, error } = await supabase.functions.invoke('ideogram-generate', {
@@ -171,20 +175,23 @@ export async function generateIdeogramImage(request: IdeogramGenerateRequest): P
         // You could show a toast here if needed
       }
 
-      console.log(`Backend Ideogram API success - Generated ${data.data?.length || 0} image(s) with Model: ${request.model}, Style: ${request.style_type || 'AUTO'}`);
+      const modelUsed = data._fallback_note ? 'V_2A_TURBO (fallback)' : request.model;
+      console.log(`Backend Ideogram API success - Generated ${data.data?.length || 0} image(s) with Model: ${modelUsed}, Style: ${request.style_type || 'AUTO'}`);
       return data as IdeogramGenerateResponse;
 
     } catch (error) {
       console.error('Backend Ideogram API call failed:', error);
       
-      // Fallback to frontend if backend fails and we have a key
-      const key = getIdeogramApiKey();
-      if (key) {
-        console.log('Falling back to frontend Ideogram API...');
-        useBackendAPI = false;
-        const result = await generateIdeogramImageFrontend(requestWithModel);
-        useBackendAPI = true; // Reset for next call
-        return result;
+      // Only fallback to frontend if not V_3 model and we have a key
+      if (!forceBackend) {
+        const key = getIdeogramApiKey();
+        if (key) {
+          console.log('Falling back to frontend Ideogram API...');
+          useBackendAPI = false;
+          const result = await generateIdeogramImageFrontend(requestWithModel);
+          useBackendAPI = true; // Reset for next call
+          return result;
+        }
       }
       
       throw error instanceof IdeogramAPIError ? error : new IdeogramAPIError(

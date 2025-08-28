@@ -9,6 +9,7 @@ const corsHeaders = {
 };
 
 const IDEOGRAM_API_BASE = 'https://api.ideogram.ai/generate';
+const IDEOGRAM_API_V3_BASE = 'https://api.ideogram.ai/v3/images';
 
 interface IdeogramGenerateRequest {
   prompt: string;
@@ -52,32 +53,67 @@ serve(async (req) => {
     console.log(`Ideogram API call - Model: ${modelToUse}, Count: ${count}, Prompt: ${request.prompt.substring(0, 50)}...`);
 
     if (count === 1) {
-      // Single image generation (existing logic)
-      const payload: any = {
-        prompt: request.prompt,
-        aspect_ratio: request.aspect_ratio,
-        model: modelToUse,
-        magic_prompt_option: request.magic_prompt_option,
-      };
-      
-      if (request.seed !== undefined) {
-        payload.seed = request.seed;
-      }
-      
-      if (request.style_type) {
-        payload.style_type = request.style_type;
-      }
+      // Single image generation with V3 endpoint support
+      let response: Response;
+      let payload: any;
+      let requestBody: string | FormData;
+      let headers: Record<string, string>;
 
-      const requestBody = JSON.stringify({ image_request: payload });
+      if (modelToUse === 'V_3') {
+        // Use V3 endpoint with multipart/form-data
+        console.log('Using V3 endpoint for V_3 model');
+        const formData = new FormData();
+        formData.append('prompt', request.prompt);
+        formData.append('resolution', mapAspectRatioToResolution(request.aspect_ratio));
+        
+        if (request.seed !== undefined) {
+          formData.append('seed', request.seed.toString());
+        }
+        
+        if (request.style_type && request.style_type !== 'AUTO') {
+          formData.append('style_type', request.style_type);
+        }
 
-      const response = await fetch(IDEOGRAM_API_BASE, {
-        method: 'POST',
-        headers: {
+        headers = {
+          'Api-Key': ideogramApiKey,
+        };
+        requestBody = formData;
+
+        response = await fetch(IDEOGRAM_API_V3_BASE, {
+          method: 'POST',
+          headers,
+          body: requestBody,
+        });
+      } else {
+        // Use legacy endpoint for other models
+        console.log('Using legacy endpoint for model:', modelToUse);
+        payload = {
+          prompt: request.prompt,
+          aspect_ratio: request.aspect_ratio,
+          model: modelToUse,
+          magic_prompt_option: request.magic_prompt_option,
+        };
+        
+        if (request.seed !== undefined) {
+          payload.seed = request.seed;
+        }
+        
+        if (request.style_type) {
+          payload.style_type = request.style_type;
+        }
+
+        headers = {
           'Api-Key': ideogramApiKey,
           'Content-Type': 'application/json',
-        },
-        body: requestBody,
-      });
+        };
+        requestBody = JSON.stringify({ image_request: payload });
+
+        response = await fetch(IDEOGRAM_API_BASE, {
+          method: 'POST',
+          headers,
+          body: requestBody,
+        });
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -126,7 +162,7 @@ serve(async (req) => {
       
       // Retry with Turbo if V_3 failed
       if (shouldRetryWithTurbo) {
-        console.log('Retrying with V_2A_TURBO model...');
+        console.log('Retrying with V_2A_TURBO model on legacy endpoint...');
         modelToUse = 'V_2A_TURBO';
         
         const fallbackPayload: any = {
@@ -192,10 +228,16 @@ serve(async (req) => {
       const promises: Promise<any>[] = [];
       
       for (let i = 0; i < count; i++) {
+        // For batch generation, always use legacy endpoint (V3 doesn't support batch well)
+        const effectiveModel = modelToUse === 'V_3' ? 'V_2A_TURBO' : modelToUse;
+        if (modelToUse === 'V_3' && i === 0) {
+          console.log('Using V_2A_TURBO for batch generation instead of V_3');
+        }
+        
         const payload: any = {
           prompt: request.prompt,
           aspect_ratio: request.aspect_ratio,
-          model: modelToUse,
+          model: effectiveModel,
           magic_prompt_option: request.magic_prompt_option,
         };
         
@@ -274,3 +316,22 @@ serve(async (req) => {
     });
   }
 });
+
+// Helper function to map aspect ratio to V3 resolution format
+function mapAspectRatioToResolution(aspectRatio: string): string {
+  const resolutionMap: Record<string, string> = {
+    'ASPECT_1_1': '1024x1024',
+    'ASPECT_10_16': '832x1216',
+    'ASPECT_16_10': '1216x832',
+    'ASPECT_9_16': '896x1152',
+    'ASPECT_16_9': '1152x896',
+    'ASPECT_3_2': '1216x832',
+    'ASPECT_2_3': '832x1216',
+    'ASPECT_4_3': '1152x896',
+    'ASPECT_3_4': '896x1152',
+    'ASPECT_1_3': '832x1216',
+    'ASPECT_3_1': '1216x832'
+  };
+  
+  return resolutionMap[aspectRatio] || '1024x1024';
+}
