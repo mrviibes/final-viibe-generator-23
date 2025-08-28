@@ -271,3 +271,37 @@ Return valid JSON array of 4 objects.
 - **Inspirational**: Energetic encouragement. Avoid cliché phrases.
 - **Playful**: Mischief and fun. No meanness.
 - **Serious**: Respectful, factual, no jokes.
+
+## 8. Runtime Configuration
+
+The application supports runtime configuration overrides via the AI Settings page (`/ai-settings`):
+
+### 8.1 Available Overrides
+- **Model Selection**: Choose between GPT-5, GPT-4.1, and other available models
+- **Temperature Control**: Adjust creativity vs focus (0.0-2.0) 
+- **Content Settings**: Toggle spellcheck, clean backgrounds, spelling guarantee
+- **Default Preferences**: Set default visual styles and tones
+- **Magic Prompt**: Enable enhanced prompt engineering
+
+### 8.2 Implementation
+```typescript
+// Get current config with overrides applied
+const config = getEffectiveConfig();
+
+// Set runtime overrides
+setRuntimeOverrides({ model: 'gpt-5-2025-08-07', temperature: 0.8 });
+
+// Clear all overrides
+clearRuntimeOverrides();
+```
+
+Runtime overrides are stored in localStorage and take precedence over default configuration values.
+
+## 9. File Locations
+
+- Main config: `src/vibe-ai.config.ts`
+- AI Settings UI: `src/pages/AiSettings.tsx`
+- Text generation: `src/lib/vibeModel.ts`
+- Image generation: `src/lib/ideogramPrompt.ts`
+- Visual concepts: `src/lib/visualModel.ts`
+- Legacy compatibility: `src/lib/vibeManual.ts`

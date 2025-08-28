@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Search, Loader2, AlertCircle, ArrowLeft, ArrowRight, X, Download } from "lucide-react";
+import { Search, Loader2, AlertCircle, ArrowLeft, ArrowRight, X, Download, Settings } from "lucide-react";
 import { openAIService, OpenAISearchResult } from "@/lib/openai";
 import { ApiKeyDialog } from "@/components/ApiKeyDialog";
 import { IdeogramKeyDialog } from "@/components/IdeogramKeyDialog";
@@ -4927,7 +4927,17 @@ const Index = () => {
         <div className="flex justify-between items-center mb-4">
           <div></div>
           <StepProgress currentStep={currentStep} />
-          <div></div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate("/ai-settings")}
+              className="gap-2"
+            >
+              <Settings className="h-4 w-4" />
+              AI Settings
+            </Button>
+          </div>
         </div>
         
         {currentStep === 1 && <>

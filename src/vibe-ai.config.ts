@@ -8,7 +8,50 @@
 
   Change log:
     - v1.0.0 initial extraction
+    - v1.1.0 added runtime overrides system
 */
+
+// Runtime overrides (stored in localStorage)
+export interface AIRuntimeOverrides {
+  model?: string;
+  temperature?: number;
+  spellcheckEnabled?: boolean;
+  cleanBackgroundDefault?: boolean;
+  spellingGuaranteeDefault?: boolean;
+  defaultVisualStyle?: VisualStyle;
+  defaultTone?: Tone;
+  magicPromptEnabled?: boolean;
+}
+
+// Get runtime overrides from localStorage
+export function getRuntimeOverrides(): AIRuntimeOverrides {
+  try {
+    const stored = localStorage.getItem('ai-runtime-overrides');
+    return stored ? JSON.parse(stored) : {};
+  } catch {
+    return {};
+  }
+}
+
+// Set runtime overrides in localStorage
+export function setRuntimeOverrides(overrides: Partial<AIRuntimeOverrides>): void {
+  try {
+    const current = getRuntimeOverrides();
+    const updated = { ...current, ...overrides };
+    localStorage.setItem('ai-runtime-overrides', JSON.stringify(updated));
+  } catch (error) {
+    console.warn('Failed to save AI runtime overrides:', error);
+  }
+}
+
+// Clear all runtime overrides
+export function clearRuntimeOverrides(): void {
+  try {
+    localStorage.removeItem('ai-runtime-overrides');
+  } catch (error) {
+    console.warn('Failed to clear AI runtime overrides:', error);
+  }
+}
 
 // =========================
 // 1) Types and Enums
@@ -159,6 +202,27 @@ export const AI_CONFIG = {
     model: 'gpt-4o-mini'
   }
 };
+
+// Get effective configuration with runtime overrides applied
+export function getEffectiveConfig() {
+  const overrides = getRuntimeOverrides();
+  return {
+    ...AI_CONFIG,
+    spellcheck: {
+      ...AI_CONFIG.spellcheck,
+      enabled: overrides.spellcheckEnabled ?? AI_CONFIG.spellcheck.enabled
+    },
+    visual_defaults: {
+      ...AI_CONFIG.visual_defaults,
+      style: overrides.defaultVisualStyle ?? AI_CONFIG.visual_defaults.style
+    },
+    generation: {
+      ...AI_CONFIG.generation,
+      model: overrides.model ?? AI_CONFIG.generation.model,
+      temperature: overrides.temperature ?? AI_CONFIG.generation.temperature
+    }
+  };
+}
 
 // =========================
 // 3) Prompts and System Messages
