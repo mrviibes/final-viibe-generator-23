@@ -852,24 +852,107 @@ export function getBackgroundPreset(presetId: string): BackgroundPreset | null {
 // =========================
 // 9) Ideogram-specific Functions
 // =========================
-export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: boolean = false): string {
+
+// Interface for concise mode options
+export interface ConciseModeOptions {
+  enabled: boolean;
+  textZone?: 'TOP' | 'BOTTOM' | 'LEFT' | 'RIGHT' | 'NATURAL';
+  strongerSubjectLock?: boolean;
+}
+
+export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: boolean = false, conciseMode?: ConciseModeOptions): string {
   const parts: string[] = [];
   const overrides = getRuntimeOverrides();
-  const typographyStyle = overrides.typographyStyle || 'poster'; // Default to poster style
+  const typographyStyle = overrides.typographyStyle || 'poster';
+  
+  // Use concise mode if specified
+  const isConciseMode = conciseMode?.enabled || false;
   
   // EXACT TEXT RENDERING (if present) - PUT FIRST for priority
   if (handoff.key_line && handoff.key_line.trim()) {
-    // Clean and normalize text to ASCII-safe characters
     const cleanText = handoff.key_line
       .replace(/[""]/g, '"')
       .replace(/['']/g, "'")
       .replace(/[—–]/g, '-')
       .replace(/[^\x00-\x7F]/g, '') // Remove non-ASCII characters
       .trim();
-    // Remove redundant "EXACT TEXT:" prefix that users might include
     const finalText = cleanText.replace(/^EXACT TEXT:\s*["']?/i, '').replace(/["']$/, '');
-    parts.push(`EXACT TEXT: "${finalText}" - Render each letter precisely as provided, maintaining exact spelling and character placement`);
+    
+    if (isConciseMode) {
+      // Ultra-concise text marking for better subject focus
+      parts.push(`EXACT TEXT: "${finalText}"`);
+    } else {
+      parts.push(`EXACT TEXT: "${finalText}" - Render each letter precisely as provided, maintaining exact spelling and character placement`);
+    }
   }
+  
+  if (isConciseMode) {
+    // CONCISE MODE: Subject-first, minimal prompting
+    const conciseParts = [];
+    
+    // MAIN SUBJECT (prioritized and locked)
+    let subject = handoff.rec_subject;
+    if (!subject && handoff.chosen_visual) {
+      const visualParts = handoff.chosen_visual.split(' - ');
+      subject = visualParts.length >= 2 ? visualParts[0].trim() : handoff.chosen_visual;
+    }
+    
+    if (subject) {
+      if (conciseMode?.strongerSubjectLock) {
+        conciseParts.push(`${subject} (main focus)`);
+      } else {
+        conciseParts.push(subject);
+      }
+    }
+    
+    // BACKGROUND (minimal)
+    let background = handoff.rec_background;
+    if (!background && handoff.chosen_visual) {
+      const visualParts = handoff.chosen_visual.split(' - ');
+      background = visualParts.length >= 2 ? visualParts[1].trim() : `${handoff.subcategory_primary} setting`;
+    }
+    if (!background) {
+      background = `${handoff.subcategory_primary} setting`;
+    }
+    if (cleanBackground) {
+      background = "clean background";
+    }
+    conciseParts.push(background);
+    
+    // STYLE (compressed)
+    if (handoff.visual_style) {
+      conciseParts.push(`${handoff.visual_style} style`);
+    }
+    if (handoff.tone) {
+      conciseParts.push(`${handoff.tone} tone`);
+    }
+    
+    // TEXT ZONE (specific placement)
+    if (handoff.key_line && conciseMode?.textZone) {
+      if (conciseMode.textZone === 'NATURAL') {
+        conciseParts.push("text in natural negative space");
+      } else {
+        conciseParts.push(`text in ${conciseMode.textZone} zone`);
+      }
+    }
+    
+    // Context-aware negative prompts (minimal)
+    if (handoff.key_line) {
+      const contextNegatives = [];
+      if (subject?.toLowerCase().includes('trophy') || subject?.toLowerCase().includes('award')) {
+        contextNegatives.push("misspellings", "distorted letters");
+      } else {
+        contextNegatives.push("text errors");
+      }
+      if (contextNegatives.length > 0) {
+        conciseParts.push(`avoid ${contextNegatives.join(', ')}`);
+      }
+    }
+    
+    return conciseParts.join(', ') + '.';
+  }
+  
+  // STANDARD MODE: Full detailed prompting (existing logic)
   
   // CHARACTER IDENTITY CUES for Pop Culture
   if (handoff.category === "Pop Culture" && handoff.subcategory_secondary) {
@@ -882,7 +965,7 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     parts.push("Recreate this scene literally and accurately with authentic details from the source material.");
   }
   
-  // Build concise prompt sections with line breaks
+  // Build standard prompt sections
   const sections = [];
   
   // MAIN SUBJECT
@@ -893,7 +976,7 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   }
   if (subject) sections.push(`Subject: ${subject}.`);
   
-  // BACKGROUND (integrate theme here instead of as separate text)
+  // BACKGROUND
   let background = handoff.rec_background;
   if (!background && handoff.chosen_visual) {
     const visualParts = handoff.chosen_visual.split(' - ');
@@ -905,13 +988,12 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   if (cleanBackground) {
     background = "clean, minimal background with high contrast for text";
   }
-  // Integrate subcategory theme into background description instead of as standalone text
   if (handoff.subcategory_primary && !background.toLowerCase().includes(handoff.subcategory_primary.toLowerCase())) {
     background = `${handoff.subcategory_primary} themed setting with ${background}`;
   }
   sections.push(`Background: ${background}.`);
   
-  // PEOPLE INCLUSION (when recommended or for Birthday)
+  // PEOPLE INCLUSION
   const peopleKeywords = ['friends', 'crowd', 'people', 'group', 'party', 'audience', 'performers', 'celebrating', 'family', 'parents', 'kids', 'children', 'guests', 'selfie', 'selfies', 'group selfie', 'partygoers'];
   const needsPeople = peopleKeywords.some(keyword => 
     handoff.chosen_visual?.toLowerCase().includes(keyword) || 
@@ -922,7 +1004,7 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     sections.push("Include multiple people clearly visible in the scene.");
   }
   
-  // STYLE, TONE, FORMAT - compressed into one line
+  // STYLE, TONE, FORMAT
   const styleDetails = [];
   let finalStyle = handoff.visual_style;
   if (handoff.category === "Pop Culture" && handoff.subcategory_secondary && !finalStyle) {
@@ -935,12 +1017,11 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     sections.push(`${styleDetails.join(', ')}.`);
   }
   
-  // TEXT PLACEMENT & NEGATIVE PROMPTS (shortened)
+  // TEXT PLACEMENT & NEGATIVE PROMPTS
   if (handoff.key_line && handoff.key_line.trim()) {
     sections.push("Place text in natural negative space areas. Use TOP, BOTTOM, LEFT, or RIGHT zones. Ensure high contrast and avoid overlapping with faces.");
     sections.push("Render only the EXACT TEXT string as graphic text; no additional labels or captions.");
     
-    // Shortened negative prompt
     const negatives = [handoff.negative_prompt, DEFAULT_NEGATIVE_PROMPT].filter(Boolean);
     if (negatives.length > 0) {
       sections.push(`Avoid ${negatives.join(', ')}`);

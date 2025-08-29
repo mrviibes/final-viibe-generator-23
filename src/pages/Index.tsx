@@ -18,13 +18,14 @@ import { StepProgress } from "@/components/StepProgress";
 import { StackedSelectionCard } from "@/components/StackedSelectionCard";
 import { MovieSceneHelper } from "@/components/MovieSceneHelper";
 import { FallbackTooltip } from "@/components/FallbackTooltip";
+import { ConciseModePanel } from "@/components/ConciseModePanel";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigate } from "react-router-dom";
 import { generateCandidates, VibeResult } from "@/lib/vibeModel";
 import { buildIdeogramHandoff } from "@/lib/ideogram";
 import { generateVisualRecommendations, VisualOption } from "@/lib/visualModel";
 import { generateIdeogramImage, setIdeogramApiKey, getIdeogramApiKey, hasIdeogramApiKey, isUsingBackend as ideogramIsUsingBackend, IdeogramAPIError, getProxySettings, setProxySettings, testProxyConnection, ProxySettings } from "@/lib/ideogramApi";
-import { buildIdeogramPrompt, getAspectRatioForIdeogram, getStyleTypeForIdeogram } from "@/lib/ideogramPrompt";
+import { buildIdeogramPrompt, getAspectRatioForIdeogram, getStyleTypeForIdeogram, ConciseModeOptions } from "@/lib/ideogramPrompt";
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
 import { normalizeTypography, suggestContractions, isTextMisspelled } from "@/lib/textUtils";
@@ -4044,6 +4045,11 @@ const Index = () => {
   const [isCustomTextConfirmed, setIsCustomTextConfirmed] = useState<boolean>(false);
   // Use fixed negative prompt - no longer editable
   const negativePrompt = DEFAULT_NEGATIVE_PROMPT;
+  const [conciseModeOptions, setConciseModeOptions] = useState<ConciseModeOptions>({
+    enabled: false,
+    textZone: 'NATURAL',
+    strongerSubjectLock: false
+  });
   const [showIdeogramKeyDialog, setShowIdeogramKeyDialog] = useState<boolean>(false);
   const [showProxySettingsDialog, setShowProxySettingsDialog] = useState<boolean>(false);
   const [showCorsRetryDialog, setShowCorsRetryDialog] = useState<boolean>(false);
@@ -4231,6 +4237,41 @@ const Index = () => {
       });
     }
     setIsTestingProxy(false);
+  };
+
+  // Quick generation with different concise modes
+  const handleQuickGenerate = async (mode: 'ultra-short' | 'short' | 'short-locked') => {
+    if (!stepTwoText.trim()) {
+      toast({
+        title: "No Text Available",
+        description: "Please add some text before generating quick prompts",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Configure concise mode options based on the selected mode
+    const modeOptions: ConciseModeOptions = {
+      enabled: true,
+      textZone: 'NATURAL',
+      strongerSubjectLock: mode === 'short-locked'
+    };
+
+    // Temporarily set the concise mode options and regenerate
+    const originalOptions = conciseModeOptions;
+    setConciseModeOptions(modeOptions);
+    
+    try {
+      await handleGenerateImage(1);
+      toast({
+        title: "Quick Generation",
+        description: `Generated with ${mode.replace('-', ' ')} mode`,
+      });
+    } catch (error) {
+      // Restore original options on error
+      setConciseModeOptions(originalOptions);
+      throw error;
+    }
   };
 
   // Helper function to build selections for StackedSelectionCard
@@ -4866,7 +4907,7 @@ const Index = () => {
 
       // ALWAYS use deterministic EXACT TEXT prompt builder
       console.log('ideogram: using EXACT TEXT builder');
-      const prompt = buildIdeogramPrompt(ideogramPayload);
+      const prompt = buildIdeogramPrompt(ideogramPayload, false, conciseModeOptions);
       const aspectForIdeogram = getAspectRatioForIdeogram(aspectRatio);
       const styleForIdeogram = getStyleTypeForIdeogram(visualStyle);
       // Get model from runtime overrides
@@ -6792,13 +6833,21 @@ const Index = () => {
                   rec_subject: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].subject : selectedSubjectOption === "design-myself" ? subjectDescription : undefined,
                   rec_background: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined
                 });
-                const promptText = buildIdeogramPrompt(tempHandoff);
+                const promptText = buildIdeogramPrompt(tempHandoff, false, conciseModeOptions);
                 return <p className="text-sm text-foreground font-mono leading-relaxed whitespace-pre-wrap">
                           {promptText || "No prompt available"}
                         </p>;
               })()}
                   </div>
                 </div>
+
+                {/* Concise Mode Panel */}
+                <ConciseModePanel 
+                  conciseModeOptions={conciseModeOptions}
+                  onOptionsChange={setConciseModeOptions}
+                  onQuickGenerate={handleQuickGenerate}
+                  className="mb-4"
+                />
 
                 {/* Negative Prompt Display */}
                 {negativePrompt.trim() && <div className="space-y-4">
@@ -6923,7 +6972,7 @@ const Index = () => {
                 });
 
                 // Generate the Ideogram prompt
-                const promptText = buildIdeogramPrompt(ideogramPayload);
+                const promptText = buildIdeogramPrompt(ideogramPayload, false, conciseModeOptions);
                 const aspectRatioKey = getAspectRatioForIdeogram(selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || "");
                 let styleType = getStyleTypeForIdeogram(visualStyle);
                 let model: 'V_1' | 'V_1_TURBO' | 'V_2' | 'V_2_TURBO' | 'V_2A' | 'V_2A_TURBO' | 'V_3' = 'V_2_TURBO';
