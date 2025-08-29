@@ -169,6 +169,7 @@ export interface VibeResult {
     originalModel?: string;
     originalModelDisplayName?: string;
     spellingFiltered?: number;
+    usedBackupPrompt?: boolean;
   };
 }
 

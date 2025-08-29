@@ -54,10 +54,42 @@ async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: st
     // Store the API metadata for later use
     const apiMeta = result._apiMeta;
     
-    // Extract lines from JSON response
-    const lines = result.lines || [];
+    // Extract lines from JSON response - try multiple possible shapes
+    let lines = result.lines || result.options || result.generated_phrases || [];
+    
     if (!Array.isArray(lines) || lines.length === 0) {
-      throw new Error('Invalid response format - no lines array');
+      console.log('🔄 Primary JSON shape failed, trying backup prompt...');
+      
+      // Retry with simpler backup prompt
+      const backupMessages = [
+        { role: 'system', content: 'You are a helpful text generator. Always respond with valid JSON in the format: {"lines": ["text1", "text2", "text3", "text4"]}' },
+        { role: 'user', content: `Generate 4 different ${inputs.tone} text variations for ${inputs.category}${inputs.subcategory ? ` (${inputs.subcategory})` : ''}. Keep each under 100 characters.` }
+      ];
+      
+      try {
+        const backupResult = await openAIService.chatJSON(backupMessages, {
+          max_tokens: config.generation.max_tokens,
+          temperature: config.generation.temperature,
+          model: targetModel
+        });
+        
+        lines = backupResult.lines || backupResult.options || backupResult.generated_phrases || [];
+        
+        if (Array.isArray(lines) && lines.length > 0) {
+          console.log('✅ Backup prompt succeeded');
+          // Mark this as backup usage in the metadata
+          if (backupResult._apiMeta) {
+            backupResult._apiMeta.usedBackupPrompt = true;
+          } else {
+            (lines as any)._apiMeta = { usedBackupPrompt: true };
+          }
+        } else {
+          throw new Error('Backup prompt also failed - no valid lines');
+        }
+      } catch (backupError) {
+        console.error('Backup prompt failed:', backupError);
+        throw new Error('Both primary and backup generation failed');
+      }
     }
     
     // Check if this is knock-knock format
@@ -72,6 +104,12 @@ async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: st
     // Add API metadata to candidates for later extraction
     if (apiMeta && candidates.length > 0) {
       (candidates as any)._apiMeta = apiMeta;
+    }
+    
+    // Check if backup prompt was used and add to metadata
+    const usedBackupPrompt = (lines as any)._apiMeta?.usedBackupPrompt || result._apiMeta?.usedBackupPrompt;
+    if (usedBackupPrompt && candidates.length > 0) {
+      (candidates as any)._apiMeta = { ...(candidates as any)._apiMeta, usedBackupPrompt: true };
     }
     
     return candidates;
@@ -110,6 +148,7 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
   let retryAttempt = 0;
   let originalModel: string | undefined;
   let modelUsed = apiMeta?.modelUsed || 'gpt-4.1-2025-04-14';
+  let usedBackupPrompt = apiMeta?.usedBackupPrompt || false;
   
   // Quality retry: if we have < 4 valid lines and spelling issues, try with next model in chain
   if (uniqueValidLines.length < 4 && spellingFiltered > 0) {
@@ -239,7 +278,8 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
       retryAttempt,
       originalModel,
       originalModelDisplayName: originalModel ? MODEL_DISPLAY_NAMES[originalModel] || originalModel : undefined,
-      spellingFiltered
+      spellingFiltered,
+      usedBackupPrompt
     }
   };
 }
