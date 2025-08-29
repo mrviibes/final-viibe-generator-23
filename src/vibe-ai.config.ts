@@ -274,6 +274,9 @@ export function getSensitiveTagSuggestions(tag: string): string[] {
 
 // Fixed negative prompt applied to all image generations - keep short and focused
 export const DEFAULT_NEGATIVE_PROMPT = "misspellings, distorted letters, typos, incorrect spelling, garbled text, unreadable text, handwriting, cursive, script font, ligatures, broken kerning, cramped kerning, letter swaps, split letters, watermark, logo, captions, duplicated words";
+
+// Enhanced negative prompt for exact text scenarios
+export const EXACT_TEXT_NEGATIVE_PROMPT = "misspellings, distorted letters, typos, incorrect spelling, garbled text, unreadable text, handwriting, cursive, script font, ligatures, broken kerning, cramped kerning, letter swaps, split letters, watermark, logo, captions, duplicated words, blurry text, unclear typography, text bleeding, overlapping text, shadow text effects, beveled text, 3D text distortion";
 // Model fallback chains for retry strategy
 export const MODEL_FALLBACK_CHAINS = {
   text: [
@@ -923,7 +926,8 @@ export const BACKGROUND_PRESETS: BackgroundPreset[] = [
   { id: 'luxury', name: 'Luxury Style', keywords: ['luxury interior', 'marble columns', 'gold accents', 'upscale setting'], textSafeZone: 'right', style: 'elegant luxury' },
   { id: 'cosmic', name: 'Space & Cosmic', keywords: ['starry night', 'galaxy background', 'cosmic setting', 'space theme'], textSafeZone: 'bottom', style: 'cosmic wonder' },
   { id: 'industrial', name: 'Industrial Edge', keywords: ['industrial setting', 'metal backdrop', 'warehouse vibe', 'concrete industrial'], textSafeZone: 'corners', style: 'industrial grit' },
-  { id: 'artistic', name: 'Creative Studio', keywords: ['art studio', 'creative workspace', 'artistic chaos', 'paint splatter'], textSafeZone: 'left', style: 'artistic freedom' }
+  { id: 'artistic', name: 'Creative Studio', keywords: ['art studio', 'creative workspace', 'artistic chaos', 'paint splatter'], textSafeZone: 'left', style: 'artistic freedom' },
+  { id: 'dispensary', name: 'Cannabis Dispensary', keywords: ['modern dispensary interior', 'stylish cannabis store shelves', 'trendy marijuana retail space', 'clean dispensary background'], textSafeZone: 'top', style: 'modern retail' }
 ];
 
 export function getBackgroundPreset(presetId: string): BackgroundPreset | null {
@@ -939,6 +943,35 @@ export interface ConciseModeOptions {
   enabled: boolean;
   textZone?: 'TOP' | 'BOTTOM' | 'LEFT' | 'RIGHT' | 'NATURAL';
   strongerSubjectLock?: boolean;
+}
+
+// Enhanced exact text detection and formatting
+function hasExactTextRequirement(prompt: string): boolean {
+  return prompt.includes('EXACT TEXT:') || 
+         prompt.includes('exact spelling') ||
+         prompt.includes('precise text') ||
+         prompt.includes('word-for-word');
+}
+
+function formatExactTextPrompt(prompt: string): string {
+  if (!hasExactTextRequirement(prompt)) return prompt;
+  
+  // Extract exact text if present
+  const exactTextMatch = prompt.match(/EXACT TEXT:\s*["']([^"']+)["']/);
+  if (exactTextMatch) {
+    const exactText = exactTextMatch[1];
+    
+    // Strong emphasis on exact spelling
+    const enhancedPrompt = prompt.replace(
+      /EXACT TEXT:\s*["'][^"']+["']/,
+      `EXACT TEXT: "${exactText}" - Render each letter precisely as provided, maintaining exact spelling and character placement`
+    );
+    
+    // Add typography guidance
+    return enhancedPrompt + `. Use clear, readable typography with high contrast. Place text in natural negative space areas. Use TOP, BOTTOM, LEFT, or RIGHT zones. Ensure high contrast and avoid overlapping with faces. Render only the EXACT TEXT string as graphic text; no additional labels or captions.`;
+  }
+  
+  return prompt;
 }
 
 export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: boolean = false, conciseMode?: ConciseModeOptions): string {
@@ -1125,7 +1158,12 @@ export function getAspectRatioForIdeogram(aspectRatio: string): 'ASPECT_10_16' |
   return ratioMap[aspectRatio] || 'ASPECT_16_9';
 }
 
-export function getStyleTypeForIdeogram(visualStyle: string): 'AUTO' | 'GENERAL' | 'REALISTIC' | 'DESIGN' | 'RENDER_3D' | 'ANIME' {
+export function getStyleTypeForIdeogram(visualStyle: string, prompt?: string): 'AUTO' | 'GENERAL' | 'REALISTIC' | 'DESIGN' | 'RENDER_3D' | 'ANIME' {
+  // Force DESIGN style when exact text is present for better typography
+  if (prompt && (prompt.includes('EXACT TEXT:') || prompt.includes('exact spelling') || prompt.includes('precise text'))) {
+    console.log('🎯 EXACT TEXT detected - forcing DESIGN style for optimal text rendering');
+    return 'DESIGN';
+  }
   const styleMap: Record<string, 'AUTO' | 'GENERAL' | 'REALISTIC' | 'DESIGN' | 'RENDER_3D' | 'ANIME'> = {
     'realistic': 'REALISTIC',
     'cartoon': 'ANIME',

@@ -152,10 +152,13 @@ export async function generateIdeogramImage(request: IdeogramGenerateRequest): P
   const hasExactText = request.prompt.includes('EXACT TEXT:');
   let requestWithModel: IdeogramGenerateRequest = { ...request };
   
-  // Force V_3 for character-heavy scenes AND exact text for better recognition/rendering
-  if ((isPopCultureCharacter || hasExactText) && request.model !== 'V_3') {
-    const reason = hasExactText ? 'exact text detected' : 'Pop Culture character detected';
-    console.log(`🎭 ${reason}, upgrading to V_3 model for better ${hasExactText ? 'text rendering' : 'character recognition'}`);
+  // Force V_3 and DESIGN style for exact text scenarios
+  if (hasExactText && request.model !== 'V_3') {
+    console.log(`🎯 EXACT TEXT detected - upgrading to V_3 model and DESIGN style for optimal text rendering`);
+    requestWithModel.model = 'V_3';
+    requestWithModel.style_type = 'DESIGN';
+  } else if (isPopCultureCharacter && request.model !== 'V_3') {
+    console.log(`🎭 Pop Culture character detected, upgrading to V_3 model for better character recognition`);
     requestWithModel.model = 'V_3';
   }
   

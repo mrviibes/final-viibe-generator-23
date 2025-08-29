@@ -5343,6 +5343,35 @@ const Index = () => {
             <div className="text-center mb-12">
               <h2 className="text-2xl md:text-3xl font-semibold text-foreground mb-4">Choose Your Category</h2>
               <p className="text-xl text-muted-foreground">Select the Category that best fits your Vibe</p>
+              
+              {/* Test Preset Quick Access */}
+              <div className="mt-6">
+                <Button 
+                  onClick={() => {
+                    // Set up Sale Poster test case
+                    setSelectedStyle('celebrations');
+                    setSelectedSubOption('420');
+                    setCurrentStep(2);
+                    setSelectedTextStyle('humorous');
+                    setCurrentStep(3);
+                    setSelectedVisualStyle('Realistic');
+                    setSelectedSubjectOption('design-myself');
+                    setSubjectDescription('Smiling shopper holding a cannabis product and a surprise gift bag');
+                    setIsSubjectDescriptionConfirmed(true);
+                    setSelectedDimension('square');
+                    setExactWordingTags(['55% Off + Free Gift on $150+ - Hurry, ends soon! - Fun times']);
+                    setStepTwoText('EXACT TEXT: "55% Off + Free Gift on $150+ - Hurry, ends soon! - Fun times"');
+                    setIsCustomTextConfirmed(true);
+                    setTags(['cannabis', 'dispensary', 'sale']);
+                    setCurrentStep(4);
+                  }}
+                  variant="secondary" 
+                  size="sm"
+                  className="text-xs"
+                >
+                  🧪 Test: Sale Poster
+                </Button>
+              </div>
             </div>
             
             {/* Show all cards when no style is selected, or only the selected card */}
@@ -7208,6 +7237,19 @@ const Index = () => {
 
                 // Get secondary subcategory for pop culture
                 const subcategorySecondary = selectedStyle === 'pop-culture' && selectedPick ? selectedPick : undefined;
+                
+                // Auto-inject dispensary background for cannabis-related content
+                const cannabisKeywords = ['cannabis', 'marijuana', 'weed', '420', 'dispensary', 'joint', 'cbd', 'thc'];
+                const hasCannabisContent = [...allTags, finalText, subcategory].some(item =>
+                  cannabisKeywords.some(keyword => item?.toLowerCase().includes(keyword))
+                );
+                
+                let recBackground = selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined;
+                if (hasCannabisContent && !recBackground) {
+                  recBackground = "Trendy dispensary interior with stylish shelves, modern decor, clear area above subject for big sale text";
+                  console.log('🌿 Auto-injected dispensary background for cannabis content');
+                }
+
                 const ideogramPayload = buildIdeogramHandoff({
                   // Core parameters
                   visual_style: visualStyle,
@@ -7227,13 +7269,13 @@ const Index = () => {
                   negative_prompt: negativePrompt,
                   // Visual AI Recommendations
                   rec_subject: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].subject : selectedSubjectOption === "design-myself" ? subjectDescription : undefined,
-                  rec_background: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined
+                  rec_background: recBackground
                 });
 
                 // Generate the Ideogram prompt
                 const promptText = buildIdeogramPrompt(ideogramPayload, false, conciseModeOptions);
                 const aspectRatioKey = getAspectRatioForIdeogram(selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || "");
-                let styleType = getStyleTypeForIdeogram(visualStyle);
+                let styleType = getStyleTypeForIdeogram(visualStyle, promptText);
                 let model: 'V_1' | 'V_1_TURBO' | 'V_2' | 'V_2_TURBO' | 'V_2A' | 'V_2A_TURBO' | 'V_3' = 'V_2_TURBO';
 
                 // Get model from AI settings instead of auto-selecting based on style
