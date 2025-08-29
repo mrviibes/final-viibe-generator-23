@@ -300,14 +300,15 @@ Return: {"lines":["option1","option2","option3","option4","option5","option6"]}`
       finalCandidates.push(...tagBlockedLines);
     }
     
-    // Ensure we have exactly 4 options by adding fallbacks if needed
+    // Ensure we have exactly 4 options by adding contextual fallbacks if needed
     while (finalCandidates.length < 4) {
-      const fallbackVariants = getFallbackVariants(inputs.tone, inputs.category, inputs.subcategory);
-      const nextFallback = fallbackVariants[finalCandidates.length % fallbackVariants.length];
+      const contextualFallbacks = getContextualFallbacks(inputs.tone, inputs.category, inputs.subcategory);
+      const fallbackIndex = (finalCandidates.length - (uniqueValidLines.length)) % contextualFallbacks.length;
+      const nextFallback = contextualFallbacks[fallbackIndex];
       if (!finalCandidates.includes(nextFallback)) {
         finalCandidates.push(nextFallback);
       } else {
-        finalCandidates.push(`${nextFallback} ${finalCandidates.length}`);
+        finalCandidates.push(`${nextFallback} today`);
       }
     }
     
@@ -337,15 +338,15 @@ Return: {"lines":["option1","option2","option3","option4","option5","option6"]}`
       finalCandidates = candidateResults.map(c => c.line).slice(0, 4);
       // Ensure exactly 4 options
       while (finalCandidates.length < 4) {
-        const fallbackVariants = getFallbackVariants(inputs.tone, inputs.category, inputs.subcategory);
-        finalCandidates.push(fallbackVariants[finalCandidates.length % fallbackVariants.length]);
+        const contextualFallbacks = getContextualFallbacks(inputs.tone, inputs.category, inputs.subcategory);
+        finalCandidates.push(contextualFallbacks[finalCandidates.length % contextualFallbacks.length]);
       }
       picked = finalCandidates[0];
       usedFallback = false;
       reason = 'Used model output with partial tag coverage';
     } else {
-      // Genuine blocks (banned words, etc.) - use tone-based fallbacks
-      finalCandidates = getFallbackVariants(inputs.tone, inputs.category, inputs.subcategory);
+      // Genuine blocks (banned words, etc.) - use contextual fallbacks
+      finalCandidates = getContextualFallbacks(inputs.tone, inputs.category, inputs.subcategory);
       picked = finalCandidates[0];
       usedFallback = true;
       reason = candidateResults.find(c => c.reason)?.reason || 'All candidates blocked';

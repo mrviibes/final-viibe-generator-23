@@ -353,14 +353,14 @@ export const BANNED_WORDS = [
 ];
 
 export const TONE_FALLBACKS: Record<string, string> = {
-  humorous: "Short and witty like you asked",
-  savage: "Bold and direct as requested",
-  sentimental: "Heartfelt message coming right up",
-  nostalgic: "Memory lane vibes activated",
-  romantic: "Sweet words in progress",
-  inspirational: "Motivational mode engaged",
-  playful: "Fun and light as ordered",
-  serious: "Thoughtful message loading"
+  humorous: "Life's too short for boring moments",
+  savage: "Excellence is the only standard",
+  sentimental: "Cherishing every meaningful moment",
+  nostalgic: "Taking a trip down memory lane",
+  romantic: "Love fills every heartbeat",
+  inspirational: "Dreams become reality with action",
+  playful: "Ready for some fun adventures",
+  serious: "Reflecting on life's important moments"
 };
 
 // =========================
