@@ -225,6 +225,65 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
     c.blocked && c.reason?.includes('meta tag verbatim')
   );
   
+  // Check for banned word issues and try allude-don't-quote retry  
+  const hasBannedWordIssues = candidateResults.some(c => 
+    c.blocked && c.reason?.includes('banned word')
+  );
+  
+  // If we have banned word issues, try allude-don't-quote retry
+  if (hasBannedWordIssues) {
+    console.log('🔁 Allude-don\'t-quote retry: Banned word issues detected');
+    
+    try {
+      // Build special banned word handling messages
+      const config = getEffectiveConfig();
+      const cleanTags = inputs.exactWordingTags?.filter(tag => 
+        !postProcessLine('', '', [], {}).reason?.includes('banned word')
+      ) || [];
+      
+      const alludeMessages = [
+        { 
+          role: 'system', 
+          content: `Generate ${inputs.tone} text while avoiding inappropriate language. If themes involve edgy content, use clever wordplay, euphemisms, or creative alternatives. Always respond with valid JSON.`
+        },
+        { 
+          role: 'user', 
+          content: `Generate 6 options under 100 chars for ${inputs.tone} ${inputs.category}${inputs.subcategory ? ` > ${inputs.subcategory}` : ''}.
+
+${cleanTags.length > 0 ? `Include these exact phrases: ${cleanTags.join(', ')}` : ''}
+${inputs.exactWordingTags && inputs.exactWordingTags.some(tag => tag !== cleanTags.find(clean => clean === tag)) ? 
+  `Allude to these themes creatively (don't use exact words): ${inputs.exactWordingTags.filter(tag => !cleanTags.includes(tag)).join(', ')}` : ''}
+
+Be witty and creative while staying appropriate.
+Return: {"lines":["option1","option2","option3","option4","option5","option6"]}`
+        }
+      ];
+      
+      const alludeResult = await openAIService.chatJSON(alludeMessages, {
+        max_tokens: config.generation.max_tokens,
+        temperature: config.generation.temperature,
+        model: config.generation.model
+      });
+      
+      const alludeLines = alludeResult.lines || [];
+      if (Array.isArray(alludeLines) && alludeLines.length > 0) {
+        // Process allude results with relaxed checking
+        const alludeCandidates = alludeLines.map((line: string) => 
+          postProcessLine(line, inputs.tone, [], { exactWordingTags: cleanTags })
+        );
+        
+        const validAllude = alludeCandidates.filter(c => !c.blocked);
+        if (validAllude.length > 0) {
+          console.log('✅ Allude-don\'t-quote retry succeeded');
+          candidateResults = alludeCandidates;
+          apiMeta = { ...apiMeta, usedAlludeMode: true };
+        }
+      }
+    } catch (error) {
+      console.error('Allude-don\'t-quote retry failed:', error);
+    }
+  }
+  
   // If all blocked for meta tags, try anti-echo retry
   if (allBlockedForTags && inputs.tags && inputs.tags.length > 0) {
     console.log('🔁 Anti-echo retry: All candidates blocked for meta tags');
@@ -411,8 +470,16 @@ Return: {"lines":["option1","option2","option3","option4","option5","option6"]}`
     // Combine shuffled model lines with unshuffled fallbacks at the end
     finalCandidates = [...modelLines, ...trueFallbacks].slice(0, 4);
     
+    // Ensure we always have at least one result
+    if (finalCandidates.length === 0) {
+      const fallbackOptions = getContextualFallbacks(inputs.tone, inputs.category, inputs.subcategory);
+      finalCandidates = fallbackOptions.slice(0, 4);
+      usedFallback = true;
+      reason = 'Complete fallback - all generation attempts failed';
+    }
+    
     // Pick the first one (from shuffled model lines if available)
-    picked = finalCandidates[0];
+    picked = finalCandidates[0] || 'Ready for anything';
     usedFallback = trueFallbacks.length > 0;
     if (!reason && tagOnlyBlocked.length > 0) {
       reason = 'Used lines with partial tag coverage';

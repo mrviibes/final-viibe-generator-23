@@ -157,6 +157,7 @@ export interface VibeCandidate {
   line: string;
   blocked: boolean;
   reason?: string;
+  hasBannedExactWords?: boolean;
 }
 
 export interface VibeResult {
@@ -601,14 +602,20 @@ export function postProcessLine(line: string, tone: string, requiredTags?: strin
     cleaned = cleaned.slice(0, maxLength);
   }
   
-  // Check for banned words
+  // Check for banned words in exact wording tags and mask them
+  const hasBannedExactWords = options?.exactWordingTags?.some(tag => 
+    BANNED_WORDS.some(word => tag.toLowerCase().includes(word.toLowerCase()))
+  );
+  
+  // Check for banned words in the generated text
   const lowerCleaned = cleaned.toLowerCase();
   for (const word of BANNED_WORDS) {
     if (lowerCleaned.includes(word)) {
       return {
         line: TONE_FALLBACKS[tone.toLowerCase()] || TONE_FALLBACKS.humorous,
         blocked: true,
-        reason: `Contains banned word: ${word}`
+        reason: `Contains banned word: ${word}`,
+        hasBannedExactWords // Pass this info for special handling
       };
     }
   }
@@ -653,11 +660,17 @@ export function postProcessLine(line: string, tone: string, requiredTags?: strin
     }
   }
 
-  // Check exact wording requirements FIRST (strict enforcement)
+  // Check exact wording requirements with special handling for banned words
   if (options?.exactWordingTags && options.exactWordingTags.length > 0) {
     const missingExactWords = options.exactWordingTags.filter(exactTag => {
       const lowerTag = exactTag.toLowerCase().trim();
       const lowerCleaned = cleaned.toLowerCase();
+      
+      // If this exact tag contains banned words, don't require it
+      const hasBannedWord = BANNED_WORDS.some(word => lowerTag.includes(word.toLowerCase()));
+      if (hasBannedWord) {
+        return false; // Don't consider this a missing requirement
+      }
       
       // Must be exact match (whole word or phrase)
       return !lowerCleaned.includes(lowerTag);
