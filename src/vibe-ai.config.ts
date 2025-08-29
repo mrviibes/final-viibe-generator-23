@@ -170,6 +170,7 @@ export interface VibeResult {
     originalModelDisplayName?: string;
     spellingFiltered?: number;
     usedBackupPrompt?: boolean;
+    usedAntiEcho?: boolean;
   };
 }
 
@@ -704,15 +705,22 @@ export function postProcessLine(line: string, tone: string, requiredTags?: strin
 function getFallbackVariants(tone: string, category: string, subcategory: string): string[] {
   const baseFallback = TONE_FALLBACKS[tone.toLowerCase()] || TONE_FALLBACKS.humorous;
   
-  // Create 4 distinct variations based on tone and context
-  const variations = [
-    baseFallback,
-    `${baseFallback} today`,
-    `${baseFallback} vibes`,
-    `${baseFallback} energy`
-  ];
+  // Create contextual variations based on category and subcategory
+  const contextualPhrases = {
+    birthday: ['Another year wiser', 'Celebrating you today', 'Age is just a number', 'Party time approaches'],
+    work: ['Grinding never stops', 'Professional mode activated', 'Career goals loading', 'Success in progress'],
+    sports: ['Game time mentality', 'Victory lap incoming', 'Champions train daily', 'Athletic excellence'],
+    movie: ['Blockbuster moment', 'Plot twist ahead', 'Credits rolling soon', 'Scene stealer alert'],
+    default: [baseFallback, `${baseFallback} today`, `${baseFallback} vibes`, `${baseFallback} energy`]
+  };
   
-  return variations;
+  // Match subcategory to contextual phrases
+  const key = subcategory?.toLowerCase().includes('birthday') ? 'birthday' :
+             subcategory?.toLowerCase().includes('work') || subcategory?.toLowerCase().includes('job') ? 'work' :
+             category?.toLowerCase().includes('sports') ? 'sports' :
+             subcategory?.toLowerCase().includes('movie') ? 'movie' : 'default';
+  
+  return contextualPhrases[key] || contextualPhrases.default;
 }
 
 function phraseCandidates(u: UserInputs): string[] {
@@ -1189,7 +1197,7 @@ Return only: {"lines":["joke1\\nwith\\nnewlines","joke2\\nwith\\nnewlines","joke
 
   const tagRequirement = inputs.tags && inputs.tags.length > 0 
     ? (() => {
-        // Apply semantic adapters for better AI direction
+  // Apply semantic adapters for better AI direction
         const semanticAdapters: Record<string, string> = {
           'gay': 'Use expressive, dramatic, and fabulously confident language',
           'flamboyant': 'Make it bold, theatrical, and dramatically expressive',
@@ -1213,7 +1221,7 @@ Return only: {"lines":["joke1\\nwith\\nnewlines","joke2\\nwith\\nnewlines","joke
           .map(tag => semanticAdapters[tag.toLowerCase()] || `Incorporate "${tag}" as a stylistic element`)
           .join('. ');
 
-        return `\n• Style direction: ${enhancedInstructions}.\n• General tags are themes/hints only - DO NOT include them verbatim. Context: ${inputs.tags.join(', ')}`;
+        return `\n• Style direction: ${enhancedInstructions}.\n• CRITICAL: NEVER echo these tags verbatim: ${inputs.tags.join(', ')}. Use the spirit and meaning instead.`;
       })()
     : '';
 

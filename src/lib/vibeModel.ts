@@ -126,10 +126,71 @@ async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: st
 }
 
 export async function generateCandidates(inputs: VibeInputs, n: number = 4): Promise<VibeResult> {
-  const candidateResults = await generateMultipleCandidates(inputs);
+  let candidateResults = await generateMultipleCandidates(inputs);
   
   // Extract API metadata if available
-  const apiMeta = (candidateResults as any)._apiMeta || null;
+  let apiMeta = (candidateResults as any)._apiMeta || null;
+  
+  // Check if all candidates are blocked for verbatim tag issues
+  const allBlockedForTags = candidateResults.every(c => 
+    c.blocked && c.reason?.includes('general tag verbatim')
+  );
+  
+  // If all blocked for verbatim tags, try anti-echo retry
+  if (allBlockedForTags && inputs.tags && inputs.tags.length > 0) {
+    console.log('🔁 Anti-echo retry: All candidates blocked for verbatim tags');
+    
+    // Create modified inputs with explicit tag ban
+    const antiEchoInputs = {
+      ...inputs,
+      tags: [...(inputs.tags || []), `ANTI_ECHO_${Date.now()}`] // Add unique marker
+    };
+    
+    // Build special anti-echo messages
+    const config = getEffectiveConfig();
+    const bannedTags = inputs.tags.join('", "');
+    const antiEchoMessages = [
+      { 
+        role: 'system', 
+        content: `Generate witty text. CRITICAL: NEVER use these exact words: "${bannedTags}". Use synonyms and creative alternatives instead. JSON array only.`
+      },
+      { 
+        role: 'user', 
+        content: `Generate 6 options under 100 chars for ${inputs.tone} ${inputs.category}${inputs.subcategory ? ` > ${inputs.subcategory}` : ''}.
+        
+BANNED WORDS (do not use): "${bannedTags}"
+${inputs.exactWordingTags && inputs.exactWordingTags.length > 0 ? `Required phrases: ${inputs.exactWordingTags.join(', ')}` : ''}
+
+Use the spirit and meaning of the banned words without saying them directly.
+Return: {"lines":["option1","option2","option3","option4","option5","option6"]}`
+      }
+    ];
+    
+    try {
+      const antiEchoResult = await openAIService.chatJSON(antiEchoMessages, {
+        max_tokens: config.generation.max_tokens,
+        temperature: config.generation.temperature,
+        model: config.generation.model
+      });
+      
+      const antiEchoLines = antiEchoResult.lines || [];
+      if (Array.isArray(antiEchoLines) && antiEchoLines.length > 0) {
+        // Process anti-echo results with relaxed tag checking
+        const antiEchoCandidates = antiEchoLines.map((line: string) => 
+          postProcessLine(line, inputs.tone, [], { exactWordingTags: inputs.exactWordingTags })
+        );
+        
+        const validAntiEcho = antiEchoCandidates.filter(c => !c.blocked);
+        if (validAntiEcho.length > 0) {
+          console.log('✅ Anti-echo retry succeeded');
+          candidateResults = antiEchoCandidates;
+          apiMeta = { ...apiMeta, usedAntiEcho: true };
+        }
+      }
+    } catch (error) {
+      console.error('Anti-echo retry failed:', error);
+    }
+  }
   
   // Filter out blocked candidates and remove duplicates
   const validCandidates = candidateResults.filter(c => !c.blocked);
@@ -149,6 +210,7 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
   let originalModel: string | undefined;
   let modelUsed = apiMeta?.modelUsed || 'gpt-4.1-2025-04-14';
   let usedBackupPrompt = apiMeta?.usedBackupPrompt || false;
+  let usedAntiEcho = apiMeta?.usedAntiEcho || false;
   
   // Quality retry: if we have < 4 valid lines and spelling issues, try with next model in chain
   if (uniqueValidLines.length < 4 && spellingFiltered > 0) {
@@ -279,7 +341,8 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
       originalModel,
       originalModelDisplayName: originalModel ? MODEL_DISPLAY_NAMES[originalModel] || originalModel : undefined,
       spellingFiltered,
-      usedBackupPrompt
+      usedBackupPrompt,
+      usedAntiEcho
     }
   };
 }
