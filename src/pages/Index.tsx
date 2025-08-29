@@ -6015,15 +6015,20 @@ const Index = () => {
                     </div>
 
                     <div className="max-w-lg mx-auto space-y-6">
-                      {/* General Tags Input */}
-                      <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
-                        <div className="text-center">
-                          <label className="text-sm font-medium text-foreground">General Tags (give AI direction for text)</label>
-                          <p className="text-xs text-muted-foreground mt-1">Style guides: flamboyant, sarcastic, nostalgic, aesthetic, chill, savage</p>
-                          <p className="text-xs text-muted-foreground">Themes: birthday, work, love, dark humor, random, movie quotes</p>
-                        </div>
-                        <Input value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={handleTagInputKeyDown} placeholder="Enter general tags (press Enter or comma to add)" className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
-                        <p className="text-xs text-muted-foreground italic">💡 Tips: "flamboyant" makes text dramatic, "chill" makes it relaxed, "aesthetic" adds style</p>
+                       {/* General Tags Input */}
+                       <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
+                         <div className="text-center flex items-center justify-center gap-2">
+                           <label className="text-sm font-medium text-foreground">Style & Mood Tags</label>
+                           <Tooltip>
+                             <TooltipTrigger>
+                               <Info className="h-4 w-4 text-muted-foreground" />
+                             </TooltipTrigger>
+                             <TooltipContent className="max-w-xs">
+                               <p className="text-xs">Give AI direction for tone and style. Examples: flamboyant, sarcastic, nostalgic, aesthetic, chill, savage, birthday, work, love, dark humor</p>
+                             </TooltipContent>
+                           </Tooltip>
+                         </div>
+                         <Input value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={handleTagInputKeyDown} placeholder="aesthetic, sarcastic, birthday..." className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
                         
                         {/* Display General Tags */}
                         {tags.length > 0 && (
@@ -6052,13 +6057,20 @@ const Index = () => {
                         )}
                       </div>
 
-                      {/* Exact Text Tags Input */}
-                      <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-200">
-                        <div className="text-center">
-                          <label className="text-sm font-medium text-foreground">Exact Text Tags (they will literally be in the text)</label>
-                          <p className="text-xs text-muted-foreground mt-1">⚠️ Don't include "EXACT TEXT:" prefix - it's added automatically</p>
-                        </div>
-                        <Input value={exactWordingTagInput} onChange={e => setExactWordingTagInput(e.target.value)} onKeyDown={handleExactWordingTagInputKeyDown} placeholder="Enter exact text tags (press Enter or comma to add)" className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
+                       {/* Exact Text Tags Input */}
+                       <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-200">
+                         <div className="text-center flex items-center justify-center gap-2">
+                           <label className="text-sm font-medium text-foreground">Must Include Words</label>
+                           <Tooltip>
+                             <TooltipTrigger>
+                               <Info className="h-4 w-4 text-muted-foreground" />
+                             </TooltipTrigger>
+                             <TooltipContent className="max-w-xs">
+                               <p className="text-xs">These words will appear literally in the generated text. Names, specific phrases, or required words.</p>
+                             </TooltipContent>
+                           </Tooltip>
+                         </div>
+                         <Input value={exactWordingTagInput} onChange={e => setExactWordingTagInput(e.target.value)} onKeyDown={handleExactWordingTagInputKeyDown} placeholder="names, specific phrases..." className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
                         
                         {/* Display Exact Wording Tags */}
                         {exactWordingTags.length > 0 && <div className="flex flex-wrap gap-2 justify-center">
