@@ -869,11 +869,6 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   // Build concise prompt sections with line breaks
   const sections = [];
   
-  // SUBCATEGORY THEME
-  if (handoff.subcategory_primary) {
-    sections.push(`${handoff.subcategory_primary} theme.`);
-  }
-  
   // MAIN SUBJECT
   let subject = handoff.rec_subject;
   if (!subject && handoff.chosen_visual) {
@@ -882,7 +877,7 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   }
   if (subject) sections.push(`Subject: ${subject}.`);
   
-  // BACKGROUND
+  // BACKGROUND (integrate theme here instead of as separate text)
   let background = handoff.rec_background;
   if (!background && handoff.chosen_visual) {
     const visualParts = handoff.chosen_visual.split(' - ');
@@ -893,6 +888,10 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   }
   if (cleanBackground) {
     background = "clean, minimal background with high contrast for text";
+  }
+  // Integrate subcategory theme into background description instead of as standalone text
+  if (handoff.subcategory_primary && !background.toLowerCase().includes(handoff.subcategory_primary.toLowerCase())) {
+    background = `${handoff.subcategory_primary} themed setting with ${background}`;
   }
   sections.push(`Background: ${background}.`);
   
