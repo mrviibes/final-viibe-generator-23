@@ -835,10 +835,12 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   const overrides = getRuntimeOverrides();
   const typographyStyle = overrides.typographyStyle || 'poster'; // Default to poster style
   
-  // EXACT TEXT RENDERING (if present)
+  // EXACT TEXT RENDERING (if present) - Remove redundant "EXACT TEXT:" prefix
   if (handoff.key_line && handoff.key_line.trim()) {
     const cleanText = handoff.key_line.replace(/[""]/g, '"').replace(/['']/g, "'").replace(/[—–]/g, '-').trim();
-    parts.push(`EXACT TEXT: "${cleanText}"`);
+    // Remove redundant "EXACT TEXT:" prefix that users might include
+    const finalText = cleanText.replace(/^EXACT TEXT:\s*["']?/i, '').replace(/["']$/, '');
+    parts.push(`EXACT TEXT: "${finalText}"`);
   }
   
   // CHARACTER IDENTITY CUES for Pop Culture
@@ -867,7 +869,7 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     parts.push(`Subject: ${subject}.`);
   }
   
-  // BACKGROUND WITH ON-THEME ELEMENTS
+  // BACKGROUND WITH ON-THEME ELEMENTS + SCENE-SPECIFIC NEGATIVE PROMPTS
   let background = handoff.rec_background;
   if (!background && handoff.chosen_visual) {
     const visualParts = handoff.chosen_visual.split(' - ');
@@ -879,7 +881,14 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   if (cleanBackground) {
     background = "clean, minimal background with high contrast for text";
   }
-  parts.push(`Background: ${background}.`);
+  
+  // Add scene-specific negative prompts for sports interior scenes
+  let negativeElements = '';
+  if (handoff.category === 'Sports' && background && background.toLowerCase().includes('locker')) {
+    negativeElements = ' Avoid stadium, field, scoreboard, jumbotron, outdoor sports venue.';
+  }
+  
+  parts.push(`Background: ${background}.${negativeElements}`);
   
   // PEOPLE INCLUSION (when recommended)
   const peopleKeywords = ['friends', 'crowd', 'people', 'group', 'party', 'audience', 'performers', 'celebrating', 'family', 'parents', 'kids', 'children'];
@@ -908,10 +917,14 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     parts.push(`Format: ${handoff.aspect_ratio}.`);
   }
   
-  // TYPOGRAPHY STYLE PLACEMENT (if present)
+  // ENHANCED TEXT PLACEMENT with negative prompts
   if (handoff.key_line && handoff.key_line.trim()) {
     if (typographyStyle !== 'poster') {
       parts.push("Place text in natural negative space areas like sky, walls, or empty backgrounds. Use TOP, BOTTOM, LEFT, or RIGHT zones rather than always centering. Ensure high contrast and avoid overlapping with faces or main subjects.");
+    }
+    // Add negative prompt for text placement
+    if (handoff.negative_prompt) {
+      parts.push(`Negative prompt: ${handoff.negative_prompt}`);
     }
   }
   
