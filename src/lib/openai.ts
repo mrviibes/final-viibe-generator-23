@@ -503,15 +503,70 @@ export class OpenAIService {
 
       const options = result?.options || [];
       
-      // Enforce character limit and ensure exactly 4 options
-      const processedOptions = options.map((option: string) => {
-        const cleaned = this.cleanVisibleOption(option.replace(/^["']|["']$/g, '').trim());
-        return cleaned.length > characterLimit ? cleaned.slice(0, characterLimit) : cleaned;
-      }).slice(0, 4);
+      // Clean and apply quality gate
+      const cleanedOptions = options.map((option: string) => 
+        this.cleanVisibleOption(option.replace(/^["']|["']$/g, '').trim())
+      );
 
-      // If we don't have 4 options, pad with generic ones
+      // Filter out low-quality options
+      const highQualityOptions: string[] = [];
+      const rejectedOptions: string[] = [];
+      
+      for (const option of cleanedOptions) {
+        const { isLowQuality, reason } = this.isLowQualityOption(option, params.tags || []);
+        if (isLowQuality) {
+          console.log(`🚫 Rejected option: "${option}" - ${reason}`);
+          rejectedOptions.push(option);
+        } else {
+          highQualityOptions.push(option);
+        }
+      }
+
+      // Remove duplicates
+      const uniqueOptions = Array.from(new Set(highQualityOptions.map(opt => opt.toLowerCase())))
+        .map(lower => highQualityOptions.find(opt => opt.toLowerCase() === lower)!);
+
+      console.log(`✅ Quality gate: ${uniqueOptions.length}/${cleanedOptions.length} options passed`);
+
+      // Top-up if we need more options
+      let finalOptions = uniqueOptions.slice(0, 4);
+      if (finalOptions.length < 4 && finalOptions.length > 0) {
+        console.log(`🔄 Top-up needed: ${4 - finalOptions.length} more options`);
+        
+        try {
+          const topUpResult = await this.chatJSON([
+            { role: 'user', content: `Generate ${4 - finalOptions.length} replacement options obeying the original instructions plus the Quality Rules. 
+            Avoid these rejected options: ${rejectedOptions.map(opt => `"${opt}"`).join(', ')}
+            Return JSON: {"options":["option1","option2",...]}` }
+          ], {
+            max_completion_tokens: 200,
+            model: targetModel
+          });
+          
+          if (topUpResult.options && Array.isArray(topUpResult.options)) {
+            const topUpCleaned = topUpResult.options
+              .map((option: string) => this.cleanVisibleOption(option.replace(/^["']|["']$/g, '').trim()))
+              .filter((option: string) => !this.isLowQualityOption(option, params.tags || []).isLowQuality)
+              .filter((option: string) => !finalOptions.some(existing => existing.toLowerCase() === option.toLowerCase()));
+            
+            finalOptions = [...finalOptions, ...topUpCleaned].slice(0, 4);
+            console.log(`✅ Top-up added ${topUpCleaned.length} options`);
+          }
+        } catch (error) {
+          console.log(`⚠️ Top-up failed:`, error);
+        }
+      }
+
+      // Enforce character limit
+      const processedOptions = finalOptions.map((option: string) => 
+        option.length > characterLimit ? option.slice(0, characterLimit) : option
+      );
+
+      // Fill with tone-specific fallbacks if still needed
       while (processedOptions.length < 4) {
-        processedOptions.push(`${tone} text option ${processedOptions.length + 1}`);
+        const fallbackIndex = processedOptions.length + 1;
+        const toneFallback = this.getToneFallback(tone, fallbackIndex);
+        processedOptions.push(toneFallback);
       }
 
       return processedOptions;
@@ -533,6 +588,25 @@ export class OpenAIService {
     }
   }
 
+  // Check if an option is low quality and should be filtered out
+  private isLowQualityOption(text: string, tags: string[] = []): { isLowQuality: boolean; reason?: string } {
+    const trimmed = text.trim();
+    
+    // Check word count and length
+    const wordCount = trimmed.split(/\s+/).length;
+    if (wordCount < 3 || trimmed.length < 12) {
+      return { isLowQuality: true, reason: `Too short: ${wordCount} words, ${trimmed.length} chars` };
+    }
+    
+    // Check if it's just a name or tag verbatim
+    const tagSet = new Set(tags.map(tag => tag.toLowerCase().trim()));
+    if (tagSet.has(trimmed.toLowerCase()) || /^[A-Z][a-z]+$/.test(trimmed)) {
+      return { isLowQuality: true, reason: "Name/tag-only output" };
+    }
+    
+    return { isLowQuality: false };
+  }
+
   // Clean visible options by removing emojis/hashtags and collapsing punctuation
   private cleanVisibleOption(text: string): string {
     return text
@@ -543,6 +617,20 @@ export class OpenAIService {
       .replace(/\s+/g, ' ')
       .replace(/([.!?])\1+/g, '$1')
       .trim();
+  }
+
+  // Generate tone-specific fallback options
+  private getToneFallback(tone: string, index: number): string {
+    const fallbacks: Record<string, string[]> = {
+      'playful': ['Let\'s have some fun!', 'Ready to play?', 'Time for excitement!', 'Join the fun!'],
+      'savage': ['No games here', 'Straight talk only', 'Real talk time', 'Keep it honest'],
+      'casual': ['Just keeping it real', 'Simple and easy', 'No fuss here', 'Straightforward vibes'],
+      'professional': ['Excellence in every detail', 'Quality you can trust', 'Professional service', 'Your success matters'],
+      'urgent': ['Act now!', 'Don\'t wait!', 'Time is running out', 'Immediate action needed']
+    };
+    
+    const toneOptions = fallbacks[tone.toLowerCase()] || ['Great choice ahead', 'Quality option here', 'Excellent selection', 'Perfect fit'];
+    return toneOptions[(index - 1) % toneOptions.length];
   }
 }
 

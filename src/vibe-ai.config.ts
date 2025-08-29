@@ -1518,6 +1518,15 @@ RETAIL OFFER RULES (CRITICAL):
 • Focus on clear, professional retail copy that sells effectively
 • No generic celebration elements unless specifically requested` : '';
 
+  const qualityRules = `
+
+QUALITY RULES (CRITICAL):
+• Each option must be a complete thought (include a verb or clear descriptor)
+• NO single-word outputs (minimum 3 words, 12+ characters)
+• Never output only a name or tag verbatim without context
+• Avoid duplicates; vary structure and wording significantly
+• Each line should feel distinct and purposeful`;
+
   const corePrompt = `Generate 6 concise options under 100 chars each for:
 Category: ${inputs.category} > ${inputs.subcategory}
 Tone: ${inputs.tone}
@@ -1526,7 +1535,7 @@ ${inputs.exactWordingTags && inputs.exactWordingTags.length > 0 ? `Exact Words R
 ${inputs.recipient_name && inputs.recipient_name !== "-" ? `Target: ${inputs.recipient_name}` : ''}
 ${hasSaleIntent ? '\nSALE INTENT DETECTED: Focus on retail offers and clear sales messaging.' : ''}
 
-${tagRequirement}${exactWordingRequirement}${specialInstructions}${saleRules}
+${tagRequirement}${exactWordingRequirement}${specialInstructions}${saleRules}${qualityRules}
 
 Return only: {"lines":["option1","option2","option3","option4","option5","option6"]}`;
 
