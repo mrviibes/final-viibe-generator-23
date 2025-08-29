@@ -151,6 +151,7 @@ export interface OutputSchema {
 export interface VibeInputs extends Partial<UserInputs> {
   // Backward compatibility mappings
   exactWordingTags?: string[]; // Support exact wording tags
+  retryMode?: 'allude-dont-quote' | 'anti-echo'; // Add retry mode support
 }
 
 export interface VibeCandidate {

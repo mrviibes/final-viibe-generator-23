@@ -4188,6 +4188,7 @@ const Index = () => {
   const [selectedGeneratedOption, setSelectedGeneratedOption] = useState<string | null>(null);
   const [selectedGeneratedIndex, setSelectedGeneratedIndex] = useState<number | null>(null);
   const [generationAudit, setGenerationAudit] = useState<any>(null);
+  const [useAlludeMode, setUseAlludeMode] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [subOptionSearchTerm, setSubOptionSearchTerm] = useState<string>("");
   const [isSearchFocused, setIsSearchFocused] = useState<boolean>(false);
@@ -4717,6 +4718,12 @@ const Index = () => {
     setTags(prev => prev.filter(tag => !sensitiveTagNames.includes(tag)));
     handleGenerateText();
   };
+
+  const handleAlludeModeRegenerate = () => {
+    // Enable allude mode for the next generation
+    setUseAlludeMode(true);
+    handleGenerateText();
+  };
   const removeExactWordingTag = (tagToRemove: string) => {
     setExactWordingTags(exactWordingTags.filter(tag => tag !== tagToRemove));
   };
@@ -4981,8 +4988,12 @@ const Index = () => {
         tone: tone as any,
         tags: finalTagsForGeneration,
         exactWordingTags: exactWordingTags,
-        recipient_name: selectedPick || "-"
+        recipient_name: selectedPick || "-",
+        retryMode: useAlludeMode ? 'allude-dont-quote' : undefined
       }, 4);
+      
+      // Reset allude mode after use
+      setUseAlludeMode(false);
 
       // Check for partial tag coverage and show notification
       if (vibeResult.audit.reason?.includes('tag coverage') || vibeResult.audit.reason?.includes('partial tag coverage')) {
@@ -6280,17 +6291,28 @@ const Index = () => {
                             Using {generationAudit.model} • Generated in {((Date.now() - textGenerationStartTime) / 1000).toFixed(1)}s
                             {generationAudit.usedFallback ? " • Used fallback" : ` • Received ${generationAudit.candidateCount} options`}
                           </p>
-                          {generationAudit.usedFallback && (
-                            <FallbackTooltip 
-                              reason="content-filter"
-                              onRegenerate={handleGenerateText}
-                              onAlludeMode={handleGenerateText}
-                              onPrideMode={handlePrideModeRegenerate}
-                              onSkipTags={handleSkipSensitiveTagsRegenerate}
-                              isGenerating={isGenerating}
-                              sanitizedTags={lastSanitizedTags}
-                            />
-                          )}
+                           {generationAudit.usedFallback && (
+                             <FallbackTooltip 
+                               reason={(() => {
+                                 const reason = generationAudit.reason?.toLowerCase() || '';
+                                 if (reason.includes('api error') || reason.includes('network')) return 'api-error';
+                                 if (reason.includes('timeout') || reason.includes('timed out')) return 'timeout'; 
+                                 if (reason.includes('banned word') || reason.includes('blocked') || reason.includes('content filter')) return 'content-filter';
+                                 if (reason.includes('insufficient') || reason.includes('candidates')) return 'insufficient-candidates';
+                                 return 'content-filter';
+                               })()}
+                               onRegenerate={handleGenerateText}
+                               onAlludeMode={handleAlludeModeRegenerate}
+                               onPrideMode={handlePrideModeRegenerate}
+                               onSkipTags={handleSkipSensitiveTagsRegenerate}
+                               isGenerating={isGenerating}
+                               sanitizedTags={lastSanitizedTags.map(tag => ({
+                                 original: tag.original,
+                                 replacement: tag.replacement,
+                                 reason: tag.reason || 'Content filtered'
+                               }))}
+                             />
+                           )}
                         </div>}
                     </div>
 
