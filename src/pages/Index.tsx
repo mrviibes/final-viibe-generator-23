@@ -4889,17 +4889,15 @@ const Index = () => {
       // Map UI selections to vibe model inputs
       let category = '';
       let subcategory = '';
-      // Auto-commit pending tag inputs before generating
-      if (tagInput.trim()) {
-        setTags([...tags, tagInput.trim()]);
-        setTagInput("");
-      }
-      if (exactWordingTagInput.trim()) {
-        setExactWordingTags([...exactWordingTags, exactWordingTagInput.trim()]);
-        setExactWordingTagInput("");
-      }
-      // Preprocess tags for sensitive content before generation
-      const allTags = [...tags, ...exactWordingTags];
+      // Auto-commit pending tag inputs before generating - use current state
+      const currentTags = tagInput.trim() ? [...tags, tagInput.trim()] : tags;
+      const currentExactWordingTags = exactWordingTagInput.trim() ? [...exactWordingTags, exactWordingTagInput.trim()] : exactWordingTags;
+      
+      // Clear inputs after committing
+      if (tagInput.trim()) setTagInput("");
+      if (exactWordingTagInput.trim()) setExactWordingTagInput("");
+      // Preprocess tags for sensitive content before generation - use current tags
+      const allTags = [...currentTags, ...currentExactWordingTags];
       const sanitizedTagResults = rewriteSensitiveTags(allTags);
       const finalTags = sanitizedTagResults.map(result => result.replacement);
       const sanitizedTags = sanitizedTagResults.filter(result => result.wasSanitized);
@@ -4907,13 +4905,13 @@ const Index = () => {
       // Store sanitized tags for audit display
       setLastSanitizedTags(sanitizedTags);
       
-      console.log('🏷️ Text generation started with tags:', tags, 'exact wording:', exactWordingTags);
+      console.log('🏷️ Text generation started with tags:', currentTags, 'exact wording:', currentExactWordingTags);
       console.log('🏷️ Sanitized tags:', sanitizedTags);
       console.log('🏷️ Current tags state:', {
-        tags,
-        exactWordingTags,
-        tagsLength: tags.length,
-        exactWordingLength: exactWordingTags.length
+        tags: currentTags,
+        exactWordingTags: currentExactWordingTags,
+        tagsLength: currentTags.length,
+        exactWordingLength: currentExactWordingTags.length
       });
       console.log('🏷️ Final tags for processing:', finalTags);
 
@@ -4964,7 +4962,7 @@ const Index = () => {
 
       // Filter out visual-only tags for text generation
       // Only use the original text tags, not subject tags or visual-only tags
-      let finalTagsForGeneration = [...tags]; // Only use text tags, not subjectTags
+      let finalTagsForGeneration = [...currentTags]; // Use committed tags
 
       console.log('📋 Final parameters for text generation:', {
         category,
@@ -4978,16 +4976,16 @@ const Index = () => {
       });
 
       // Ensure we have at least the basic tags
-      if (finalTagsForGeneration.length === 0 && tags.length > 0) {
-        console.warn('⚠️ finalTagsForGeneration is empty but original tags exist, using original tags');
-        finalTagsForGeneration = [...tags];
+      if (finalTagsForGeneration.length === 0 && currentTags.length > 0) {
+        console.warn('⚠️ finalTagsForGeneration is empty but current tags exist, using current tags');
+        finalTagsForGeneration = [...currentTags];
       }
       const vibeResult: VibeResult = await generateCandidates({
         category: category as any,
         subcategory,
         tone: tone as any,
         tags: finalTagsForGeneration,
-        exactWordingTags: exactWordingTags,
+        exactWordingTags: currentExactWordingTags,
         recipient_name: selectedPick || "-",
         retryMode: useAlludeMode ? 'allude-dont-quote' : undefined
       }, 4);
@@ -6189,18 +6187,46 @@ const Index = () => {
                     <div className="max-w-lg mx-auto space-y-6">
                        {/* General Tags Input */}
                        <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
-                         <div className="text-center flex items-center justify-center gap-2">
-                           <label className="text-sm font-medium text-foreground">Style & Mood Tags</label>
-                           <Tooltip>
-                             <TooltipTrigger>
-                               <Info className="h-4 w-4 text-muted-foreground" />
-                             </TooltipTrigger>
-                             <TooltipContent className="max-w-xs">
-                               <p className="text-xs">Give AI direction for tone and style. Examples: flamboyant, sarcastic, nostalgic, aesthetic, chill, savage, birthday, work, love, dark humor</p>
-                             </TooltipContent>
-                           </Tooltip>
-                         </div>
-                         <Input value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={handleTagInputKeyDown} placeholder="aesthetic, sarcastic, birthday..." className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
+                          <div className="text-center flex items-center justify-center gap-2">
+                            <label className="text-sm font-medium text-foreground">Context & Direction Tags</label>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Info className="h-4 w-4 text-muted-foreground" />
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">
+                                <p className="text-xs">Guide the AI with any context: industry (online dispensary, fintech), audience (millennials, professionals), style (sarcastic, aesthetic), or situation (birthday, work announcement)</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <Input value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={handleTagInputKeyDown} placeholder="online dispensary, millennials, sarcastic, birthday..." className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
+                          
+                          {/* Quick suggestion chips */}
+                          <div className="space-y-2">
+                            <div className="text-xs text-muted-foreground text-center">Quick add:</div>
+                            <div className="flex flex-wrap gap-2 justify-center">
+                              {[
+                                'Industry: online dispensary, crypto, fintech, wellness, gaming',
+                                'Audience: millennials, gen-z, professionals, families, luxury',
+                                'Vibe: sarcastic, aesthetic, savage, nostalgic, wholesome, edgy'
+                              ].map((category, categoryIndex) => {
+                                const [label, ...suggestions] = category.split(': ');
+                                return suggestions[0].split(', ').map((suggestion, index) => (
+                                  <button
+                                    key={`${categoryIndex}-${index}`}
+                                    onClick={() => {
+                                      if (!tags.includes(suggestion)) {
+                                        setTags([...tags, suggestion]);
+                                      }
+                                    }}
+                                    className="text-xs px-2 py-1 rounded-md bg-muted hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+                                    disabled={tags.includes(suggestion)}
+                                  >
+                                    {suggestion}
+                                  </button>
+                                ));
+                              })}
+                            </div>
+                          </div>
                         
                         {/* Display General Tags */}
                         {tags.length > 0 && (

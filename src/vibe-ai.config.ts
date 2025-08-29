@@ -746,8 +746,15 @@ export function postProcessLine(line: string, tone: string, requiredTags?: strin
         return false; // Don't consider this a missing requirement
       }
       
+      // Normalize both strings by removing quotes and backticks for comparison
+      const normalizeForComparison = (str: string) => 
+        str.replace(/['""`]/g, '').replace(/\s+/g, ' ').trim();
+      
+      const normalizedTag = normalizeForComparison(lowerTag);
+      const normalizedCleaned = normalizeForComparison(lowerCleaned);
+      
       // Must be exact match (whole word or phrase)
-      return !lowerCleaned.includes(lowerTag);
+      return !normalizedCleaned.includes(normalizedTag);
     });
     
     if (missingExactWords.length > 0) {
