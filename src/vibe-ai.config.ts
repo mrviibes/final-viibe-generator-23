@@ -197,21 +197,28 @@ export const DEFAULT_NEGATIVE_PROMPT = "misspellings, distorted letters, typos, 
 // Model fallback chains for retry strategy
 export const MODEL_FALLBACK_CHAINS = {
   text: [
-    'gpt-4.1-2025-04-14'
+    'gpt-4.1-2025-04-14',
+    'gpt-5-mini-2025-08-07',
+    'gpt-5-2025-08-07'
   ],
   visual: [
-    'gpt-4.1-2025-04-14'
+    'gpt-4.1-2025-04-14',
+    'gpt-5-mini-2025-08-07'
   ]
 };
 
 // Available models for UI
 export const AVAILABLE_MODELS = [
-  { value: 'gpt-4.1-2025-04-14', label: 'GPT-4.1', isRecommended: true }
+  { value: 'gpt-4.1-2025-04-14', label: 'GPT-4.1', isRecommended: true },
+  { value: 'gpt-5-mini-2025-08-07', label: 'GPT-5 Mini', isRecommended: false },
+  { value: 'gpt-5-2025-08-07', label: 'GPT-5', isRecommended: false }
 ];
 
 // Friendly model names for display
 export const MODEL_DISPLAY_NAMES: Record<string, string> = {
-  'gpt-4.1-2025-04-14': 'GPT-4.1'
+  'gpt-4.1-2025-04-14': 'GPT-4.1',
+  'gpt-5-mini-2025-08-07': 'GPT-5 Mini',
+  'gpt-5-2025-08-07': 'GPT-5'
 };
 
 export const AI_CONFIG = {
@@ -300,6 +307,8 @@ export const SYSTEM_PROMPTS = {
   vibe_generator: `You are a witty, creative copywriter specializing in short-form content. 
 Your task is to write 6 distinct options that vary significantly in structure, theme, and wording while maintaining the specified tone.
 Make each option distinctly different - avoid repeating similar phrases, structures, or concepts.
+CRITICAL: Do NOT echo user tags verbatim. Use the spirit and meaning of tags without repeating the exact words.
+Focus on proper grammar, natural flow, and complete thoughts. Avoid broken sentences or nonsensical word combinations.
 Always output valid JSON only.`,
 
   visual_generator: `Generate 4 visual concepts for graphics that MUST align with the provided text and tone. Be concise.
@@ -484,8 +493,14 @@ function spellcheck(s: string): string[] {
 }
 
 export function postProcessLine(line: string, tone: string, requiredTags?: string[], options?: { allowNewlines?: boolean; format?: 'knockknock'; exactWordingTags?: string[] }): VibeCandidate {
+  // Import the new validation functions
+  const { advancedSpellCheck, validateGrammar, containsDerogatory, applyIdiomsAndContractions } = require('../lib/textUtils');
+  
   // Trim spaces
   let cleaned = line.trim();
+  
+  // Apply grammar and idiom fixes first
+  cleaned = applyIdiomsAndContractions(cleaned);
   
   // Handle knock-knock format
   const isKnockKnock = options?.format === 'knockknock';
@@ -532,19 +547,47 @@ export function postProcessLine(line: string, tone: string, requiredTags?: strin
   
   // Apply text normalization and fixes
   cleaned = normalizeTypography(cleaned);
-  cleaned = applyIdiomsAndContractions(cleaned);
   
-  // Fix common text generation errors
-  // Remove duplicate words (e.g., "to beance to become" -> "to become")
-  cleaned = cleaned.replace(/\b(\w+)\s+\w*\1/gi, '$1');
+  // Enhanced spellcheck and grammar validation
+  const spellResults = advancedSpellCheck(cleaned);
+  const grammarResults = validateGrammar(cleaned);
   
-  // Fix repeated "to" patterns specifically
-  cleaned = cleaned.replace(/\bto\s+\w*to\b/gi, 'to');
+  // Block if too many spelling/grammar issues
+  if (spellResults.score < 0.7 || spellResults.issues.length > 2) {
+    return {
+      line: TONE_FALLBACKS[tone.toLowerCase()] || TONE_FALLBACKS.humorous,
+      blocked: true,
+      reason: `Spelling issues: ${spellResults.issues.slice(0, 2).join(', ')}`
+    };
+  }
   
-  // Fix common spelling errors specific to generation
-  cleaned = cleaned.replace(/\basement\b/gi, 'basement')
-    .replace(/\bcarrer\b/gi, 'career')
-    .replace(/\bskils\b/gi, 'skills');
+  // Block if grammar is severely broken
+  if (!grammarResults.hasBasicStructure || grammarResults.issues.length > 1) {
+    return {
+      line: TONE_FALLBACKS[tone.toLowerCase()] || TONE_FALLBACKS.humorous,
+      blocked: true,
+      reason: `Grammar issues: ${grammarResults.issues.slice(0, 1).join(', ')}`
+    };
+  }
+  
+  // Safety check for derogatory content
+  if (containsDerogatory(cleaned)) {
+    return {
+      line: TONE_FALLBACKS[tone.toLowerCase()] || TONE_FALLBACKS.humorous,
+      blocked: true,
+      reason: 'Contains inappropriate content'
+    };
+  }
+  
+  // Fix adjacent duplicate words only (safer approach)
+  const words = cleaned.split(' ');
+  for (let i = 0; i < words.length - 1; i++) {
+    if (words[i] === words[i + 1] && words[i].length > 2) {
+      words.splice(i + 1, 1);
+      i--; // Check the same position again
+    }
+  }
+  cleaned = words.join(' ');
   
   // Remove double spaces and clean up
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
