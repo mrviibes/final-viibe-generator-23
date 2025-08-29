@@ -32,6 +32,37 @@ function getFallbackVariants(tone: string, category: string, subcategory: string
   return variations;
 }
 
+function getContextualFallbacks(tone: string, category: string, subcategory: string): string[] {
+  const contextualOptions: Record<string, Record<string, string[]>> = {
+    humorous: {
+      work: ["Monday mood activated", "Coffee required for operation", "Workplace comedy in progress", "Professional chaos mode"],
+      birthday: ["Another year of awesome", "Cake is calling my name", "Birthday vibes activated", "Celebrating life goals"],
+      party: ["Party mode: ON", "Let's make some memories", "Good vibes only tonight", "Ready to celebrate"],
+      food: ["Foodie adventures await", "Taste buds in paradise", "Culinary exploration time", "Hungry for greatness"],
+      default: ["Life's too short for boring", "Making memories one laugh at a time", "Comedy gold in progress", "Bringing the fun energy"]
+    },
+    savage: {
+      work: ["Boss mode activated", "Excellence is not negotiable", "Crushing goals daily", "Success is the only option"],
+      birthday: ["Leveling up like a legend", "Another year stronger", "Born to stand out", "Unstoppable since birth"],
+      party: ["Bringing the main character energy", "Setting the standard tonight", "Unforgettable vibes incoming", "Making this legendary"],
+      food: ["Only the finest will do", "Elevating my taste standards", "Quality over everything", "Sophisticated palate activated"],
+      default: ["Built different, stay pressed", "Main character energy always", "Excellence is my baseline", "Setting standards daily"]
+    },
+    random: {
+      work: ["Plot twist: actually productive today", "Chaos coordinator reporting for duty", "Making sense optional", "Professional randomness activated"],
+      birthday: ["Aging like fine chaos", "Birthday plot twist incoming", "Celebrating my beautiful disaster", "Another year of unpredictability"],
+      party: ["Bringing the weird energy", "Spontaneous fun generator", "Chaos coordinator at your service", "Making tonight unforgettable"],
+      food: ["Culinary adventure mode activated", "Taste testing life's surprises", "Food journey gets interesting", "Flavor discovery mission"],
+      default: ["Embracing the beautiful chaos", "Plot twist specialist", "Making ordinary extraordinary", "Keeping life interesting"]
+    }
+  };
+
+  const toneOptions = contextualOptions[tone.toLowerCase()] || contextualOptions.humorous;
+  const categoryOptions = toneOptions[category.toLowerCase()] || toneOptions.default;
+  
+  return categoryOptions;
+}
+
 // Post-processing now handled by centralized config
 
 async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: string): Promise<VibeCandidate[]> {
@@ -115,12 +146,12 @@ async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: st
     return candidates;
   } catch (error) {
     console.error('Failed to generate multiple candidates:', error);
-    // Return fallback variants instead of duplicates
-    const fallbackVariants = getFallbackVariants(inputs.tone, inputs.category, inputs.subcategory);
-    return fallbackVariants.map((line, index) => ({
+    // Return contextual fallbacks based on tone and category
+    const contextualFallbacks = getContextualFallbacks(inputs.tone, inputs.category, inputs.subcategory);
+    return contextualFallbacks.map((line, index) => ({
       line,
       blocked: true,
-      reason: index === 0 ? `API Error: ${error instanceof Error ? error.message : 'Unknown error'}` : 'Fallback variant'
+      reason: index === 0 ? `API Error: ${error instanceof Error ? error.message : 'Unknown error'}` : 'Contextual fallback'
     }));
   }
 }
@@ -131,14 +162,14 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
   // Extract API metadata if available
   let apiMeta = (candidateResults as any)._apiMeta || null;
   
-  // Check if all candidates are blocked for verbatim tag issues
+  // Check if all candidates are blocked for meta tag issues (not content tags)
   const allBlockedForTags = candidateResults.every(c => 
-    c.blocked && c.reason?.includes('general tag verbatim')
+    c.blocked && c.reason?.includes('meta tag verbatim')
   );
   
-  // If all blocked for verbatim tags, try anti-echo retry
+  // If all blocked for meta tags, try anti-echo retry
   if (allBlockedForTags && inputs.tags && inputs.tags.length > 0) {
-    console.log('🔁 Anti-echo retry: All candidates blocked for verbatim tags');
+    console.log('🔁 Anti-echo retry: All candidates blocked for meta tags');
     
     // Create modified inputs with explicit tag ban
     const antiEchoInputs = {

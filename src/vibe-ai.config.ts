@@ -633,18 +633,19 @@ export function postProcessLine(line: string, tone: string, requiredTags?: strin
     }
   }
   
-  // Block if general tags appear verbatim in the text
+  // Only block meta/instructional tags, allow content tags like 'christmas', 'birthday', etc.
+  const metaTags = ['meta', 'instruction', 'system', 'prompt', 'generate', 'create', 'format', 'json', 'array'];
   const generalTags = requiredTags?.filter(tag => 
-    !options?.exactWordingTags?.includes(tag)
+    !options?.exactWordingTags?.includes(tag) &&
+    metaTags.some(metaTag => tag.toLowerCase().includes(metaTag))
   ) || [];
   
   for (const tag of generalTags) {
-    // Only enforce for tags with length >= 4 to avoid false positives
-    if (tag.length >= 4 && lowerCleaned.includes(tag.toLowerCase())) {
+    if (lowerCleaned.includes(tag.toLowerCase())) {
       return {
         line: TONE_FALLBACKS[tone.toLowerCase()] || TONE_FALLBACKS.humorous,
         blocked: true,
-        reason: `Contains general tag verbatim: ${tag}`
+        reason: `Contains meta tag verbatim: ${tag}`
       };
     }
   }
@@ -668,73 +669,8 @@ export function postProcessLine(line: string, tone: string, requiredTags?: strin
     }
   }
 
-  // Check tag coverage for important tags (skip visual-only tags) - relaxed approach
-  if (generalTags && generalTags.length > 0) {
-    const visualOnlyTags = ['person', 'people', 'group', 'man', 'woman', 'male', 'female'];
-    const contentTags = generalTags.filter(tag => !visualOnlyTags.includes(tag.toLowerCase()));
-    
-    if (contentTags.length > 0) {
-      // Create expanded synonyms map for better AI direction
-      const synonymsMap: Record<string, string[]> = {
-        'work': ['job', 'career', 'office', 'workplace', 'employment', 'professional', 'business'],
-        'job': ['work', 'career', 'employment', 'position', 'occupation'],
-        'career': ['work', 'job', 'profession', 'employment', 'professional'],
-        'birthday': ['bday', 'birth', 'celebration', 'party', 'anniversary'],
-        'party': ['celebration', 'bash', 'gathering', 'event', 'festive'],
-        'funny': ['hilarious', 'comedy', 'humor', 'joke', 'laughter', 'witty', 'amusing'],
-        'movie': ['film', 'cinema', 'flick', 'hollywood', 'blockbuster'],
-        'music': ['song', 'album', 'band', 'artist', 'melody', 'tune'],
-        'love': ['romance', 'relationship', 'dating', 'crush', 'romantic'],
-        'food': ['eat', 'meal', 'cooking', 'restaurant', 'dining'],
-        'gay': ['flamboyant', 'fabulous', 'dramatic', 'colorful', 'expressive'],
-        'flamboyant': ['dramatic', 'bold', 'expressive', 'theatrical', 'vibrant'],
-        'marijuana': ['chill', 'relaxed', 'mellow', 'laid-back', 'peaceful'],
-        'weed': ['chill', 'relaxed', 'mellow', 'laid-back', 'peaceful'],
-        'cannabis': ['chill', 'relaxed', 'mellow', 'laid-back', 'peaceful'],
-        'drunk': ['tipsy', 'festive', 'party-mode', 'celebratory', 'uninhibited'],
-        'alcohol': ['party', 'celebration', 'social', 'festive', 'cheers'],
-        'dark': ['edgy', 'mysterious', 'intense', 'dramatic', 'bold'],
-        'savage': ['fierce', 'bold', 'confident', 'unapologetic', 'direct'],
-        'sarcastic': ['witty', 'dry', 'clever', 'ironic', 'sharp'],
-        'random': ['quirky', 'unexpected', 'spontaneous', 'chaotic', 'unpredictable'],
-        'weird': ['quirky', 'unusual', 'eccentric', 'unique', 'offbeat'],
-        'nostalgic': ['retro', 'vintage', 'throwback', 'classic', 'old-school'],
-        'aesthetic': ['stylish', 'beautiful', 'artistic', 'visual', 'trendy'],
-        'vibe': ['mood', 'energy', 'feeling', 'atmosphere', 'spirit'],
-        'mood': ['vibe', 'energy', 'feeling', 'atmosphere', 'tone'],
-        'energy': ['vibe', 'mood', 'spirit', 'enthusiasm', 'power']
-      };
-      
-      // Extract keywords from tags and check for matches with synonyms
-      const hasTagCoverage = contentTags.some(tag => {
-        const lowerTag = tag.toLowerCase();
-        
-        // Direct match
-        if (lowerCleaned.includes(lowerTag)) return true;
-        
-        // Check for synonyms
-        const synonyms = synonymsMap[lowerTag] || [];
-        if (synonyms.some(synonym => lowerCleaned.includes(synonym))) return true;
-        
-        // Check for partial word matches (e.g., "birthday" matches "birth")
-        if (lowerTag.length > 4) {
-          const rootWord = lowerTag.slice(0, -2); // Remove last 2 chars for partial match
-          if (lowerCleaned.includes(rootWord)) return true;
-        }
-        
-        return false;
-      });
-      
-      if (!hasTagCoverage) {
-        // Don't block for tag issues - just mark it
-        return {
-          line: cleaned,
-          blocked: false,
-          reason: `Partial tag coverage: ${contentTags.join(', ')}`
-        };
-      }
-    }
-  }
+  // Skip tag coverage checks entirely - too restrictive
+  // Allow all content through as long as it passes other filters
   
   return {
     line: cleaned,
