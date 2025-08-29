@@ -5855,7 +5855,7 @@ const Index = () => {
                       {/* General Tags Input */}
                       <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
                         <div className="text-center">
-                          <label className="text-sm font-medium text-foreground">General Tags</label>
+                          <label className="text-sm font-medium text-foreground">General Tags (give AI direction for text)</label>
                           <p className="text-xs text-muted-foreground mt-1">Theme, vibe, direction (movie quotes, birthday, funny)</p>
                         </div>
                         <Input value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={handleTagInputKeyDown} placeholder="Enter general tags (press Enter or comma to add)" className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
@@ -5869,13 +5869,13 @@ const Index = () => {
                           </div>}
                       </div>
 
-                      {/* Exact Wording Tags Input */}
+                      {/* Exact Text Tags Input */}
                       <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-200">
                         <div className="text-center">
-                          <label className="text-sm font-medium text-foreground">Exact Wording Tags</label>
+                          <label className="text-sm font-medium text-foreground">Exact Text Tags (they will literally be in the text)</label>
                           
                         </div>
-                        <Input value={exactWordingTagInput} onChange={e => setExactWordingTagInput(e.target.value)} onKeyDown={handleExactWordingTagInputKeyDown} placeholder="Enter exact wording tags (press Enter or comma to add)" className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
+                        <Input value={exactWordingTagInput} onChange={e => setExactWordingTagInput(e.target.value)} onKeyDown={handleExactWordingTagInputKeyDown} placeholder="Enter exact text tags (press Enter or comma to add)" className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
                         
                         {/* Display Exact Wording Tags */}
                         {exactWordingTags.length > 0 && <div className="flex flex-wrap gap-2 justify-center">
