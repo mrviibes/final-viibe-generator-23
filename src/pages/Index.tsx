@@ -6198,94 +6198,28 @@ const Index = () => {
                                </TooltipContent>
                              </Tooltip>
                            </div>
-                           <Input value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={handleTagInputKeyDown} placeholder="online dispensary, 55% off, millennials, labor day sale..." className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
-                           
-                           {/* Quick-add suggestion chips */}
-                           <div className="space-y-3">
-                             <div className="text-center">
-                               <p className="text-xs text-muted-foreground mb-2">Quick add:</p>
+                           <Input value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={handleTagInputKeyDown} placeholder="theme, sale, millennials, birthday, sarcastic..." className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
+                         
+                         {/* Display General Tags */}
+                         {tags.length > 0 && (
+                           <div className="space-y-2">
+                             <div className="flex flex-wrap gap-2 justify-center">
+                               {tags.map((tag, index) => (
+                                 <Badge key={index} variant="secondary" className="px-3 py-1 text-sm flex items-center gap-1">
+                                   {tag}
+                                   <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => removeTag(tag)} />
+                                 </Badge>
+                               ))}
                              </div>
-                             <div className="space-y-2">
-                               <div>
-                                 <p className="text-xs font-medium text-muted-foreground mb-1">Industry</p>
-                                 <div className="flex flex-wrap gap-1 justify-center">
-                                   {['Online dispensary', 'Cannabis brand', 'THC', 'CBD', 'Edibles', 'Flower', 'Vape'].map(chip => (
-                                     <button
-                                       key={chip}
-                                       onClick={() => {
-                                         if (!tags.includes(chip)) {
-                                           setTags([...tags, chip]);
-                                         }
-                                       }}
-                                       className="px-2 py-1 text-xs rounded-full border border-border hover:bg-accent/50 transition-colors disabled:opacity-50"
-                                       disabled={tags.includes(chip)}
-                                     >
-                                       {chip}
-                                     </button>
-                                   ))}
-                                 </div>
-                               </div>
-                               <div>
-                                 <p className="text-xs font-medium text-muted-foreground mb-1">Offer</p>
-                                 <div className="flex flex-wrap gap-1 justify-center">
-                                   {['55% off', 'Free gift', 'BOGO', 'Flash sale', 'Limited-time', 'New drop'].map(chip => (
-                                     <button
-                                       key={chip}
-                                       onClick={() => {
-                                         if (!tags.includes(chip)) {
-                                           setTags([...tags, chip]);
-                                         }
-                                       }}
-                                       className="px-2 py-1 text-xs rounded-full border border-border hover:bg-accent/50 transition-colors disabled:opacity-50"
-                                       disabled={tags.includes(chip)}
-                                     >
-                                       {chip}
-                                     </button>
-                                   ))}
-                                 </div>
-                               </div>
-                               <div>
-                                 <p className="text-xs font-medium text-muted-foreground mb-1">Audience/Angle</p>
-                                 <div className="flex flex-wrap gap-1 justify-center">
-                                   {['First-time buyers', 'Loyal customers', 'Weekend promo', 'Local delivery', 'Age 21+', 'Discreet'].map(chip => (
-                                     <button
-                                       key={chip}
-                                       onClick={() => {
-                                         if (!tags.includes(chip)) {
-                                           setTags([...tags, chip]);
-                                         }
-                                       }}
-                                       className="px-2 py-1 text-xs rounded-full border border-border hover:bg-accent/50 transition-colors disabled:opacity-50"
-                                       disabled={tags.includes(chip)}
-                                     >
-                                       {chip}
-                                     </button>
-                                   ))}
-                                 </div>
-                               </div>
-                             </div>
-                           </div>
-                        
-                        {/* Display General Tags */}
-                        {tags.length > 0 && (
-                          <div className="space-y-2">
-                            <div className="flex flex-wrap gap-2 justify-center">
-                              {tags.map((tag, index) => (
-                                <Badge key={index} variant="secondary" className="px-3 py-1 text-sm flex items-center gap-1">
-                                  {tag}
-                                  <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => removeTag(tag)} />
-                                </Badge>
-                              ))}
-                            </div>
-                            
-                            {/* Sensitive tag notices */}
-                            {tags.map((tag) => 
-                              sensitiveTagNotices[tag] && (
-                                <SensitiveTagNotice
-                                  key={`notice-${tag}`}
-                                  tag={tag}
-                                  onReplace={(newTag) => handleSensitiveTagReplace(tag, newTag)}
-                                  onDismiss={() => handleSensitiveTagDismiss(tag)}
+                             
+                             {/* Sensitive tag notices */}
+                             {tags.map((tag) => 
+                               sensitiveTagNotices[tag] && (
+                                 <SensitiveTagNotice
+                                   key={`notice-${tag}`}
+                                   tag={tag}
+                                   onReplace={(newTag) => handleSensitiveTagReplace(tag, newTag)}
+                                   onDismiss={() => handleSensitiveTagDismiss(tag)}
                                 />
                               )
                             )}
