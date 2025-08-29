@@ -177,6 +177,7 @@ export interface VibeResult {
     spellingFiltered?: number;
     usedBackupPrompt?: boolean;
     usedAntiEcho?: boolean;
+    sanitizedTags?: Array<{ original: string; replacement: string; reason: string; }>;
   };
 }
 
@@ -197,6 +198,78 @@ export interface IdeogramHandoff {
 // =========================
 // 2) Feature Flags and Constants  
 // =========================
+
+// Sensitive tag detection and rewriting system
+export interface SensitiveTagResult {
+  original: string;
+  replacement: string;
+  reason: string;
+  wasSanitized: boolean;
+}
+
+export function rewriteSensitiveTags(tags: string[]): SensitiveTagResult[] {
+  return tags.map(tag => {
+    const lowerTag = tag.toLowerCase().trim();
+    
+    // Pattern: "[name] is so gay" or similar derogatory usage
+    const derogatoryGayPattern = /(.+)\s+is\s+so\s+gay/i;
+    const match = derogatoryGayPattern.exec(tag);
+    
+    if (match) {
+      const name = match[1];
+      return {
+        original: tag,
+        replacement: `${name} is fabulous`,
+        reason: 'Converted derogatory usage to positive expression',
+        wasSanitized: true
+      };
+    }
+    
+    // Check for other potentially problematic phrases
+    const problematicPatterns = [
+      { pattern: /\b(retard|retarded)\b/i, replacement: 'silly', reason: 'Replaced ableist language' },
+      { pattern: /\b(lame)\b/i, replacement: 'uncool', reason: 'Replaced ableist language' },
+      { pattern: /\b(crazy|insane)\b/i, replacement: 'wild', reason: 'Replaced mental health language' }
+    ];
+    
+    for (const { pattern, replacement, reason } of problematicPatterns) {
+      if (pattern.test(lowerTag)) {
+        return {
+          original: tag,
+          replacement: tag.replace(pattern, replacement),
+          reason,
+          wasSanitized: true
+        };
+      }
+    }
+    
+    // No sanitization needed
+    return {
+      original: tag,
+      replacement: tag,
+      reason: '',
+      wasSanitized: false
+    };
+  });
+}
+
+export function getSensitiveTagSuggestions(tag: string): string[] {
+  const lowerTag = tag.toLowerCase();
+  
+  if (lowerTag.includes('gay')) {
+    return ['fabulous', 'camp', 'theatrical', 'pride'];
+  }
+  
+  if (lowerTag.includes('crazy') || lowerTag.includes('insane')) {
+    return ['wild', 'chaotic', 'unpredictable', 'intense'];
+  }
+  
+  if (lowerTag.includes('lame')) {
+    return ['uncool', 'boring', 'disappointing', 'weak'];
+  }
+  
+  return ['stylish', 'dramatic', 'expressive', 'bold'];
+}
 
 // Fixed negative prompt applied to all image generations - keep short and focused
 export const DEFAULT_NEGATIVE_PROMPT = "misspellings, distorted letters, typos, incorrect spelling, garbled text, unreadable text, handwriting, cursive, script font, ligatures, broken kerning, cramped kerning, letter swaps, split letters, watermark, logo, captions, duplicated words";

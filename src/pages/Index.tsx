@@ -19,6 +19,7 @@ import { StackedSelectionCard } from "@/components/StackedSelectionCard";
 import { MovieSceneHelper } from "@/components/MovieSceneHelper";
 import { FallbackTooltip } from "@/components/FallbackTooltip";
 import { ConciseModePanel } from "@/components/ConciseModePanel";
+import { SensitiveTagNotice } from "@/components/SensitiveTagNotice";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigate } from "react-router-dom";
 import { generateCandidates, VibeResult } from "@/lib/vibeModel";
@@ -29,7 +30,7 @@ import { buildIdeogramPrompt, getAspectRatioForIdeogram, getStyleTypeForIdeogram
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
 import { normalizeTypography, suggestContractions, isTextMisspelled } from "@/lib/textUtils";
-import { BACKGROUND_PRESETS, getRuntimeOverrides, TONES, VISUAL_STYLES, DEFAULT_NEGATIVE_PROMPT } from "../vibe-ai.config";
+import { BACKGROUND_PRESETS, getRuntimeOverrides, TONES, VISUAL_STYLES, DEFAULT_NEGATIVE_PROMPT, rewriteSensitiveTags, SensitiveTagResult } from "../vibe-ai.config";
 const styleOptions = [{
   id: "celebrations",
   name: "Celebrations",
@@ -4018,6 +4019,8 @@ const Index = () => {
   const [tagInput, setTagInput] = useState<string>("");
   const [exactWordingTags, setExactWordingTags] = useState<string[]>([]);
   const [exactWordingTagInput, setExactWordingTagInput] = useState<string>("");
+  const [sensitiveTagNotices, setSensitiveTagNotices] = useState<Record<string, boolean>>({});
+  const [lastSanitizedTags, setLastSanitizedTags] = useState<SensitiveTagResult[]>([]);
   const [textGenerationStartTime, setTextGenerationStartTime] = useState<number>(0);
   const [visualGenerationStartTime, setVisualGenerationStartTime] = useState<number>(0);
   const [generatedOptions, setGeneratedOptions] = useState<string[]>([]);
@@ -4494,6 +4497,12 @@ const Index = () => {
     const trimmedTag = tag.trim();
     if (trimmedTag && !tags.includes(trimmedTag)) {
       setTags([...tags, trimmedTag]);
+      
+      // Check for sensitive content and show notice
+      const sanitizedResult = rewriteSensitiveTags([trimmedTag]);
+      if (sanitizedResult[0].wasSanitized) {
+        setSensitiveTagNotices(prev => ({ ...prev, [trimmedTag]: true }));
+      }
     }
     setTagInput("");
   };
@@ -4520,6 +4529,32 @@ const Index = () => {
       e.preventDefault();
       handleAddExactWordingTag(exactWordingTagInput);
     }
+  };
+
+  // Sensitive tag handlers
+  const handleSensitiveTagReplace = (originalTag: string, newTag: string) => {
+    setTags(prev => prev.map(tag => tag === originalTag ? newTag : tag));
+    setSensitiveTagNotices(prev => ({ ...prev, [originalTag]: false }));
+  };
+
+  const handleSensitiveTagDismiss = (tag: string) => {
+    setSensitiveTagNotices(prev => ({ ...prev, [tag]: false }));
+  };
+
+  const handlePrideModeRegenerate = () => {
+    // Add pride-positive tags and regenerate
+    const prideStyle = 'fabulous';
+    if (!tags.includes(prideStyle)) {
+      setTags(prev => [...prev, prideStyle]);
+    }
+    handleGenerateText();
+  };
+
+  const handleSkipSensitiveTagsRegenerate = () => {
+    // Remove flagged tags and regenerate
+    const sensitiveTagNames = Object.keys(sensitiveTagNotices).filter(tag => sensitiveTagNotices[tag]);
+    setTags(prev => prev.filter(tag => !sensitiveTagNames.includes(tag)));
+    handleGenerateText();
   };
   const removeExactWordingTag = (tagToRemove: string) => {
     setExactWordingTags(exactWordingTags.filter(tag => tag !== tagToRemove));
@@ -4695,8 +4730,17 @@ const Index = () => {
         setExactWordingTags([...exactWordingTags, exactWordingTagInput.trim()]);
         setExactWordingTagInput("");
       }
-      let finalTags = [...tags, ...exactWordingTags];
+      // Preprocess tags for sensitive content before generation
+      const allTags = [...tags, ...exactWordingTags];
+      const sanitizedTagResults = rewriteSensitiveTags(allTags);
+      const finalTags = sanitizedTagResults.map(result => result.replacement);
+      const sanitizedTags = sanitizedTagResults.filter(result => result.wasSanitized);
+      
+      // Store sanitized tags for audit display
+      setLastSanitizedTags(sanitizedTags);
+      
       console.log('🏷️ Text generation started with tags:', tags, 'exact wording:', exactWordingTags);
+      console.log('🏷️ Sanitized tags:', sanitizedTags);
       console.log('🏷️ Current tags state:', {
         tags,
         exactWordingTags,
@@ -5982,12 +6026,30 @@ const Index = () => {
                         <p className="text-xs text-muted-foreground italic">💡 Tips: "flamboyant" makes text dramatic, "chill" makes it relaxed, "aesthetic" adds style</p>
                         
                         {/* Display General Tags */}
-                        {tags.length > 0 && <div className="flex flex-wrap gap-2 justify-center">
-                            {tags.map((tag, index) => <Badge key={index} variant="secondary" className="px-3 py-1 text-sm flex items-center gap-1">
-                                {tag}
-                                <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => removeTag(tag)} />
-                              </Badge>)}
-                          </div>}
+                        {tags.length > 0 && (
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap gap-2 justify-center">
+                              {tags.map((tag, index) => (
+                                <Badge key={index} variant="secondary" className="px-3 py-1 text-sm flex items-center gap-1">
+                                  {tag}
+                                  <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => removeTag(tag)} />
+                                </Badge>
+                              ))}
+                            </div>
+                            
+                            {/* Sensitive tag notices */}
+                            {tags.map((tag) => 
+                              sensitiveTagNotices[tag] && (
+                                <SensitiveTagNotice
+                                  key={`notice-${tag}`}
+                                  tag={tag}
+                                  onReplace={(newTag) => handleSensitiveTagReplace(tag, newTag)}
+                                  onDismiss={() => handleSensitiveTagDismiss(tag)}
+                                />
+                              )
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       {/* Exact Text Tags Input */}
@@ -6049,7 +6111,11 @@ const Index = () => {
                             <FallbackTooltip 
                               reason="content-filter"
                               onRegenerate={handleGenerateText}
+                              onAlludeMode={handleGenerateText}
+                              onPrideMode={handlePrideModeRegenerate}
+                              onSkipTags={handleSkipSensitiveTagsRegenerate}
                               isGenerating={isGenerating}
+                              sanitizedTags={lastSanitizedTags}
                             />
                           )}
                         </div>}

@@ -6,14 +6,20 @@ interface FallbackTooltipProps {
   reason?: string;
   onRegenerate?: () => void;
   onAlludeMode?: () => void;
+  onPrideMode?: () => void;
+  onSkipTags?: () => void;
   isGenerating?: boolean;
+  sanitizedTags?: Array<{ original: string; replacement: string; reason: string; }>;
 }
 
 export function FallbackTooltip({ 
   reason = "content-filter", 
   onRegenerate, 
   onAlludeMode,
-  isGenerating = false 
+  onPrideMode,
+  onSkipTags,
+  isGenerating = false,
+  sanitizedTags = []
 }: FallbackTooltipProps) {
   const getReasonText = () => {
     switch (reason) {
@@ -31,12 +37,23 @@ export function FallbackTooltip({
   };
 
   const getQuickFixes = () => {
+    const hasSanitizedTags = sanitizedTags.length > 0;
+    
     switch (reason) {
       case "content-filter":
-        return [
+        const fixes = [
           { label: "Try Allude Mode", action: onAlludeMode, icon: Shield, description: "Generate subtler variations" },
           { label: "Regenerate", action: onRegenerate, icon: RefreshCw, description: "Try again with different AI approach" }
         ];
+        
+        if (hasSanitizedTags) {
+          fixes.unshift(
+            { label: "Pride-Positive Style", action: onPrideMode, icon: Shield, description: "Generate with celebratory pride tone" },
+            { label: "Skip Sensitive Tags", action: onSkipTags, icon: RefreshCw, description: "Generate without flagged tags" }
+          );
+        }
+        
+        return fixes;
       case "timeout":
       case "api-error":
         return [
@@ -63,6 +80,22 @@ export function FallbackTooltip({
               <p className="font-medium text-sm">Why fallback was used:</p>
               <p className="text-xs text-muted-foreground mt-1">{getReasonText()}</p>
             </div>
+            
+            {sanitizedTags.length > 0 && (
+              <div>
+                <p className="font-medium text-sm">Sanitized tags:</p>
+                <div className="space-y-1 mt-1">
+                  {sanitizedTags.map((tag, index) => (
+                    <div key={index} className="text-xs">
+                      <span className="text-muted-foreground">"{tag.original}"</span>
+                      <span className="mx-1">→</span>
+                      <span className="font-medium">"{tag.replacement}"</span>
+                      <p className="text-muted-foreground italic">{tag.reason}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             
             <div className="space-y-2">
               <p className="font-medium text-sm">Quick fixes:</p>
