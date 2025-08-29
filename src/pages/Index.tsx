@@ -16,6 +16,7 @@ import { ProxySettingsDialog } from "@/components/ProxySettingsDialog";
 import { CorsRetryDialog } from "@/components/CorsRetryDialog";
 import { StepProgress } from "@/components/StepProgress";
 import { StackedSelectionCard } from "@/components/StackedSelectionCard";
+import { MovieSceneHelper } from "@/components/MovieSceneHelper";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigate } from "react-router-dom";
 import { generateCandidates, VibeResult } from "@/lib/vibeModel";
@@ -4152,6 +4153,14 @@ const Index = () => {
   const [targetSlot, setTargetSlot] = useState<string>('');
   const [exactSceneMode, setExactSceneMode] = useState<boolean>(false);
 
+  // Movie Scene Helper state
+  const [showMovieSceneHelper, setShowMovieSceneHelper] = useState<boolean>(false);
+  const [movieSceneData, setMovieSceneData] = useState<{
+    exactQuote: string;
+    sceneDescription: string;
+    useExactMode: boolean;
+  } | null>(null);
+
   // Text speed locked to fast (removed state)
 
   // Auto-generate 1 image when Step 4 loads AND visual recommendations are ready
@@ -4800,7 +4809,7 @@ const Index = () => {
     setSelectedImageIndex(0);
     try {
       // Build the handoff data using actual form values
-      const finalText = selectedGeneratedOption || stepTwoText || "";
+      const finalText = movieSceneData?.exactQuote || selectedGeneratedOption || stepTwoText || "";
       const categoryName = selectedStyle ? styleOptions.find(s => s.id === selectedStyle)?.name || "" : "";
       const subcategory = (() => {
         if (selectedStyle === 'celebrations' && selectedSubOption) {
@@ -4840,6 +4849,8 @@ const Index = () => {
         final_line: finalText,
         tags_csv: [textTagsStr, visualTagsStr].filter(tag => tag !== "None").join(', '),
         chosen_visual: chosenVisual,
+        custom_design_notes: movieSceneData?.sceneDescription,
+        exact_scene_mode: movieSceneData?.useExactMode || exactSceneMode,
         category: categoryName,
         subcategory_secondary: subcategorySecondary,
         aspect_ratio: aspectRatio,
@@ -5673,16 +5684,35 @@ const Index = () => {
                       <p className="text-sm text-destructive">{popSearchError}</p>
                     </div>}
 
-                  {/* Custom Entry Option */}
-                  {popSearchTerm.trim() && popSearchResults.length === 0 && !isPopSearching && !popSearchError && <div className="text-center">
-                      <Button onClick={() => {
-                  setSelectedPick(popSearchTerm.trim());
-                  setPopSearchTerm("");
-                }} variant="outline" size="lg" className="px-6 py-3">
-                        Use "{popSearchTerm.trim()}" as custom {selectedSubOption.toLowerCase()}
-                      </Button>
-                    </div>}
-                </div>
+                   {/* Custom Entry Option */}
+                   {popSearchTerm.trim() && popSearchResults.length === 0 && !isPopSearching && !popSearchError && <div className="text-center">
+                       <Button onClick={() => {
+                   setSelectedPick(popSearchTerm.trim());
+                   setPopSearchTerm("");
+                 }} variant="outline" size="lg" className="px-6 py-3">
+                         Use "{popSearchTerm.trim()}" as custom {selectedSubOption.toLowerCase()}
+                       </Button>
+                     </div>}
+
+                   {/* Movie Scene Helper */}
+                   {selectedSubOption === "movies" && (
+                     <div className="mt-6 pt-6 border-t border-border">
+                       <div className="text-center mb-4">
+                         <Button
+                           onClick={() => setShowMovieSceneHelper(!showMovieSceneHelper)}
+                           variant="secondary"
+                           size="lg"
+                           className="px-6 py-3"
+                         >
+                           🎬 Movie Scene Helper
+                         </Button>
+                         <p className="text-xs text-muted-foreground mt-2">
+                           Perfect for recreating iconic movie scenes with exact quotes
+                         </p>
+                       </div>
+                     </div>
+                   )}
+                 </div>
               </div> : selectedStyle === "random" && !selectedSubOption ? <div className="selected-card mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="text-center mb-6">
                   <p className="text-xl text-muted-foreground">Ready to create your text</p>
@@ -5701,6 +5731,19 @@ const Index = () => {
 
           </div>}
           </>}
+
+        {/* Movie Scene Helper */}
+        <MovieSceneHelper
+          isVisible={showMovieSceneHelper}
+          onSceneData={(data) => {
+            setMovieSceneData(data);
+            setStepTwoText(data.exactQuote);
+            setIsCustomTextConfirmed(true);
+            setExactSceneMode(data.useExactMode);
+            setShowMovieSceneHelper(false);
+            setCurrentStep(3); // Move to visual style selection
+          }}
+        />
 
         {currentStep === 2 && <>
             <div className="text-center mb-12">
@@ -6705,7 +6748,7 @@ const Index = () => {
                   <div className="bg-muted/30 rounded-lg p-6">
                     {(() => {
                 // Build the same handoff structure we use for generation
-                const finalText = selectedGeneratedOption || stepTwoText || "";
+                const finalText = movieSceneData?.exactQuote || selectedGeneratedOption || stepTwoText || "";
                 const visualStyle = selectedVisualStyle || "";
                 const subcategory = (() => {
                   if (selectedStyle === 'celebrations' && selectedSubOption) {
@@ -6822,7 +6865,7 @@ const Index = () => {
               // Start manual image generation on Step 4
               setIsGeneratingImage(true);
               try {
-                const finalText = selectedGeneratedOption || stepTwoText || "";
+                const finalText = movieSceneData?.exactQuote || selectedGeneratedOption || stepTwoText || "";
                 const visualStyle = selectedVisualStyle || "";
                 const subcategory = (() => {
                   if (selectedStyle === 'celebrations' && selectedSubOption) {
@@ -6941,7 +6984,7 @@ const Index = () => {
               }
             } else if (currentStep === 4 && isStep4Complete()) {
               // Generate vibe with Ideogram handoff
-              const finalText = selectedGeneratedOption || stepTwoText || "";
+              const finalText = movieSceneData?.exactQuote || selectedGeneratedOption || stepTwoText || "";
               const visualStyle = selectedVisualStyle || "";
               const subcategory = (() => {
                 if (selectedStyle === 'celebrations' && selectedSubOption) {
