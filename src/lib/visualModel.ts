@@ -53,8 +53,15 @@ function autoEnrichInputs(inputs: VisualInputs): VisualInputs {
     enriched.tags = [...inputs.tags, ...categoryTags].slice(0, 6);
   }
   
-  // Pride/LGBTQ+ theme enhancement
-  if (inputs.finalLine) {
+  // Pride/LGBTQ+ theme enhancement - DISABLED for object-focused exact scenes
+  const isObjectScene = inputs.finalLine && (
+    inputs.finalLine.toLowerCase().includes('ruler') ||
+    inputs.finalLine.toLowerCase().includes('object') ||
+    inputs.finalLine.toLowerCase().includes('thing') ||
+    inputs.tags.some(tag => ['ruler', 'tool', 'object', 'item'].includes(tag.toLowerCase()))
+  );
+  
+  if (inputs.finalLine && !isObjectScene && !(inputs as any).exact_scene_mode) {
     const prideKeywords = ['pride', 'parade', 'rainbow', 'gay', 'lesbian', 'drag', 'queens', 'queer', 'lgbtq'];
     const hasPrideTheme = prideKeywords.some(keyword => 
       inputs.finalLine!.toLowerCase().includes(keyword) || 

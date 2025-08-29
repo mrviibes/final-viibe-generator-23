@@ -837,7 +837,13 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   
   // EXACT TEXT RENDERING (if present) - Remove redundant "EXACT TEXT:" prefix
   if (handoff.key_line && handoff.key_line.trim()) {
-    const cleanText = handoff.key_line.replace(/[""]/g, '"').replace(/['']/g, "'").replace(/[—–]/g, '-').trim();
+    // Clean and normalize text to ASCII-safe characters
+    const cleanText = handoff.key_line
+      .replace(/[""]/g, '"')
+      .replace(/['']/g, "'")
+      .replace(/[—–]/g, '-')
+      .replace(/[^\x00-\x7F]/g, '') // Remove non-ASCII characters
+      .trim();
     // Remove redundant "EXACT TEXT:" prefix that users might include
     const finalText = cleanText.replace(/^EXACT TEXT:\s*["']?/i, '').replace(/["']$/, '');
     parts.push(`EXACT TEXT: "${finalText}"`);
@@ -882,10 +888,24 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     background = "clean, minimal background with high contrast for text";
   }
   
-  // Add scene-specific negative prompts for sports interior scenes
+  // Detect object scenes and add appropriate negative prompts
+  const isObjectScene = handoff.key_line && (
+    handoff.key_line.toLowerCase().includes('ruler') ||
+    handoff.key_line.toLowerCase().includes('object') ||
+    handoff.key_line.toLowerCase().includes('thing') ||
+    subject?.toLowerCase().includes('ruler') ||
+    subject?.toLowerCase().includes('object')
+  );
+  
+  // Add scene-specific negative prompts 
   let negativeElements = '';
   if (handoff.category === 'Sports' && background && background.toLowerCase().includes('locker')) {
     negativeElements = ' Avoid stadium, field, scoreboard, jumbotron, outdoor sports venue.';
+  }
+  
+  // Add object scene negative prompts to prevent people/parade confusion
+  if (isObjectScene) {
+    negativeElements += ' Avoid people, parade, crowds, signs, posters, flags, protesters, demonstrations.';
   }
   
   parts.push(`Background: ${background}.${negativeElements}`);
@@ -919,12 +939,23 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   
   // ENHANCED TEXT PLACEMENT with negative prompts
   if (handoff.key_line && handoff.key_line.trim()) {
-    if (typographyStyle !== 'poster') {
+    // Default to negative_space for exact text with object scenes
+    const effectiveTypographyStyle = isObjectScene ? 'negative_space' : typographyStyle;
+    
+    if (effectiveTypographyStyle !== 'poster') {
       parts.push("Place text in natural negative space areas like sky, walls, or empty backgrounds. Use TOP, BOTTOM, LEFT, or RIGHT zones rather than always centering. Ensure high contrast and avoid overlapping with faces or main subjects.");
     }
-    // Add negative prompt for text placement
+    
+    // Build comprehensive negative prompt
+    const negativePromptParts = [];
     if (handoff.negative_prompt) {
-      parts.push(`Negative prompt: ${handoff.negative_prompt}`);
+      negativePromptParts.push(handoff.negative_prompt);
+    }
+    // Add text-specific negatives
+    negativePromptParts.push('misspellings, distorted letters, extra characters, typos, random symbols, unreadable fonts');
+    
+    if (negativePromptParts.length > 0) {
+      parts.push(`Negative prompt: ${negativePromptParts.join(', ')}`);
     }
   }
   

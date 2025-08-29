@@ -147,13 +147,15 @@ export async function findBestProxy(): Promise<ProxySettings['type']> {
 }
 
 export async function generateIdeogramImage(request: IdeogramGenerateRequest): Promise<IdeogramGenerateResponse> {
-  // Prioritize V_3 model for Pop Culture character scenes
+  // Prioritize V_3 model for Pop Culture character scenes AND exact text
   const isPopCultureCharacter = request.prompt.includes('Character:') && request.prompt.includes('Pop Culture');
+  const hasExactText = request.prompt.includes('EXACT TEXT:');
   let requestWithModel: IdeogramGenerateRequest = { ...request };
   
-  // Force V_3 for character-heavy scenes for better identity recognition
-  if (isPopCultureCharacter && request.model !== 'V_3') {
-    console.log('🎭 Pop Culture character detected, upgrading to V_3 model for better character recognition');
+  // Force V_3 for character-heavy scenes AND exact text for better recognition/rendering
+  if ((isPopCultureCharacter || hasExactText) && request.model !== 'V_3') {
+    const reason = hasExactText ? 'exact text detected' : 'Pop Culture character detected';
+    console.log(`🎭 ${reason}, upgrading to V_3 model for better ${hasExactText ? 'text rendering' : 'character recognition'}`);
     requestWithModel.model = 'V_3';
   }
   
