@@ -6740,7 +6740,7 @@ const Index = () => {
                   rec_background: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined
                 });
                 const promptText = buildIdeogramPrompt(tempHandoff);
-                return <p className="text-sm text-foreground font-mono leading-relaxed">
+                return <p className="text-sm text-foreground font-mono leading-relaxed whitespace-pre-wrap">
                           {promptText || "No prompt available"}
                         </p>;
               })()}
