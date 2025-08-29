@@ -3749,6 +3749,10 @@ const anythingGoesOptions = [{
   subtitle: ""
 }, {
   // Advertisements & Platforms
+  id: "general-advertisement",
+  name: "General Advertisement",
+  subtitle: ""
+}, {
   id: "facebook-ads",
   name: "Facebook ads",
   subtitle: ""
@@ -3906,7 +3910,7 @@ const anythingGoesGroups = [{
 }, {
   id: "advertisements-platforms",
   name: "Advertisements & Platforms",
-  itemIds: ["facebook-ads", "instagram-posts", "tiktok-skits", "youtube-prerolls", "billboards", "print-ads", "clickbait-headlines", "infomercials"]
+  itemIds: ["general-advertisement", "facebook-ads", "instagram-posts", "tiktok-skits", "youtube-prerolls", "billboards", "print-ads", "clickbait-headlines", "infomercials"]
 }, {
   id: "careers-work-life",
   name: "Careers & Work Life", 
