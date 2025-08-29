@@ -44,9 +44,9 @@ function getContextualFallbacks(tone: string, category: string, subcategory: str
     savage: {
       work: ["Boss mode activated", "Excellence is not negotiable", "Crushing goals daily", "Success is the only option"],
       birthday: ["Leveling up like a legend", "Another year stronger", "Born to stand out", "Unstoppable since birth"],
-      party: ["Bringing the main character energy", "Setting the standard tonight", "Unforgettable vibes incoming", "Making this legendary"],
+      party: ["Setting the standard tonight", "Unforgettable vibes incoming", "Making this legendary", "Elite energy activated"],
       food: ["Only the finest will do", "Elevating my taste standards", "Quality over everything", "Sophisticated palate activated"],
-      default: ["Built different, stay pressed", "Main character energy always", "Excellence is my baseline", "Setting standards daily"]
+      default: ["Excellence is the only standard", "Raise the bar or get out of the way", "Results talk; excuses walk", "Discipline over drama"]
     },
     random: {
       work: ["Plot twist: actually productive today", "Chaos coordinator reporting for duty", "Making sense optional", "Professional randomness activated"],
@@ -61,6 +61,64 @@ function getContextualFallbacks(tone: string, category: string, subcategory: str
   const categoryOptions = toneOptions[category.toLowerCase()] || toneOptions.default;
   
   return categoryOptions;
+}
+
+// Banned phrases that should be filtered out to prevent generic internet clichés
+const BANNED_PHRASES = [
+  "built different",
+  "stay pressed", 
+  "main character energy",
+  "good vibes only",
+  "living rent-free"
+];
+
+async function generateTopUpCandidates(inputs: VibeInputs, needed: number, bannedLines: Set<string>): Promise<VibeCandidate[]> {
+  try {
+    const config = getEffectiveConfig();
+    
+    // Build stricter prompt for top-up generation
+    const topUpMessages = [
+      { 
+        role: 'system', 
+        content: `Generate on-topic text that references the specific subject/category. CRITICAL: Must relate to "${inputs.category}"${inputs.subcategory ? ` > ${inputs.subcategory}` : ''}. Avoid generic clichés. Always respond with valid JSON.`
+      },
+      { 
+        role: 'user', 
+        content: `Generate ${needed} additional ${inputs.tone} text options that specifically reference the subject/category.
+
+Requirements:
+- Must relate to: ${inputs.category}${inputs.subcategory ? ` (${inputs.subcategory})` : ''}
+- Tone: ${inputs.tone}
+- Keep under 100 characters each
+- NO generic phrases like: "built different", "main character energy", "stay pressed", "good vibes only"
+- Avoid these existing lines: ${Array.from(bannedLines).join(', ')}
+${inputs.exactWordingTags?.length ? `- Include these phrases: ${inputs.exactWordingTags.join(', ')}` : ''}
+
+Return: {"lines":["option1","option2","option3","option4"]}`
+      }
+    ];
+    
+    const result = await openAIService.chatJSON(topUpMessages, {
+      max_tokens: config.generation.max_tokens,
+      temperature: config.generation.temperature,
+      model: config.generation.model
+    });
+    
+    const lines = result.lines || [];
+    if (!Array.isArray(lines) || lines.length === 0) {
+      return [];
+    }
+    
+    // Post-process and filter
+    const candidates = lines.map((line: string) => 
+      postProcessLine(line, inputs.tone, inputs.tags, { exactWordingTags: inputs.exactWordingTags })
+    );
+    
+    return candidates;
+  } catch (error) {
+    console.error('Top-up generation failed:', error);
+    return [];
+  }
 }
 
 // Post-processing now handled by centralized config
@@ -225,7 +283,13 @@ Return: {"lines":["option1","option2","option3","option4","option5","option6"]}`
   
   // Filter out blocked candidates and remove duplicates
   const validCandidates = candidateResults.filter(c => !c.blocked);
-  const uniqueValidLines = Array.from(new Set(validCandidates.map(c => c.line)));
+  let uniqueValidLines = Array.from(new Set(validCandidates.map(c => c.line)));
+  
+  // Filter out banned phrases to prevent generic clichés
+  uniqueValidLines = uniqueValidLines.filter(line => 
+    !BANNED_PHRASES.some(phrase => line.toLowerCase().includes(phrase.toLowerCase()))
+  );
+  
   const blockedCount = candidateResults.length - validCandidates.length;
   
   // Count spelling-related blocks
@@ -288,6 +352,29 @@ Return: {"lines":["option1","option2","option3","option4","option5","option6"]}`
     finalCandidates = [...uniqueValidLines];
   }
   
+  // Top-up generation if we have fewer than 4 valid options
+  if (finalCandidates.length < 4) {
+    console.log(`🔄 Top-up generation: only ${finalCandidates.length} valid lines, need ${4 - finalCandidates.length} more`);
+    
+    const needed = 4 - finalCandidates.length;
+    const bannedLines = new Set(finalCandidates);
+    
+    try {
+      const topUpCandidates = await generateTopUpCandidates(inputs, needed, bannedLines);
+      const validTopUps = topUpCandidates.filter(c => !c.blocked && !bannedLines.has(c.line));
+      
+      if (validTopUps.length > 0) {
+        const topUpLines = validTopUps.map(c => c.line).slice(0, needed);
+        finalCandidates.push(...topUpLines);
+        console.log(`✅ Top-up generated ${topUpLines.length} additional lines`);
+      }
+    } catch (error) {
+      console.error('Top-up generation failed:', error);
+    }
+  }
+  
+  let trueFallbacks: string[] = [];
+  
   if (finalCandidates.length > 0) {
     // Check if we have any lines that were blocked only for tag coverage
     const tagOnlyBlocked = candidateResults.filter(c => 
@@ -300,32 +387,38 @@ Return: {"lines":["option1","option2","option3","option4","option5","option6"]}`
       finalCandidates.push(...tagBlockedLines);
     }
     
-    // Ensure we have exactly 4 options by adding contextual fallbacks if needed
+    // Only add contextual fallbacks as true fallbacks if still needed
     while (finalCandidates.length < 4) {
       const contextualFallbacks = getContextualFallbacks(inputs.tone, inputs.category, inputs.subcategory);
-      const fallbackIndex = (finalCandidates.length - (uniqueValidLines.length)) % contextualFallbacks.length;
+      const fallbackIndex = trueFallbacks.length % contextualFallbacks.length;
       const nextFallback = contextualFallbacks[fallbackIndex];
       if (!finalCandidates.includes(nextFallback)) {
-        finalCandidates.push(nextFallback);
+        trueFallbacks.push(nextFallback);
       } else {
-        finalCandidates.push(`${nextFallback} today`);
+        trueFallbacks.push(`${nextFallback} today`);
       }
     }
     
-    // Take only first 4 if we have more
-    finalCandidates = finalCandidates.slice(0, 4);
+    // Separate model-generated lines from true fallbacks
+    const modelLines = finalCandidates.slice(0, Math.min(finalCandidates.length, 4));
     
-    // Shuffle the array to avoid always showing short ones first
-    for (let i = finalCandidates.length - 1; i > 0; i--) {
+    // Shuffle only the model-generated portion
+    for (let i = modelLines.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [finalCandidates[i], finalCandidates[j]] = [finalCandidates[j], finalCandidates[i]];
+      [modelLines[i], modelLines[j]] = [modelLines[j], modelLines[i]];
     }
     
-    // Pick the first one after shuffling
+    // Combine shuffled model lines with unshuffled fallbacks at the end
+    finalCandidates = [...modelLines, ...trueFallbacks].slice(0, 4);
+    
+    // Pick the first one (from shuffled model lines if available)
     picked = finalCandidates[0];
-    usedFallback = false;
+    usedFallback = trueFallbacks.length > 0;
     if (!reason && tagOnlyBlocked.length > 0) {
       reason = 'Used lines with partial tag coverage';
+    }
+    if (trueFallbacks.length > 0 && !reason) {
+      reason = `Added ${trueFallbacks.length} contextual fallback(s)`;
     }
   } else {
     // Check if all were blocked only for tag coverage
