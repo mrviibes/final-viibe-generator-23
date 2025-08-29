@@ -4036,7 +4036,7 @@ const Index = () => {
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [searchResults, setSearchResults] = useState<OpenAISearchResult[]>([]);
   const [searchError, setSearchError] = useState<string>("");
-  
+
   // Independent state for pop culture search
   const [popSearchTerm, setPopSearchTerm] = useState<string>("");
   const [popSearchResults, setPopSearchResults] = useState<OpenAISearchResult[]>([]);
@@ -4058,7 +4058,6 @@ const Index = () => {
   const [showProxySettings, setShowProxySettings] = useState(false);
   const [proxySettings, setLocalProxySettings] = useState(() => getProxySettings());
   const [proxyApiKey, setProxyApiKey] = useState('');
-  
 
   // Remember choices toggle and load saved choices
   const [rememberChoices, setRememberChoices] = useState<boolean>(() => {
@@ -4069,13 +4068,12 @@ const Index = () => {
   // Load saved choices on component mount
   useEffect(() => {
     const overrides = getRuntimeOverrides();
-    
+
     // Negative prompt is now fixed - no need to load from localStorage
-    
+
     if (rememberChoices) {
       const savedTextStyle = localStorage.getItem('last_selected_text_style');
       const savedVisualStyle = localStorage.getItem('last_selected_visual_style');
-      
       if (savedTextStyle && textStyleOptions.find(opt => opt.id === savedTextStyle)) {
         setSelectedTextStyle(savedTextStyle);
       } else if (overrides.defaultTone) {
@@ -4085,7 +4083,6 @@ const Index = () => {
           setSelectedTextStyle(defaultToneOption.id);
         }
       }
-      
       if (savedVisualStyle && visualStyleOptions.find(opt => opt.id === savedVisualStyle)) {
         setSelectedVisualStyle(savedVisualStyle);
       } else if (overrides.defaultVisualStyle) {
@@ -4103,7 +4100,6 @@ const Index = () => {
           setSelectedTextStyle(defaultToneOption.id);
         }
       }
-      
       if (overrides.defaultVisualStyle) {
         const defaultVisualOption = visualStyleOptions.find(opt => opt.name === overrides.defaultVisualStyle);
         if (defaultVisualOption) {
@@ -4119,7 +4115,6 @@ const Index = () => {
       localStorage.setItem('last_selected_text_style', selectedTextStyle);
     }
   }, [selectedTextStyle, rememberChoices]);
-
   useEffect(() => {
     if (rememberChoices && selectedVisualStyle) {
       localStorage.setItem('last_selected_visual_style', selectedVisualStyle);
@@ -4130,7 +4125,6 @@ const Index = () => {
   const handleRememberChoicesToggle = (checked: boolean) => {
     setRememberChoices(checked);
     localStorage.setItem('remember_last_choices', checked.toString());
-    
     if (!checked) {
       // Clear saved choices when disabled
       localStorage.removeItem('last_selected_text_style');
@@ -4150,7 +4144,7 @@ const Index = () => {
   const [visualRecommendations, setVisualRecommendations] = useState<any>(null);
   const [selectedRecommendation, setSelectedRecommendation] = useState<number | null>(null);
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
-  
+
   // Background style and focus state
   const [backgroundPreset, setBackgroundPreset] = useState<string>('');
   const [targetSlot, setTargetSlot] = useState<string>('');
@@ -4202,7 +4196,6 @@ const Index = () => {
       const overrides = getRuntimeOverrides();
       const selectedModel = overrides.model || 'gpt-4.1-2025-04-14';
       console.log(`🧪 Testing AI connection with model: ${selectedModel}`);
-      
       const testResult = await openAIService.chatJSON([{
         role: 'user',
         content: 'Test connection. Return JSON response: {"status": "ok"}'
@@ -4649,7 +4642,6 @@ const Index = () => {
         setExactWordingTags([...exactWordingTags, exactWordingTagInput.trim()]);
         setExactWordingTagInput("");
       }
-
       let finalTags = [...tags, ...exactWordingTags];
       console.log('🏷️ Text generation started with tags:', tags, 'exact wording:', exactWordingTags);
       console.log('🏷️ Current tags state:', {
@@ -4740,7 +4732,7 @@ const Index = () => {
           description: "The AI created content that may not exactly match all your keywords but fits the tone and context."
         });
       }
-      
+
       // Show spelling filter notification if options were filtered for quality
       if (vibeResult.audit.spellingFiltered && vibeResult.audit.spellingFiltered > 0) {
         console.log(`📝 Filtered ${vibeResult.audit.spellingFiltered} options for spelling quality`);
@@ -4839,7 +4831,6 @@ const Index = () => {
         recSubject = firstRec.subject;
         recBackground = firstRec.background;
       }
-
       const ideogramPayload = buildIdeogramHandoff({
         visual_style: visualStyle,
         subcategory: subcategory,
@@ -4869,7 +4860,6 @@ const Index = () => {
       const chosenModel = runtimeOverrides.ideogramModel || 'V_2A_TURBO';
       const magicPromptEnabled = runtimeOverrides.magicPromptEnabled ?? true;
       console.log('=== Ideogram Generation Debug ===');
-      
       console.log('Direct prompt provided:', !!directPrompt.trim());
       console.log('Final prompt:', prompt);
       console.log('Aspect ratio:', aspectForIdeogram);
@@ -4884,24 +4874,16 @@ const Index = () => {
         style_type: styleForIdeogram
       });
       // Generate multiple images
-      const imagePromises = Array(numImages).fill(null).map(() => 
-        generateIdeogramImage({
-          prompt,
-          aspect_ratio: aspectForIdeogram,
-          model: chosenModel,
-          magic_prompt_option: magicPromptEnabled ? 'AUTO' : 'OFF',
-          style_type: styleForIdeogram
-        })
-      );
-      
+      const imagePromises = Array(numImages).fill(null).map(() => generateIdeogramImage({
+        prompt,
+        aspect_ratio: aspectForIdeogram,
+        model: chosenModel,
+        magic_prompt_option: magicPromptEnabled ? 'AUTO' : 'OFF',
+        style_type: styleForIdeogram
+      }));
       const responses = await Promise.all(imagePromises);
       // Collect all image URLs from all responses
-      const allImageUrls = responses.flatMap(response => 
-        response.data && response.data.length > 0 
-          ? response.data.map(img => img.url)
-          : []
-      );
-      
+      const allImageUrls = responses.flatMap(response => response.data && response.data.length > 0 ? response.data.map(img => img.url) : []);
       if (allImageUrls.length > 0) {
         setGeneratedImages(allImageUrls);
         setSelectedImageIndex(0);
@@ -4980,7 +4962,7 @@ const Index = () => {
       setIsSearching(false);
     }
   };
-  
+
   // Independent pop culture search handler
   const handlePopSearch = async (searchTerm: string) => {
     if (!searchTerm.trim() || !selectedSubOption) return;
@@ -5006,7 +4988,6 @@ const Index = () => {
       setIsPopSearching(false);
     }
   };
-
   const handlePopSearchInputChange = (value: string) => {
     setPopSearchTerm(value);
     setPopSearchResults([]);
@@ -5019,9 +5000,7 @@ const Index = () => {
 
     // If searching fictional characters, also search the local list
     if (selectedSubOption === "Fictional Characters" && value.trim()) {
-      const filteredCharacters = fictionalCharactersList.filter(character => 
-        character.toLowerCase().includes(value.toLowerCase())
-      ).slice(0, 8).map(character => ({
+      const filteredCharacters = fictionalCharactersList.filter(character => character.toLowerCase().includes(value.toLowerCase())).slice(0, 8).map(character => ({
         title: character,
         description: `Fictional character from popular culture`
       }));
@@ -5040,7 +5019,6 @@ const Index = () => {
       }
     }, 250);
   };
-  
   const handleSearchInputChange = (value: string) => {
     setFinalSearchTerm(value);
     setSearchResults([]);
@@ -5085,12 +5063,7 @@ const Index = () => {
           <div></div>
           <StepProgress currentStep={currentStep} />
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate("/ai-settings")}
-              className="gap-2"
-            >
+            <Button variant="outline" size="sm" onClick={() => navigate("/ai-settings")} className="gap-2">
               <Settings className="h-4 w-4" />
               AI Settings
             </Button>
@@ -5269,7 +5242,6 @@ const Index = () => {
                   return 'Selected option';
                 }
               };
-
               selections.push({
                 title: selectedSubOption,
                 subtitle: getSubcategorySubtitle(),
@@ -5300,7 +5272,6 @@ const Index = () => {
                   return 'Selected specific option';
                 }
               };
-
               selections.push({
                 title: selectedPick,
                 subtitle: getPickSubtitle(),
@@ -5309,7 +5280,6 @@ const Index = () => {
                 }
               });
             }
-            
             return <StackedSelectionCard selections={selections} />;
           })()}
 
@@ -5707,11 +5677,7 @@ const Index = () => {
                   <label htmlFor="remember-choices" className="text-muted-foreground cursor-pointer">
                     Remember my last choices
                   </label>
-                  <Switch
-                    id="remember-choices"
-                    checked={rememberChoices}
-                    onCheckedChange={handleRememberChoicesToggle}
-                  />
+                  <Switch id="remember-choices" checked={rememberChoices} onCheckedChange={handleRememberChoicesToggle} />
                 </div>}
               </div>
               
@@ -5756,13 +5722,11 @@ const Index = () => {
             </div>
 
             
-            {!selectedTextStyle && (
-              <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg max-w-2xl mx-auto">
+            {!selectedTextStyle && <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg max-w-2xl mx-auto">
                 <p className="text-sm text-blue-800 dark:text-blue-200">
                   <strong>Please select a tone:</strong> This determines the style and mood of your generated text.
                 </p>
-              </div>
-            )}
+              </div>}
 
             {/* Show style selection grid when no style is selected */}
             {!selectedTextStyle ? <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 justify-items-center max-w-6xl mx-auto">
@@ -5844,9 +5808,7 @@ const Index = () => {
               // Add generated options available notice (when options generated but none selected)
               if (selectedCompletionOption === "ai-assist" && generatedOptions.length > 0 && !selectedGeneratedOption) {
                 const tagDisplay = tags.length > 0 ? `, tags: ${tags.join(", ")}` : " (no tags added)";
-                const qualityNote = generationAudit?.spellingFiltered && generationAudit.spellingFiltered > 0 
-                  ? ` • Filtered ${generationAudit.spellingFiltered} for quality`
-                  : "";
+                const qualityNote = generationAudit?.spellingFiltered && generationAudit.spellingFiltered > 0 ? ` • Filtered ${generationAudit.spellingFiltered} for quality` : "";
                 selections.push({
                   title: "Text options generated",
                   subtitle: `100 characters max${tagDisplay}${qualityNote}`,
@@ -5896,13 +5858,7 @@ const Index = () => {
                           <label className="text-sm font-medium text-foreground">General Tags</label>
                           <p className="text-xs text-muted-foreground mt-1">Theme, vibe, direction (movie quotes, birthday, funny)</p>
                         </div>
-                        <Input 
-                          value={tagInput} 
-                          onChange={e => setTagInput(e.target.value)} 
-                          onKeyDown={handleTagInputKeyDown} 
-                          placeholder="Enter general tags (press Enter or comma to add)" 
-                          className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" 
-                        />
+                        <Input value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={handleTagInputKeyDown} placeholder="Enter general tags (press Enter or comma to add)" className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
                         
                         {/* Display General Tags */}
                         {tags.length > 0 && <div className="flex flex-wrap gap-2 justify-center">
@@ -5917,15 +5873,9 @@ const Index = () => {
                       <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-200">
                         <div className="text-center">
                           <label className="text-sm font-medium text-foreground">Exact Wording Tags</label>
-                          <p className="text-xs text-muted-foreground mt-1">Words that MUST appear in the text (happy birthday, congratulations)</p>
+                          
                         </div>
-                        <Input 
-                          value={exactWordingTagInput} 
-                          onChange={e => setExactWordingTagInput(e.target.value)} 
-                          onKeyDown={handleExactWordingTagInputKeyDown} 
-                          placeholder="Enter exact wording tags (press Enter or comma to add)" 
-                          className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" 
-                        />
+                        <Input value={exactWordingTagInput} onChange={e => setExactWordingTagInput(e.target.value)} onKeyDown={handleExactWordingTagInputKeyDown} placeholder="Enter exact wording tags (press Enter or comma to add)" className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
                         
                         {/* Display Exact Wording Tags */}
                         {exactWordingTags.length > 0 && <div className="flex flex-wrap gap-2 justify-center">
@@ -5938,21 +5888,14 @@ const Index = () => {
 
                       {/* Generate Button */}
                       <div className="text-center space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-300">
-                        {!canGenerateText() && (
-                          <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
+                        {!canGenerateText() && <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
                             <p className="font-medium mb-1">To generate text, please select:</p>
                             <ul className="text-xs space-y-1">
                               {!selectedTextStyle && <li>• Text style (tone)</li>}
                               {!selectedCompletionOption && <li>• Text completion option</li>}
                             </ul>
-                          </div>
-                        )}
-                        <Button 
-                          variant="brand" 
-                          className="px-8 py-3 text-base font-medium rounded-lg" 
-                          onClick={handleGenerateText} 
-                          disabled={isGenerating || !canGenerateText()}
-                        >
+                          </div>}
+                        <Button variant="brand" className="px-8 py-3 text-base font-medium rounded-lg" onClick={handleGenerateText} disabled={isGenerating || !canGenerateText()}>
                           {isGenerating ? <>
                               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                               Generating...
@@ -5976,12 +5919,10 @@ const Index = () => {
                           {isGenerating ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : "Regenerate"}
                         </Button>
                       </div>
-                       {generatedOptions.length > 0 && generationAudit && (
-                        <p className="text-xs text-muted-foreground">
+                       {generatedOptions.length > 0 && generationAudit && <p className="text-xs text-muted-foreground">
                            Using {generationAudit.model} • Generated in {((Date.now() - textGenerationStartTime) / 1000).toFixed(1)}s
                            {generationAudit.usedFallback ? " • Used fallback" : ` • Received ${generationAudit.candidateCount} options`}
-                        </p>
-                      )}
+                        </p>}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-6">
@@ -6052,13 +5993,11 @@ const Index = () => {
         {currentStep === 3 && <>
             <div className="text-center mb-12">
               <h2 className="text-2xl md:text-3xl font-semibold text-foreground mb-4">Choose Your Visual Style</h2>
-              {!selectedVisualStyle && (
-                <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg max-w-2xl mx-auto">
+              {!selectedVisualStyle && <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg max-w-2xl mx-auto">
                   <p className="text-sm text-blue-800 dark:text-blue-200">
                     <strong>Please select a visual style:</strong> This determines how your image will look.
                   </p>
-                </div>
-              )}
+                </div>}
               <p className="text-xl text-muted-foreground">
                 {(() => {
               // Show the actual text they chose, or indicate no text
@@ -6139,22 +6078,14 @@ const Index = () => {
                             
                             {/* Generate Button - Below the input */}
                             <div className="space-y-3 flex flex-col items-center">
-                              {!canGenerateVisuals() && (
-                                <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-3 mb-3 w-full">
+                              {!canGenerateVisuals() && <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-3 mb-3 w-full">
                                   <p className="font-medium mb-1">To generate visuals, please select:</p>
                                   <ul className="text-xs space-y-1">
                                     {!selectedVisualStyle && <li>• Visual style</li>}
                                     {!selectedSubjectOption && <li>• Subject option</li>}
                                   </ul>
-                                </div>
-                              )}
-                              <Button 
-                                variant="brand" 
-                                size="lg" 
-                                className="px-8 py-3 text-base font-medium rounded-lg" 
-                                onClick={handleGenerateSubject} 
-                                disabled={isGeneratingSubject || !canGenerateVisuals()}
-                              >
+                                </div>}
+                              <Button variant="brand" size="lg" className="px-8 py-3 text-base font-medium rounded-lg" onClick={handleGenerateSubject} disabled={isGeneratingSubject || !canGenerateVisuals()}>
                                 {isGeneratingSubject ? <>
                                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                                     Generating...
@@ -6194,12 +6125,10 @@ const Index = () => {
                                   {isGeneratingSubject ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : "Regenerate"}
                                 </Button>
                               </div>
-                              {visualOptions.length > 0 && visualModel && (
-                                <p className="text-xs text-muted-foreground mb-2">
+                              {visualOptions.length > 0 && visualModel && <p className="text-xs text-muted-foreground mb-2">
                                   Using GPT-4.1 • Generated in {((Date.now() - visualGenerationStartTime) / 1000).toFixed(1)}s
                                   {visualModel === 'fallback' && " • Used fallback"}
-                                </p>
-                              )}
+                                </p>}
                             {visualModel === 'fallback' && <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 text-xs p-2 rounded-lg mb-3 max-w-md mx-auto">
                                 {getErrorMessage(visualRecommendations?.errorCode)}
                               </div>}
@@ -6216,8 +6145,7 @@ const Index = () => {
                                      <CardTitle className="text-base font-semibold text-card-foreground">
                                        <div className="flex items-center gap-2">
                                          <span>Option {index + 1} ({option.slot?.replace('-', ' ') || 'Visual'})</span>
-                                         {option.textAligned && (
-                                           <TooltipProvider>
+                                         {option.textAligned && <TooltipProvider>
                                              <Tooltip>
                                                <TooltipTrigger asChild>
                                                  <span className="cursor-help">🎯</span>
@@ -6226,17 +6154,12 @@ const Index = () => {
                                                  <p className="text-sm">Closest match to your message</p>
                                                </TooltipContent>
                                              </Tooltip>
-                                           </TooltipProvider>
-                                         )}
+                                           </TooltipProvider>}
                                        </div>
                                      </CardTitle>
-                                   {visualModel === 'fallback' && (
-                                     <Badge variant="secondary" className="text-xs">
-                                       {visualRecommendations?.errorCode === 'timeout' ? 'Timeout' : 
-                                        visualRecommendations?.errorCode === 'unauthorized' ? 'Auth Error' :
-                                        visualRecommendations?.errorCode === 'network' ? 'Network Error' : 'Fallback'}
-                                     </Badge>
-                                   )}
+                                   {visualModel === 'fallback' && <Badge variant="secondary" className="text-xs">
+                                       {visualRecommendations?.errorCode === 'timeout' ? 'Timeout' : visualRecommendations?.errorCode === 'unauthorized' ? 'Auth Error' : visualRecommendations?.errorCode === 'network' ? 'Network Error' : 'Fallback'}
+                                     </Badge>}
                                  </div>
                                </CardHeader>
                                <CardContent className="pt-0">
@@ -6314,11 +6237,7 @@ const Index = () => {
                           
                           {/* Exact Scene Mode Toggle */}
                           <div className="flex items-center justify-center gap-3 mt-4 p-3 bg-card/50 rounded-lg border">
-                            <Switch
-                              id="exact-scene-mode"
-                              checked={exactSceneMode}
-                              onCheckedChange={setExactSceneMode}
-                            />
+                            <Switch id="exact-scene-mode" checked={exactSceneMode} onCheckedChange={setExactSceneMode} />
                             <label htmlFor="exact-scene-mode" className="text-sm font-medium text-foreground cursor-pointer">
                               Exact Scene Mode
                             </label>
@@ -6481,13 +6400,13 @@ const Index = () => {
                       <Loader2 className="h-8 w-8 animate-spin text-primary" />
                       <p className="text-muted-foreground text-lg">Generating image...</p>
                       {(() => {
-                        const runtimeOverrides = getRuntimeOverrides();
-                        const chosenModel = runtimeOverrides.ideogramModel || 'V_2A_TURBO';
-                        if (chosenModel === 'V_3') {
-                          return <p className="text-muted-foreground text-sm">We'll try Ideogram V3 first and automatically use Turbo if V3 is unavailable.</p>;
-                        }
-                        return null;
-                      })()}
+                  const runtimeOverrides = getRuntimeOverrides();
+                  const chosenModel = runtimeOverrides.ideogramModel || 'V_2A_TURBO';
+                  if (chosenModel === 'V_3') {
+                    return <p className="text-muted-foreground text-sm">We'll try Ideogram V3 first and automatically use Turbo if V3 is unavailable.</p>;
+                  }
+                  return null;
+                })()}
                     </div> : generatedImages.length > 0 ? <div className="max-w-full max-h-full">
                       <div className="mb-4">
                         <img src={generatedImages[selectedImageIndex]} alt={`Generated Vibe ${selectedImageIndex + 1}`} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
@@ -6495,22 +6414,12 @@ const Index = () => {
                       {generatedImages.length > 1 && <div className="flex flex-col gap-4">
                         <p className="text-sm text-muted-foreground text-center">Choose your favorite ({selectedImageIndex + 1} of {generatedImages.length})</p>
                         <div className="grid grid-cols-5 gap-2 max-w-md mx-auto">
-                          {generatedImages.map((imageUrl, index) => (
-                            <button
-                              key={index}
-                              onClick={() => setSelectedImageIndex(index)}
-                              className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
-                                selectedImageIndex === index ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'
-                              }`}
-                            >
+                          {generatedImages.map((imageUrl, index) => <button key={index} onClick={() => setSelectedImageIndex(index)} className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${selectedImageIndex === index ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'}`}>
                               <img src={imageUrl} alt={`Vibe option ${index + 1}`} className="w-full h-full object-cover" />
-                              {selectedImageIndex === index && (
-                                <div className="absolute inset-0 bg-primary/10 flex items-center justify-center">
+                              {selectedImageIndex === index && <div className="absolute inset-0 bg-primary/10 flex items-center justify-center">
                                   <div className="w-4 h-4 rounded-full bg-primary" />
-                                </div>
-                              )}
-                            </button>
-                          ))}
+                                </div>}
+                            </button>)}
                         </div>
                       </div>}
                     </div> : imageGenerationError ? <div className="flex flex-col items-center gap-4 text-center max-w-md">
@@ -6743,15 +6652,12 @@ const Index = () => {
                   <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
                     <div>
                       <span className="font-medium">Typography Style:</span> {(() => {
-                        const runtimeOverrides = getRuntimeOverrides();
-                        return runtimeOverrides.typographyStyle || "Natural";
-                      })()}
+                  const runtimeOverrides = getRuntimeOverrides();
+                  return runtimeOverrides.typographyStyle || "Natural";
+                })()}
                     </div>
                     <div>
-                      <span className="font-medium">Negative Prompt:</span> {negativePrompt.trim() ? 
-                        `${negativePrompt.substring(0, 30)}${negativePrompt.length > 30 ? '...' : ''}` : 
-                        'None'
-                      }
+                      <span className="font-medium">Negative Prompt:</span> {negativePrompt.trim() ? `${negativePrompt.substring(0, 30)}${negativePrompt.length > 30 ? '...' : ''}` : 'None'}
                     </div>
                   </div>
                 </div>
@@ -6806,16 +6712,14 @@ const Index = () => {
                 </div>
 
                 {/* Negative Prompt Display */}
-                {negativePrompt.trim() && (
-                  <div className="space-y-4">
+                {negativePrompt.trim() && <div className="space-y-4">
                     <h3 className="text-lg font-medium text-foreground">Applied Negative Prompt</h3>
                     <div className="bg-muted/30 rounded-lg p-6">
                       <p className="text-sm text-foreground font-mono leading-relaxed">
                         {negativePrompt}
                       </p>
                     </div>
-                  </div>
-                )}
+                  </div>}
             </div>
           </>}
 
@@ -6827,67 +6731,60 @@ const Index = () => {
               Back
             </Button>
             
-            {currentStep < 4 && (
-              <Button variant={currentStep === 1 && !isStep1Complete() || currentStep === 2 && !isStep2Complete() || currentStep === 3 && !isStep3Complete() ? "outline" : "brand"} onClick={async () => {
+            {currentStep < 4 && <Button variant={currentStep === 1 && !isStep1Complete() || currentStep === 2 && !isStep2Complete() || currentStep === 3 && !isStep3Complete() ? "outline" : "brand"} onClick={async () => {
             if (currentStep === 3 && isStep3Complete() && selectedDimension) {
-               // Generate visual recommendations first, then move to Step 4
-               setIsLoadingRecommendations(true);
-               
-               try {
-                 // Generate visual recommendations
-                 const category = selectedStyle ? styleOptions.find(s => s.id === selectedStyle)?.name || "" : "";
-                 let subcategory = 'general';
-                 const finalTags = [...tags, ...subjectTags];
-                 
-                 if (selectedStyle === 'celebrations' && selectedSubOption) {
-                   const celebOption = celebrationOptions.find(c => c.id === selectedSubOption);
-                   subcategory = celebOption?.name || selectedSubOption;
-                 } else if (selectedStyle === 'pop-culture' && selectedSubOption) {
-                   const popOption = popCultureOptions.find(p => p.id === selectedSubOption);
-                   subcategory = popOption?.name || selectedSubOption;
-                   if (selectedPick) {
-                     finalTags.push(selectedPick);
-                   }
-                 } else if (selectedSubOption) {
-                   subcategory = selectedSubOption;
-                 }
-                 
-                 const selectedTextStyleObj = textStyleOptions.find(ts => ts.id === selectedTextStyle);
-                 const tone = selectedTextStyleObj?.name || 'Humorous';
-                 const finalLine = selectedGeneratedOption || (isCustomTextConfirmed ? stepTwoText : undefined);
-                 
-                    const visualResult = await generateVisualRecommendations({
-                      category,
-                      subcategory,
-                      tone: tone.toLowerCase(),
-                      tags: finalTags,
-                      visualStyle: selectedVisualStyle || undefined,
-                      finalLine,
-                      subjectOption: selectedSubjectOption || undefined,
-                      subjectDescription: subjectDescription || undefined,
-                      dimensions: selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || undefined,
-                      targetSlot: targetSlot || undefined,
-                      backgroundPreset: backgroundPreset || undefined,
-                      exactSceneMode: exactSceneMode
-                   }, 4);
-                 
-                 setVisualRecommendations(visualResult);
-                 setIsLoadingRecommendations(false);
-                 
-                 // Now move to Step 4 (auto-generation will trigger via useEffect)
-                 setCurrentStep(4);
-               } catch (error) {
-                 console.error('Failed to generate visual recommendations:', error);
-                 setIsLoadingRecommendations(false);
-                 // Move to Step 4 anyway with fallback
-                 setCurrentStep(4);
-               }
-               return;
-             }
-             
-             if (currentStep === 4 && isStep4Complete()) {
-               // Start manual image generation on Step 4
-               setIsGeneratingImage(true);
+              // Generate visual recommendations first, then move to Step 4
+              setIsLoadingRecommendations(true);
+              try {
+                // Generate visual recommendations
+                const category = selectedStyle ? styleOptions.find(s => s.id === selectedStyle)?.name || "" : "";
+                let subcategory = 'general';
+                const finalTags = [...tags, ...subjectTags];
+                if (selectedStyle === 'celebrations' && selectedSubOption) {
+                  const celebOption = celebrationOptions.find(c => c.id === selectedSubOption);
+                  subcategory = celebOption?.name || selectedSubOption;
+                } else if (selectedStyle === 'pop-culture' && selectedSubOption) {
+                  const popOption = popCultureOptions.find(p => p.id === selectedSubOption);
+                  subcategory = popOption?.name || selectedSubOption;
+                  if (selectedPick) {
+                    finalTags.push(selectedPick);
+                  }
+                } else if (selectedSubOption) {
+                  subcategory = selectedSubOption;
+                }
+                const selectedTextStyleObj = textStyleOptions.find(ts => ts.id === selectedTextStyle);
+                const tone = selectedTextStyleObj?.name || 'Humorous';
+                const finalLine = selectedGeneratedOption || (isCustomTextConfirmed ? stepTwoText : undefined);
+                const visualResult = await generateVisualRecommendations({
+                  category,
+                  subcategory,
+                  tone: tone.toLowerCase(),
+                  tags: finalTags,
+                  visualStyle: selectedVisualStyle || undefined,
+                  finalLine,
+                  subjectOption: selectedSubjectOption || undefined,
+                  subjectDescription: subjectDescription || undefined,
+                  dimensions: selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || undefined,
+                  targetSlot: targetSlot || undefined,
+                  backgroundPreset: backgroundPreset || undefined,
+                  exactSceneMode: exactSceneMode
+                }, 4);
+                setVisualRecommendations(visualResult);
+                setIsLoadingRecommendations(false);
+
+                // Now move to Step 4 (auto-generation will trigger via useEffect)
+                setCurrentStep(4);
+              } catch (error) {
+                console.error('Failed to generate visual recommendations:', error);
+                setIsLoadingRecommendations(false);
+                // Move to Step 4 anyway with fallback
+                setCurrentStep(4);
+              }
+              return;
+            }
+            if (currentStep === 4 && isStep4Complete()) {
+              // Start manual image generation on Step 4
+              setIsGeneratingImage(true);
               try {
                 const finalText = selectedGeneratedOption || stepTwoText || "";
                 const visualStyle = selectedVisualStyle || "";
@@ -6952,10 +6849,8 @@ const Index = () => {
                 if (spellingGuaranteeMode && finalText && finalText.trim()) {
                   // Generate background-only image first - remove ALL text-related instructions
                   const backgroundPrompt = promptText.replace(/EXACT_TEXT \(VERBATIM\): ".*?"/g, '').replace(/Render this text EXACTLY.*?\./g, '').replace(/Use only standard ASCII.*?\./g, '').replace(/If you cannot render.*?\./g, '').replace(/Style and display this text.*?\./g, '').replace(/Ensure the text is.*?\./g, '').replace(/NEGATIVE PROMPTS:.*?\./g, '').replace(/\s+/g, ' ').trim() + ' No text, no typography, no words, no letters, no characters, no glyphs, no symbols, no UI elements overlaid on the image. Clean minimal background only.';
-                  
                   const runtimeOverrides2 = getRuntimeOverrides();
                   const magicPromptEnabled2 = runtimeOverrides2.magicPromptEnabled ?? true;
-                  
                   const backgroundResult = await generateIdeogramImage({
                     prompt: backgroundPrompt,
                     aspect_ratio: aspectRatioKey,
@@ -6974,15 +6869,14 @@ const Index = () => {
                 // Generate 1 image with appropriate model
                 const runtimeOverrides3 = getRuntimeOverrides();
                 const magicPromptEnabled3 = runtimeOverrides3.magicPromptEnabled ?? true;
-                
                 console.log(`Magic Prompt: ${magicPromptEnabled3 ? 'ON' : 'OFF'} (Turbo only)`);
                 console.log(`Using model: ${model}`);
-                
                 const result = await generateIdeogramImage({
                   prompt: promptText,
                   aspect_ratio: aspectRatioKey,
                   style_type: styleType,
-                  model: model, // Use the chosen model
+                  model: model,
+                  // Use the chosen model
                   magic_prompt_option: magicPromptEnabled3 ? 'AUTO' : 'OFF',
                   count: 1
                 });
@@ -6993,14 +6887,11 @@ const Index = () => {
                   // Determine actual model used
                   let actualModelUsed = model;
                   let fallbackNote = '';
-                  
                   if (result._fallback_note) {
                     actualModelUsed = 'V_2A_TURBO';
                     fallbackNote = ' (fallback)';
                   }
-                  
                   console.log(`Final model used: ${actualModelUsed}${fallbackNote ? ' (fell back from V3)' : ''}`);
-                  
                   const modelDescription = actualModelUsed === 'V_3' ? 'Ideogram V3 (Realistic)' : 'Ideogram Turbo';
                   sonnerToast.success(`Generated ${imageUrls.length} vibe options with ${modelDescription}${fallbackNote}! Choose your favorite.`);
                 } else {
@@ -7086,23 +6977,14 @@ const Index = () => {
               setCurrentStep(prev => prev + 1);
             }
           }} disabled={currentStep === 1 && !isStep1Complete() || currentStep === 2 && !isStep2Complete() || currentStep === 3 && !isStep3Complete()}>
-              {currentStep === 3 && isStep3Complete() && selectedDimension ? (
-                isLoadingRecommendations ? (
-                  <>
+              {currentStep === 3 && isStep3Complete() && selectedDimension ? isLoadingRecommendations ? <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Generating...
-                  </>
-                ) : (
-                  "Generate your vibe"
-                )
-              ) : (
-                <>
+                  </> : "Generate your vibe" : <>
                   Continue
                   <ArrowRight className="h-4 w-4 ml-2" />
-                </>
-              )}
-            </Button>
-            )}
+                </>}
+            </Button>}
           </div>
         </div>
 
