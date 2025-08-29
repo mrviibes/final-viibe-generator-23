@@ -427,30 +427,44 @@ Return: {"lines":["option1","option2","option3","option4","option5","option6"]}`
         const hardIncludeOptions = composeHardInclude(inputs.exactWordingTags, inputs.tone, inputs.tags || []);
         
         if (hardIncludeOptions.length > 0) {
-          // Ensure slots calculation is always positive and clamped
-          const slotsToFill = Math.max(1, Math.min(4, Math.max(4 - finalCandidates.length, missingExactPhrases.length)));
+          console.log(`🔧 Hard-include generated ${hardIncludeOptions.length} raw options`);
           
-          // Keep lines that already contain exact phrases
-          const goodLines = finalCandidates.filter(line => containsExactPhrases(line, inputs.exactWordingTags));
+          // Route repair options through postProcessLine for quality validation
+          const processedRepairOptions = hardIncludeOptions.map(option => 
+            postProcessLine(option, inputs.tone, inputs.tags, { exactWordingTags: inputs.exactWordingTags })
+          ).filter(candidate => !candidate.blocked);
           
-          // Get replacement options - repeat or trim to fill exactly the needed slots
-          let replacementOptions = [...hardIncludeOptions];
-          while (replacementOptions.length < slotsToFill) {
-            replacementOptions = [...replacementOptions, ...hardIncludeOptions];
+          // De-duplicate with existing lines
+          const existingLines = new Set(finalCandidates);
+          const uniqueRepairOptions = processedRepairOptions
+            .filter(candidate => !existingLines.has(candidate.line))
+            .map(candidate => candidate.line);
+          
+          console.log(`🔧 After post-processing: ${uniqueRepairOptions.length} valid repair options`);
+          
+          if (uniqueRepairOptions.length > 0) {
+            // Ensure slots calculation is always positive and clamped
+            const slotsToFill = Math.max(1, Math.min(4, Math.max(4 - finalCandidates.length, missingExactPhrases.length)));
+            
+            // Keep lines that already contain exact phrases
+            const goodLines = finalCandidates.filter(line => containsExactPhrases(line, inputs.exactWordingTags));
+            
+            // Get replacement options - repeat or trim to fill exactly the needed slots
+            let replacementOptions = [...uniqueRepairOptions];
+            while (replacementOptions.length < slotsToFill && uniqueRepairOptions.length > 0) {
+              replacementOptions = [...replacementOptions, ...uniqueRepairOptions];
+            }
+            replacementOptions = replacementOptions.slice(0, slotsToFill);
+            
+            // Combine good lines with hard-include options to always get 4 total
+            finalCandidates = [...goodLines, ...replacementOptions].slice(0, 4);
+            
+            console.log(`✅ Hard-include repair completed: ${replacementOptions.length} options enforced, total: ${finalCandidates.length}`);
+            reason = 'Enforced exact phrase inclusion in all options';
+            usedFallback = false; // This is not really a fallback, it's a fix
+          } else {
+            console.log(`⚠️ All hard-include options blocked by post-processing, using original candidates`);
           }
-          replacementOptions = replacementOptions.slice(0, slotsToFill);
-          
-          // Combine good lines with hard-include options to always get 4 total
-          finalCandidates = [...goodLines, ...replacementOptions].slice(0, 4);
-          
-          // Ensure we always have exactly 4 by repeating if needed
-          while (finalCandidates.length < 4) {
-            finalCandidates.push(hardIncludeOptions[finalCandidates.length % hardIncludeOptions.length]);
-          }
-          
-          console.log(`✅ Hard-include repair completed: ${replacementOptions.length} options enforced, total: ${finalCandidates.length}`);
-          reason = 'Enforced exact phrase inclusion in all options';
-          usedFallback = false; // This is not really a fallback, it's a fix
         }
       }
     } catch (error) {

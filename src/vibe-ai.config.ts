@@ -706,6 +706,37 @@ export function postProcessLine(line: string, tone: string, requiredTags?: strin
     };
   }
   
+  // Early quality guard - block lines that are too short or generic
+  const wordCount = cleaned.split(' ').filter(w => w.length > 0).length;
+  if (wordCount < 3 || cleaned.length < 12) {
+    return {
+      line: TONE_FALLBACKS[tone.toLowerCase()] || TONE_FALLBACKS.humorous,
+      blocked: true,
+      reason: 'Too short'
+    };
+  }
+  
+  // Block generic closer patterns (exact phrase + generic suffix)
+  const genericCloserPatterns = [
+    /— go for it$/i,
+    /— let's go$/i,
+    /— you got this$/i,
+    /— nice$/i,
+    /— good$/i,
+    /— yes$/i,
+    /— cool$/i
+  ];
+  
+  for (const pattern of genericCloserPatterns) {
+    if (pattern.test(cleaned)) {
+      return {
+        line: TONE_FALLBACKS[tone.toLowerCase()] || TONE_FALLBACKS.humorous,
+        blocked: true,
+        reason: 'Generic closer'
+      };
+    }
+  }
+  
   // Enforce savage tone quality - block joke-like content for savage (skip for knock-knock)
   if (tone.toLowerCase() === 'savage' && !isKnockKnock) {
     // Block obvious joke patterns that don't fit savage tone
@@ -1361,27 +1392,94 @@ export function composeHardInclude(exactPhrases: string[], tone: string, extraTa
   
   const combinePhrase = exactPhrases.join(' ');
   const characterBudget = 100;
-  const remaining = characterBudget - combinePhrase.length;
   
-  // Tone-aware suffixes that fit the remaining budget
-  const suffixOptions: Record<string, string[]> = {
-    humorous: ["😂", "LOL", "Too funny", "Classic"],
-    savage: ["Period.", "Facts.", "No cap", "Deal with it"],
-    sentimental: ["❤️", "So sweet", "Heartwarming", "Beautiful"],
-    nostalgic: ["Those days", "Remember when", "Good times", "Take me back"],
-    romantic: ["💕", "Love it", "Perfect match", "Swoon"],
-    inspirational: ["Go for it", "Believe", "You got this", "Rise up"],
-    playful: ["🎉", "Fun times", "Let's go", "Yay"],
-    serious: ["Truth", "Reality", "Important", "Facts"]
+  // Check if phrase is short and needs micro-template wrapping
+  const words = combinePhrase.split(' ').filter(w => w.length > 0);
+  const isShortPhrase = words.length < 2 || combinePhrase.length < 10;
+  
+  if (isShortPhrase) {
+    // Use tone-specific micro-templates for short phrases
+    const microTemplates: Record<string, string[]> = {
+      savage: [
+        `${combinePhrase}, step up or step aside.`,
+        `Standards > talk, ${combinePhrase}.`,
+        `${combinePhrase} spoke volumes.`,
+        `${combinePhrase}, prove yourself.`
+      ],
+      playful: [
+        `${combinePhrase} showed up—now make it fun.`,
+        `${combinePhrase} brought the energy today.`,
+        `${combinePhrase} entered the chat.`,
+        `${combinePhrase} joined the party.`
+      ],
+      inspirational: [
+        `${combinePhrase}, prove it today.`,
+        `${combinePhrase} demands excellence.`,
+        `${combinePhrase} rises to the challenge.`,
+        `${combinePhrase} makes dreams happen.`
+      ],
+      serious: [
+        `${combinePhrase}, deliver results.`,
+        `${combinePhrase} requires focus.`,
+        `${combinePhrase} means business.`,
+        `${combinePhrase} sets the standard.`
+      ],
+      humorous: [
+        `${combinePhrase} walked into a bar...`,
+        `${combinePhrase} has entered the building.`,
+        `${combinePhrase} stole the show.`,
+        `${combinePhrase} broke the internet.`
+      ],
+      sentimental: [
+        `${combinePhrase} warms the heart.`,
+        `${combinePhrase} brings back memories.`,
+        `${combinePhrase} means everything.`,
+        `${combinePhrase} touches the soul.`
+      ],
+      nostalgic: [
+        `${combinePhrase} takes us back.`,
+        `${combinePhrase} reminds us of better days.`,
+        `${combinePhrase} brings back the magic.`,
+        `${combinePhrase} captures those moments.`
+      ],
+      romantic: [
+        `${combinePhrase} makes hearts flutter.`,
+        `${combinePhrase} sparks the romance.`,
+        `${combinePhrase} creates perfect moments.`,
+        `${combinePhrase} writes love stories.`
+      ]
+    };
+    
+    const templates = microTemplates[tone.toLowerCase()] || [
+      `${combinePhrase} makes a statement.`,
+      `${combinePhrase} stands out today.`,
+      `${combinePhrase} gets attention.`,
+      `${combinePhrase} delivers impact.`
+    ];
+    
+    return templates.map(t => t.slice(0, characterBudget));
+  }
+  
+  // For longer phrases, use enhanced suffixes but avoid generic closers
+  const remaining = characterBudget - combinePhrase.length;
+  const enhancedSuffixOptions: Record<string, string[]> = {
+    savage: ["speaks truth.", "drops reality.", "delivers facts.", "sets records straight."],
+    playful: ["brings the vibes.", "makes it memorable.", "adds the spark.", "creates the magic."],
+    inspirational: ["ignites potential.", "fuels greatness.", "drives success.", "builds legends."],
+    serious: ["demands attention.", "requires action.", "sets standards.", "delivers results."],
+    humorous: ["breaks the internet.", "steals the spotlight.", "brings the laughs.", "wins the day."],
+    sentimental: ["touches hearts.", "creates memories.", "brings warmth.", "spreads love."],
+    nostalgic: ["brings back memories.", "captures the essence.", "relives the magic.", "honors the past."],
+    romantic: ["creates magic moments.", "writes love stories.", "sparks connections.", "builds romance."]
   };
   
-  const suffixes = suffixOptions[tone.toLowerCase()] || ["Nice", "Good", "Yes", "Cool"];
+  const suffixes = enhancedSuffixOptions[tone.toLowerCase()] || ["makes an impact.", "stands out.", "gets noticed.", "delivers value."];
   
   const variations = [
     combinePhrase,
-    remaining > 10 ? `${combinePhrase} — ${suffixes[0]}` : combinePhrase,
-    remaining > 15 ? `${combinePhrase} — ${suffixes[1] || "Now"}` : combinePhrase,
-    remaining > 12 ? `${combinePhrase} — ${suffixes[2] || "Go"}` : combinePhrase
+    remaining > 20 ? `${combinePhrase} ${suffixes[0]}` : combinePhrase,
+    remaining > 25 ? `${combinePhrase} ${suffixes[1]}` : combinePhrase,
+    remaining > 22 ? `${combinePhrase} ${suffixes[2]}` : combinePhrase
   ];
   
   return variations.map(v => v.slice(0, characterBudget));
