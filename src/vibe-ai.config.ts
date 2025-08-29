@@ -313,11 +313,11 @@ CRITICAL: Do NOT echo user tags verbatim. Use the spirit and meaning of tags wit
 Focus on proper grammar, natural flow, and complete thoughts. Avoid broken sentences or nonsensical word combinations.
 Always output valid JSON only.`,
 
-  visual_generator: `Generate 4 visual concepts for graphics that MUST align with the provided text and tone. Be concise.
+  visual_generator: `Generate 4 visual concepts for graphics that MUST align with the provided text and tone. Be ultra-concise.
 
 RULES:
 - Return ONLY valid JSON - no markdown, no extra text
-- Each prompt: 40-60 words maximum
+- Each prompt: ONE SENTENCE, maximum ~20 words
 - Generate exactly 4 diverse visual concepts
 - CRITICAL: Visual concepts MUST relate to the provided text/joke content and tone
 - Provide exactly one background-only concept and 3 distinct subject+background concepts
@@ -331,7 +331,7 @@ Format:
     {
       "subject": "brief description (optional for background-only)",
       "background": "brief description", 
-      "prompt": "concise prompt (40-60 words)"
+      "prompt": "ultra-concise prompt (~20 words max)"
     }
   ]
 }`
@@ -841,7 +841,7 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   const overrides = getRuntimeOverrides();
   const typographyStyle = overrides.typographyStyle || 'poster'; // Default to poster style
   
-  // EXACT TEXT RENDERING (if present) - Remove redundant "EXACT TEXT:" prefix
+  // EXACT TEXT RENDERING (if present) - PUT FIRST for priority
   if (handoff.key_line && handoff.key_line.trim()) {
     // Clean and normalize text to ASCII-safe characters
     const cleanText = handoff.key_line
@@ -932,8 +932,8 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     }
   }
   
-  // Join sections with line breaks
-  return sections.join('\n');
+  // Join all parts: EXACT TEXT first, then sections
+  return [...parts, ...sections].join('\n');
 }
 
 export function getAspectRatioForIdeogram(aspectRatio: string): 'ASPECT_10_16' | 'ASPECT_16_10' | 'ASPECT_9_16' | 'ASPECT_16_9' | 'ASPECT_3_2' | 'ASPECT_2_3' | 'ASPECT_4_3' | 'ASPECT_3_4' | 'ASPECT_1_1' | 'ASPECT_1_3' | 'ASPECT_3_1' {
@@ -1297,7 +1297,7 @@ TEXT PLACEMENT DIRECTIVES:
 
 IMPORTANT: Visual concepts must directly relate to the joke/text content above. For Pride themes, include rainbow colors, drag queens, parades, celebration elements.
 
-4 unique concepts. Each 40-60 words. No slots required.
+4 unique concepts. Each ONE SENTENCE, maximum ~20 words. No slots required.
 
 JSON only.`;
 
