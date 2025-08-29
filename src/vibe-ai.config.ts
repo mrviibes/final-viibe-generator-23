@@ -852,7 +852,7 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
       .trim();
     // Remove redundant "EXACT TEXT:" prefix that users might include
     const finalText = cleanText.replace(/^EXACT TEXT:\s*["']?/i, '').replace(/["']$/, '');
-    parts.push(`EXACT TEXT: "${finalText}"`);
+    parts.push(`EXACT TEXT: "${finalText}" - Render each letter precisely as provided, maintaining exact spelling and character placement`);
   }
   
   // CHARACTER IDENTITY CUES for Pop Culture
