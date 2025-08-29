@@ -282,6 +282,20 @@ export default function AiSettings() {
                   Poster style creates larger, more prominent text like the examples you prefer.
                 </p>
               </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="magic-prompt"
+                    checked={overrides.enableMagicPrompt !== false}
+                    onCheckedChange={(checked) => updateOverride('enableMagicPrompt', checked)}
+                  />
+                  <Label htmlFor="magic-prompt">Magic Prompt (Ideogram)</Label>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Enhances image prompts with additional details for better visual results.
+                </p>
+              </div>
             </CardContent>
           </Card>
 

@@ -21,6 +21,7 @@ export interface AIRuntimeOverrides {
   defaultVisualStyle?: VisualStyle;
   defaultTone?: Tone;
   magicPromptEnabled?: boolean;
+  enableMagicPrompt?: boolean;
   ideogramModel?: 'V_2A_TURBO' | 'V_3';
   typographyStyle?: 'poster' | 'negative_space';
 }
@@ -628,18 +629,35 @@ export function postProcessLine(line: string, tone: string, requiredTags?: strin
     const contentTags = generalTags.filter(tag => !visualOnlyTags.includes(tag.toLowerCase()));
     
     if (contentTags.length > 0) {
-      // Create a simple synonyms map for common terms
+      // Create expanded synonyms map for better AI direction
       const synonymsMap: Record<string, string[]> = {
-        'work': ['job', 'career', 'office', 'workplace', 'employment'],
-        'job': ['work', 'career', 'employment', 'position'],
-        'career': ['work', 'job', 'profession', 'employment'],
-        'birthday': ['bday', 'birth', 'celebration', 'party'],
-        'party': ['celebration', 'bash', 'gathering', 'event'],
-        'funny': ['hilarious', 'comedy', 'humor', 'joke', 'laughter'],
-        'movie': ['film', 'cinema', 'flick'],
-        'music': ['song', 'album', 'band', 'artist'],
-        'love': ['romance', 'relationship', 'dating', 'crush'],
-        'food': ['eat', 'meal', 'cooking', 'restaurant', 'dining']
+        'work': ['job', 'career', 'office', 'workplace', 'employment', 'professional', 'business'],
+        'job': ['work', 'career', 'employment', 'position', 'occupation'],
+        'career': ['work', 'job', 'profession', 'employment', 'professional'],
+        'birthday': ['bday', 'birth', 'celebration', 'party', 'anniversary'],
+        'party': ['celebration', 'bash', 'gathering', 'event', 'festive'],
+        'funny': ['hilarious', 'comedy', 'humor', 'joke', 'laughter', 'witty', 'amusing'],
+        'movie': ['film', 'cinema', 'flick', 'hollywood', 'blockbuster'],
+        'music': ['song', 'album', 'band', 'artist', 'melody', 'tune'],
+        'love': ['romance', 'relationship', 'dating', 'crush', 'romantic'],
+        'food': ['eat', 'meal', 'cooking', 'restaurant', 'dining'],
+        'gay': ['flamboyant', 'fabulous', 'dramatic', 'colorful', 'expressive'],
+        'flamboyant': ['dramatic', 'bold', 'expressive', 'theatrical', 'vibrant'],
+        'marijuana': ['chill', 'relaxed', 'mellow', 'laid-back', 'peaceful'],
+        'weed': ['chill', 'relaxed', 'mellow', 'laid-back', 'peaceful'],
+        'cannabis': ['chill', 'relaxed', 'mellow', 'laid-back', 'peaceful'],
+        'drunk': ['tipsy', 'festive', 'party-mode', 'celebratory', 'uninhibited'],
+        'alcohol': ['party', 'celebration', 'social', 'festive', 'cheers'],
+        'dark': ['edgy', 'mysterious', 'intense', 'dramatic', 'bold'],
+        'savage': ['fierce', 'bold', 'confident', 'unapologetic', 'direct'],
+        'sarcastic': ['witty', 'dry', 'clever', 'ironic', 'sharp'],
+        'random': ['quirky', 'unexpected', 'spontaneous', 'chaotic', 'unpredictable'],
+        'weird': ['quirky', 'unusual', 'eccentric', 'unique', 'offbeat'],
+        'nostalgic': ['retro', 'vintage', 'throwback', 'classic', 'old-school'],
+        'aesthetic': ['stylish', 'beautiful', 'artistic', 'visual', 'trendy'],
+        'vibe': ['mood', 'energy', 'feeling', 'atmosphere', 'spirit'],
+        'mood': ['vibe', 'energy', 'feeling', 'atmosphere', 'tone'],
+        'energy': ['vibe', 'mood', 'spirit', 'enthusiasm', 'power']
       };
       
       // Extract keywords from tags and check for matches with synonyms
@@ -1201,7 +1219,33 @@ Return only: {"lines":["joke1\\nwith\\nnewlines","joke2\\nwith\\nnewlines","joke
   }
 
   const tagRequirement = inputs.tags && inputs.tags.length > 0 
-    ? `\n• General tags are themes/hints only - DO NOT include them verbatim. Paraphrase, allude to, or reference them creatively: ${inputs.tags.join(', ')}`
+    ? (() => {
+        // Apply semantic adapters for better AI direction
+        const semanticAdapters: Record<string, string> = {
+          'gay': 'Use expressive, dramatic, and fabulously confident language',
+          'flamboyant': 'Make it bold, theatrical, and dramatically expressive',
+          'marijuana': 'Keep it chill, relaxed, and laid-back in tone',
+          'weed': 'Use mellow, peaceful, and relaxed vibes',
+          'cannabis': 'Maintain a calm, chill, and zen-like atmosphere',
+          'drunk': 'Add uninhibited, party-ready, celebratory energy',
+          'alcohol': 'Include festive, social, and cheers-worthy spirit',
+          'savage': 'Be fierce, unapologetic, and confidently direct',
+          'dark': 'Add mysterious, edgy, and intensely dramatic elements',
+          'sarcastic': 'Use witty, dry humor with clever ironic twists',
+          'random': 'Be spontaneously quirky and unpredictably chaotic',
+          'weird': 'Embrace eccentric, unusual, and delightfully offbeat vibes',
+          'aesthetic': 'Focus on stylish, visually appealing, and trendy elements',
+          'nostalgic': 'Capture retro, vintage, and classic throwback feelings',
+          'background': 'Use this as thematic context and atmospheric backdrop',
+          'theme': 'Let this guide the overall conceptual direction and mood'
+        };
+
+        const enhancedInstructions = inputs.tags
+          .map(tag => semanticAdapters[tag.toLowerCase()] || `Incorporate "${tag}" as a stylistic element`)
+          .join('. ');
+
+        return `\n• Style direction: ${enhancedInstructions}.\n• General tags are themes/hints only - DO NOT include them verbatim. Context: ${inputs.tags.join(', ')}`;
+      })()
     : '';
 
   const exactWordingRequirement = inputs.exactWordingTags && inputs.exactWordingTags.length > 0
@@ -1340,7 +1384,31 @@ export function buildGenerateTextMessages(params: {
   let prompt = `Generate exactly 4 short ${tone.toLowerCase()} text options for: ${context}.`;
   
   if (tags.length > 0) {
-    prompt += ` General tags are hints. Do NOT include them verbatim: ${tags.join(', ')}.`;
+    // Apply semantic adapters for better AI direction
+    const semanticAdapters: Record<string, string> = {
+      'gay': 'Use expressive, dramatic, and fabulously confident language',
+      'flamboyant': 'Make it bold, theatrical, and dramatically expressive',
+      'marijuana': 'Keep it chill, relaxed, and laid-back in tone',
+      'weed': 'Use mellow, peaceful, and relaxed vibes',
+      'cannabis': 'Maintain a calm, chill, and zen-like atmosphere',
+      'drunk': 'Add uninhibited, party-ready, celebratory energy',
+      'alcohol': 'Include festive, social, and cheers-worthy spirit',
+      'savage': 'Be fierce, unapologetic, and confidently direct',
+      'dark': 'Add mysterious, edgy, and intensely dramatic elements',
+      'sarcastic': 'Use witty, dry humor with clever ironic twists',
+      'random': 'Be spontaneously quirky and unpredictably chaotic',
+      'weird': 'Embrace eccentric, unusual, and delightfully offbeat vibes',
+      'aesthetic': 'Focus on stylish, visually appealing, and trendy elements',
+      'nostalgic': 'Capture retro, vintage, and classic throwback feelings',
+      'background': 'Use this as thematic context and atmospheric backdrop',
+      'theme': 'Let this guide the overall conceptual direction and mood'
+    };
+
+    const enhancedInstructions = tags
+      .map(tag => semanticAdapters[tag.toLowerCase()] || `Incorporate "${tag}" as a stylistic element`)
+      .join('. ');
+
+    prompt += ` Style direction: ${enhancedInstructions}. General tags are hints. Do NOT include them verbatim: ${tags.join(', ')}.`;
   }
   
   prompt += ` Each option must be ${characterLimit} characters or fewer. Be creative and engaging.
