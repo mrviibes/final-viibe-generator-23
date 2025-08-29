@@ -841,6 +841,17 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     parts.push(`EXACT TEXT: "${cleanText}"`);
   }
   
+  // CHARACTER IDENTITY CUES for Pop Culture
+  if (handoff.category === "Pop Culture" && handoff.subcategory_secondary) {
+    const characterName = handoff.subcategory_secondary;
+    parts.push(`Character: ${characterName} as recognizable character with accurate physical features and appearance.`);
+  }
+  
+  // EXACT SCENE MODE ENHANCEMENT
+  if ((handoff as any).exact_scene_mode) {
+    parts.push("Recreate this scene literally and accurately with authentic details from the source material.");
+  }
+  
   // OCCASION/CATEGORY
   if (handoff.category && handoff.subcategory_primary) {
     parts.push(`Occasion: ${handoff.category}, ${handoff.subcategory_primary}${handoff.subcategory_secondary ? ` (${handoff.subcategory_secondary})` : ''}.`);
@@ -882,8 +893,13 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   }
   
   // COMPOSITION & STYLE
-  if (handoff.visual_style) {
-    parts.push(`Style: ${handoff.visual_style}.`);
+  let finalStyle = handoff.visual_style;
+  // Force realistic style for Pop Culture character scenes
+  if (handoff.category === "Pop Culture" && handoff.subcategory_secondary && !finalStyle) {
+    finalStyle = "realistic";
+  }
+  if (finalStyle) {
+    parts.push(`Style: ${finalStyle}.`);
   }
   if (handoff.tone) {
     parts.push(`Tone: ${handoff.tone}.`);

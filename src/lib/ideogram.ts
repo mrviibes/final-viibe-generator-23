@@ -19,6 +19,7 @@ export interface IdeogramHandoff {
   ai_visual_assist_used: boolean; // ai_visual_assist_used
   chosen_visual?: string;      // chosen_visual
   negative_prompt?: string;    // User's negative prompt to avoid
+  exact_scene_mode?: boolean;  // Whether to recreate scene literally
   
   // Visual AI Recommendations fields
   rec_subject?: string;        // AI recommended subject
@@ -43,6 +44,7 @@ export function buildIdeogramHandoff(params: {
   ai_text_assist_used: boolean;
   ai_visual_assist_used: boolean;
   negative_prompt?: string;
+  exact_scene_mode?: boolean;
   
   // Visual AI Recommendations
   rec_subject?: string;
@@ -63,6 +65,7 @@ export function buildIdeogramHandoff(params: {
     ai_text_assist_used,
     ai_visual_assist_used,
     negative_prompt,
+    exact_scene_mode,
     rec_subject,
     rec_background
   } = params;
@@ -92,6 +95,7 @@ export function buildIdeogramHandoff(params: {
     ai_visual_assist_used: ai_visual_assist_used,
     chosen_visual: chosen_visual,
     negative_prompt: negative_prompt,
+    exact_scene_mode: exact_scene_mode,
     
     // Visual AI Recommendations
     rec_subject: rec_subject,

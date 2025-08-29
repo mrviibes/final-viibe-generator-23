@@ -7056,6 +7056,7 @@ const Index = () => {
                 ai_text_assist_used: selectedCompletionOption === "ai-assist",
                 ai_visual_assist_used: selectedSubjectOption === "ai-assist",
                 negative_prompt: negativePrompt,
+                exact_scene_mode: exactSceneMode,
                 // Visual AI Recommendations
                 rec_subject: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].subject : selectedSubjectOption === "design-myself" ? subjectDescription : undefined,
                 rec_background: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined
