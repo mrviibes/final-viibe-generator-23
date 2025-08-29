@@ -413,33 +413,49 @@ Return: {"lines":["option1","option2","option3","option4","option5","option6"]}`
   
   // Check for missing exact words and hard-include if needed
   if (inputs.exactWordingTags && inputs.exactWordingTags.length > 0) {
-    const missingExactPhrases = finalCandidates.filter(line => {
-      const { containsExactPhrases } = require('../vibe-ai.config');
-      return !containsExactPhrases(line, inputs.exactWordingTags);
-    });
-    
-    if (missingExactPhrases.length > 0 || finalCandidates.length < 4) {
-      console.log(`🔧 Hard-include repair: ${missingExactPhrases.length} lines missing exact phrases, ${4 - finalCandidates.length} slots to fill`);
+    try {
+      // Import containsExactPhrases statically
+      const { containsExactPhrases, composeHardInclude } = await import('../vibe-ai.config');
       
-      const { composeHardInclude } = require('../vibe-ai.config');
-      const hardIncludeOptions = composeHardInclude(inputs.exactWordingTags, inputs.tone, inputs.tags || []);
+      const missingExactPhrases = finalCandidates.filter(line => {
+        return !containsExactPhrases(line, inputs.exactWordingTags);
+      });
       
-      if (hardIncludeOptions.length > 0) {
-        // Replace missing lines with hard-include options
-        const slotsToFill = Math.max(4 - finalCandidates.length, missingExactPhrases.length);
-        const replacementOptions = hardIncludeOptions.slice(0, slotsToFill);
+      if (missingExactPhrases.length > 0 || finalCandidates.length < 4) {
+        console.log(`🔧 Hard-include repair: ${missingExactPhrases.length} lines missing exact phrases, ${4 - finalCandidates.length} slots to fill`);
         
-        // Keep lines that already contain exact phrases
-        const { containsExactPhrases } = require('../vibe-ai.config');
-        const goodLines = finalCandidates.filter(line => containsExactPhrases(line, inputs.exactWordingTags));
+        const hardIncludeOptions = composeHardInclude(inputs.exactWordingTags, inputs.tone, inputs.tags || []);
         
-        // Combine good lines with hard-include options
-        finalCandidates = [...goodLines, ...replacementOptions].slice(0, 4);
-        
-        console.log(`✅ Hard-include repair completed: ${replacementOptions.length} options enforced`);
-        reason = 'Enforced exact phrase inclusion in all options';
-        usedFallback = false; // This is not really a fallback, it's a fix
+        if (hardIncludeOptions.length > 0) {
+          // Ensure slots calculation is always positive and clamped
+          const slotsToFill = Math.max(1, Math.min(4, Math.max(4 - finalCandidates.length, missingExactPhrases.length)));
+          
+          // Keep lines that already contain exact phrases
+          const goodLines = finalCandidates.filter(line => containsExactPhrases(line, inputs.exactWordingTags));
+          
+          // Get replacement options - repeat or trim to fill exactly the needed slots
+          let replacementOptions = [...hardIncludeOptions];
+          while (replacementOptions.length < slotsToFill) {
+            replacementOptions = [...replacementOptions, ...hardIncludeOptions];
+          }
+          replacementOptions = replacementOptions.slice(0, slotsToFill);
+          
+          // Combine good lines with hard-include options to always get 4 total
+          finalCandidates = [...goodLines, ...replacementOptions].slice(0, 4);
+          
+          // Ensure we always have exactly 4 by repeating if needed
+          while (finalCandidates.length < 4) {
+            finalCandidates.push(hardIncludeOptions[finalCandidates.length % hardIncludeOptions.length]);
+          }
+          
+          console.log(`✅ Hard-include repair completed: ${replacementOptions.length} options enforced, total: ${finalCandidates.length}`);
+          reason = 'Enforced exact phrase inclusion in all options';
+          usedFallback = false; // This is not really a fallback, it's a fix
+        }
       }
+    } catch (error) {
+      console.error('Hard-include repair failed:', error);
+      // Continue with existing finalCandidates
     }
   }
   
