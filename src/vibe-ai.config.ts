@@ -11,6 +11,8 @@
     - v1.1.0 added runtime overrides system
 */
 
+import { advancedSpellCheck, validateGrammar, containsDerogatory } from './lib/textUtils';
+
 // Runtime overrides (stored in localStorage)
 export interface AIRuntimeOverrides {
   model?: string;
@@ -493,8 +495,6 @@ function spellcheck(s: string): string[] {
 }
 
 export function postProcessLine(line: string, tone: string, requiredTags?: string[], options?: { allowNewlines?: boolean; format?: 'knockknock'; exactWordingTags?: string[] }): VibeCandidate {
-  // Import the new validation functions
-  const { advancedSpellCheck, validateGrammar, containsDerogatory, applyIdiomsAndContractions } = require('../lib/textUtils');
   
   // Trim spaces
   let cleaned = line.trim();
