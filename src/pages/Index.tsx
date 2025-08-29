@@ -5343,35 +5343,6 @@ const Index = () => {
             <div className="text-center mb-12">
               <h2 className="text-2xl md:text-3xl font-semibold text-foreground mb-4">Choose Your Category</h2>
               <p className="text-xl text-muted-foreground">Select the Category that best fits your Vibe</p>
-              
-              {/* Test Preset Quick Access */}
-              <div className="mt-6">
-                <Button 
-                  onClick={() => {
-                    // Set up Sale Poster test case
-                    setSelectedStyle('celebrations');
-                    setSelectedSubOption('420');
-                    setCurrentStep(2);
-                    setSelectedTextStyle('humorous');
-                    setCurrentStep(3);
-                    setSelectedVisualStyle('Realistic');
-                    setSelectedSubjectOption('design-myself');
-                    setSubjectDescription('Smiling shopper holding a cannabis product and a surprise gift bag');
-                    setIsSubjectDescriptionConfirmed(true);
-                    setSelectedDimension('square');
-                    setExactWordingTags(['55% Off + Free Gift on $150+ - Hurry, ends soon! - Fun times']);
-                    setStepTwoText('EXACT TEXT: "55% Off + Free Gift on $150+ - Hurry, ends soon! - Fun times"');
-                    setIsCustomTextConfirmed(true);
-                    setTags(['cannabis', 'dispensary', 'sale']);
-                    setCurrentStep(4);
-                  }}
-                  variant="secondary" 
-                  size="sm"
-                  className="text-xs"
-                >
-                  🧪 Test: Sale Poster
-                </Button>
-              </div>
             </div>
             
             {/* Show all cards when no style is selected, or only the selected card */}
