@@ -241,7 +241,7 @@ export const AI_CONFIG = {
   generation: {
     max_candidates: 6,
     temperature: 0.7,
-    max_tokens: 150,
+    max_tokens: 400,
     model: 'gpt-4.1-2025-04-14' // Default to GPT-4.1 as requested
   },
   visual_generation: {

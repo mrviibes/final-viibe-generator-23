@@ -314,6 +314,21 @@ export class OpenAIService {
       throw new Error(`No content received from OpenAI (finish_reason: ${finishReason})`);
     }
 
+    // Check if response was truncated and retry with higher token limit
+    if (finishReason === 'length') {
+      console.log('Response truncated, retrying with higher token limit...');
+      try {
+        return await this.attemptChatJSON(messages, {
+          ...options,
+          max_completion_tokens: 600,
+          model
+        });
+      } catch (retryError) {
+        console.error('Retry with higher tokens failed:', retryError);
+        throw new Error('Response truncated - content too long for model');
+      }
+    }
+
     // Enhanced JSON parsing with cleanup
     try {
       const parsed = JSON.parse(content);
@@ -322,6 +337,20 @@ export class OpenAIService {
     } catch (parseError) {
       console.error('JSON parse error:', parseError);
       console.error('Raw content that failed to parse:', content);
+      
+      // If JSON parsing fails, retry once with higher token limit (might be truncated)
+      if (tokenLimit < 600) {
+        console.log('JSON parse failed, retrying with higher token limit...');
+        try {
+          return await this.attemptChatJSON(messages, {
+            ...options,
+            max_completion_tokens: 600,
+            model
+          });
+        } catch (retryError) {
+          console.error('Retry with higher tokens failed:', retryError);
+        }
+      }
       
       // Clean content by removing common wrapping patterns
       let cleanedContent = content
