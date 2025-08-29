@@ -1295,6 +1295,59 @@ export function getStyleKeywords(visualStyle?: string): string {
   return styles[visualStyle || '3d-animated'] || 'modern visual style';
 }
 
+// Hard-include composer for exact phrase enforcement
+export function composeHardInclude(exactPhrases: string[], tone: string, extraTags: string[] = []): string[] {
+  if (!exactPhrases.length) return [];
+  
+  const combinePhrase = exactPhrases.join(' ');
+  const characterBudget = 100;
+  const remaining = characterBudget - combinePhrase.length;
+  
+  // Tone-aware suffixes that fit the remaining budget
+  const suffixOptions: Record<string, string[]> = {
+    humorous: ["😂", "LOL", "Too funny", "Classic"],
+    savage: ["Period.", "Facts.", "No cap", "Deal with it"],
+    sentimental: ["❤️", "So sweet", "Heartwarming", "Beautiful"],
+    nostalgic: ["Those days", "Remember when", "Good times", "Take me back"],
+    romantic: ["💕", "Love it", "Perfect match", "Swoon"],
+    inspirational: ["Go for it", "Believe", "You got this", "Rise up"],
+    playful: ["🎉", "Fun times", "Let's go", "Yay"],
+    serious: ["Truth", "Reality", "Important", "Facts"]
+  };
+  
+  const suffixes = suffixOptions[tone.toLowerCase()] || ["Nice", "Good", "Yes", "Cool"];
+  
+  const variations = [
+    combinePhrase,
+    remaining > 10 ? `${combinePhrase} — ${suffixes[0]}` : combinePhrase,
+    remaining > 15 ? `${combinePhrase} — ${suffixes[1] || "Now"}` : combinePhrase,
+    remaining > 12 ? `${combinePhrase} — ${suffixes[2] || "Go"}` : combinePhrase
+  ];
+  
+  return variations.map(v => v.slice(0, characterBudget));
+}
+
+// Normalize text for matching (remove quotes, backticks, extra spaces)
+export function normalizeTextForMatching(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/["""''`]/g, '')
+    .replace(/[—–-]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Check if text contains exact phrases (normalized matching)
+export function containsExactPhrases(text: string, phrases: string[]): boolean {
+  if (!phrases.length) return true;
+  
+  const normalizedText = normalizeTextForMatching(text);
+  return phrases.every(phrase => {
+    const normalizedPhrase = normalizeTextForMatching(phrase);
+    return normalizedText.includes(normalizedPhrase);
+  });
+}
+
 // Builder for vibe generator chat messages
 export function buildVibeGeneratorMessages(inputs: VibeInputs): Array<{role: string; content: string}> {
   // Check for knock-knock jokes
@@ -1382,7 +1435,7 @@ Return only: {"lines":["joke1\\nwith\\nnewlines","joke2\\nwith\\nnewlines","joke
     : '';
 
   const exactWordingRequirement = inputs.exactWordingTags && inputs.exactWordingTags.length > 0
-    ? `\n• CRITICAL: MUST include these EXACT words/phrases in the text: ${inputs.exactWordingTags.map(tag => `"${tag}"`).join(', ')}`
+    ? `\n• CRITICAL: Every single line MUST include these EXACT words/phrases verbatim: ${inputs.exactWordingTags.map(tag => `"${tag}"`).join(', ')}. If the phrase is long, output the phrase followed by 0–6 words max.`
     : '';
 
   const corePrompt = `Generate 6 concise options under 100 chars each for:

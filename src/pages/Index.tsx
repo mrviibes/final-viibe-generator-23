@@ -6187,46 +6187,84 @@ const Index = () => {
                     <div className="max-w-lg mx-auto space-y-6">
                        {/* General Tags Input */}
                        <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
-                          <div className="text-center flex items-center justify-center gap-2">
-                            <label className="text-sm font-medium text-foreground">Context & Direction Tags</label>
-                            <Tooltip>
-                              <TooltipTrigger>
-                                <Info className="h-4 w-4 text-muted-foreground" />
-                              </TooltipTrigger>
-                              <TooltipContent className="max-w-xs">
-                                <p className="text-xs">Guide the AI with any context: industry (online dispensary, fintech), audience (millennials, professionals), style (sarcastic, aesthetic), or situation (birthday, work announcement)</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </div>
-                          <Input value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={handleTagInputKeyDown} placeholder="online dispensary, millennials, sarcastic, birthday..." className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
-                          
-                          {/* Quick suggestion chips */}
-                          <div className="space-y-2">
-                            <div className="text-xs text-muted-foreground text-center">Quick add:</div>
-                            <div className="flex flex-wrap gap-2 justify-center">
-                              {[
-                                'Industry: online dispensary, crypto, fintech, wellness, gaming',
-                                'Audience: millennials, gen-z, professionals, families, luxury',
-                                'Vibe: sarcastic, aesthetic, savage, nostalgic, wholesome, edgy'
-                              ].map((category, categoryIndex) => {
-                                const [label, ...suggestions] = category.split(': ');
-                                return suggestions[0].split(', ').map((suggestion, index) => (
-                                  <button
-                                    key={`${categoryIndex}-${index}`}
-                                    onClick={() => {
-                                      if (!tags.includes(suggestion)) {
-                                        setTags([...tags, suggestion]);
-                                      }
-                                    }}
-                                    className="text-xs px-2 py-1 rounded-md bg-muted hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
-                                    disabled={tags.includes(suggestion)}
-                                  >
-                                    {suggestion}
-                                  </button>
-                                ));
-                              })}
-                            </div>
-                          </div>
+                           <div className="text-center flex items-center justify-center gap-2">
+                             <label className="text-sm font-medium text-foreground">Guidance Tags</label>
+                             <Tooltip>
+                               <TooltipTrigger>
+                                 <Info className="h-4 w-4 text-muted-foreground" />
+                               </TooltipTrigger>
+                               <TooltipContent className="max-w-xs">
+                                 <p className="text-xs">Industry, offer, audience, keywords — guide the AI in the right direction for your content</p>
+                               </TooltipContent>
+                             </Tooltip>
+                           </div>
+                           <Input value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={handleTagInputKeyDown} placeholder="online dispensary, 55% off, millennials, labor day sale..." className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
+                           
+                           {/* Quick-add suggestion chips */}
+                           <div className="space-y-3">
+                             <div className="text-center">
+                               <p className="text-xs text-muted-foreground mb-2">Quick add:</p>
+                             </div>
+                             <div className="space-y-2">
+                               <div>
+                                 <p className="text-xs font-medium text-muted-foreground mb-1">Industry</p>
+                                 <div className="flex flex-wrap gap-1 justify-center">
+                                   {['Online dispensary', 'Cannabis brand', 'THC', 'CBD', 'Edibles', 'Flower', 'Vape'].map(chip => (
+                                     <button
+                                       key={chip}
+                                       onClick={() => {
+                                         if (!tags.includes(chip)) {
+                                           setTags([...tags, chip]);
+                                         }
+                                       }}
+                                       className="px-2 py-1 text-xs rounded-full border border-border hover:bg-accent/50 transition-colors disabled:opacity-50"
+                                       disabled={tags.includes(chip)}
+                                     >
+                                       {chip}
+                                     </button>
+                                   ))}
+                                 </div>
+                               </div>
+                               <div>
+                                 <p className="text-xs font-medium text-muted-foreground mb-1">Offer</p>
+                                 <div className="flex flex-wrap gap-1 justify-center">
+                                   {['55% off', 'Free gift', 'BOGO', 'Flash sale', 'Limited-time', 'New drop'].map(chip => (
+                                     <button
+                                       key={chip}
+                                       onClick={() => {
+                                         if (!tags.includes(chip)) {
+                                           setTags([...tags, chip]);
+                                         }
+                                       }}
+                                       className="px-2 py-1 text-xs rounded-full border border-border hover:bg-accent/50 transition-colors disabled:opacity-50"
+                                       disabled={tags.includes(chip)}
+                                     >
+                                       {chip}
+                                     </button>
+                                   ))}
+                                 </div>
+                               </div>
+                               <div>
+                                 <p className="text-xs font-medium text-muted-foreground mb-1">Audience/Angle</p>
+                                 <div className="flex flex-wrap gap-1 justify-center">
+                                   {['First-time buyers', 'Loyal customers', 'Weekend promo', 'Local delivery', 'Age 21+', 'Discreet'].map(chip => (
+                                     <button
+                                       key={chip}
+                                       onClick={() => {
+                                         if (!tags.includes(chip)) {
+                                           setTags([...tags, chip]);
+                                         }
+                                       }}
+                                       className="px-2 py-1 text-xs rounded-full border border-border hover:bg-accent/50 transition-colors disabled:opacity-50"
+                                       disabled={tags.includes(chip)}
+                                     >
+                                       {chip}
+                                     </button>
+                                   ))}
+                                 </div>
+                               </div>
+                             </div>
+                           </div>
                         
                         {/* Display General Tags */}
                         {tags.length > 0 && (
@@ -6264,11 +6302,11 @@ const Index = () => {
                                <Info className="h-4 w-4 text-muted-foreground" />
                              </TooltipTrigger>
                              <TooltipContent className="max-w-xs">
-                               <p className="text-xs">These words will appear literally in the generated text. Names, specific phrases, or required words.</p>
+                               <p className="text-xs">These exact words/phrases will appear in all 4 options. Great for promo codes, brand names, or required terms.</p>
                              </TooltipContent>
                            </Tooltip>
                          </div>
-                         <Input value={exactWordingTagInput} onChange={e => setExactWordingTagInput(e.target.value)} onKeyDown={handleExactWordingTagInputKeyDown} placeholder="names, specific phrases..." className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
+                         <Input value={exactWordingTagInput} onChange={e => setExactWordingTagInput(e.target.value)} onKeyDown={handleExactWordingTagInputKeyDown} placeholder="55% Off + Free Gift on $150+ – Hurry, ends soon!" className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
                         
                         {/* Display Exact Wording Tags */}
                         {exactWordingTags.length > 0 && <div className="flex flex-wrap gap-2 justify-center">

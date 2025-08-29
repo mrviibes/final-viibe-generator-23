@@ -411,11 +411,43 @@ Return: {"lines":["option1","option2","option3","option4","option5","option6"]}`
     finalCandidates = [...uniqueValidLines];
   }
   
-  // Top-up generation if we have fewer than 4 valid options
+  // Check for missing exact words and hard-include if needed
+  if (inputs.exactWordingTags && inputs.exactWordingTags.length > 0) {
+    const missingExactPhrases = finalCandidates.filter(line => {
+      const { containsExactPhrases } = require('../vibe-ai.config');
+      return !containsExactPhrases(line, inputs.exactWordingTags);
+    });
+    
+    if (missingExactPhrases.length > 0 || finalCandidates.length < 4) {
+      console.log(`🔧 Hard-include repair: ${missingExactPhrases.length} lines missing exact phrases, ${4 - finalCandidates.length} slots to fill`);
+      
+      const { composeHardInclude } = require('../vibe-ai.config');
+      const hardIncludeOptions = composeHardInclude(inputs.exactWordingTags, inputs.tone, inputs.tags || []);
+      
+      if (hardIncludeOptions.length > 0) {
+        // Replace missing lines with hard-include options
+        const slotsToFill = Math.max(4 - finalCandidates.length, missingExactPhrases.length);
+        const replacementOptions = hardIncludeOptions.slice(0, slotsToFill);
+        
+        // Keep lines that already contain exact phrases
+        const { containsExactPhrases } = require('../vibe-ai.config');
+        const goodLines = finalCandidates.filter(line => containsExactPhrases(line, inputs.exactWordingTags));
+        
+        // Combine good lines with hard-include options
+        finalCandidates = [...goodLines, ...replacementOptions].slice(0, 4);
+        
+        console.log(`✅ Hard-include repair completed: ${replacementOptions.length} options enforced`);
+        reason = 'Enforced exact phrase inclusion in all options';
+        usedFallback = false; // This is not really a fallback, it's a fix
+      }
+    }
+  }
+  
+  // Top-up generation if we still have fewer than 4 valid options
   if (finalCandidates.length < 4) {
     console.log(`🔄 Top-up generation: only ${finalCandidates.length} valid lines, need ${4 - finalCandidates.length} more`);
     
-    const needed = 4 - finalCandidates.length;
+    const needed = Math.max(0, Math.min(4, 4 - finalCandidates.length)); // Clamp to prevent negative
     const bannedLines = new Set(finalCandidates);
     
     try {
