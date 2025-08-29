@@ -17,6 +17,7 @@ import { CorsRetryDialog } from "@/components/CorsRetryDialog";
 import { StepProgress } from "@/components/StepProgress";
 import { StackedSelectionCard } from "@/components/StackedSelectionCard";
 import { MovieSceneHelper } from "@/components/MovieSceneHelper";
+import { FallbackTooltip } from "@/components/FallbackTooltip";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigate } from "react-router-dom";
 import { generateCandidates, VibeResult } from "@/lib/vibeModel";
@@ -5998,10 +5999,19 @@ const Index = () => {
                           {isGenerating ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : "Regenerate"}
                         </Button>
                       </div>
-                       {generatedOptions.length > 0 && generationAudit && <p className="text-xs text-muted-foreground">
-                           Using {generationAudit.model} • Generated in {((Date.now() - textGenerationStartTime) / 1000).toFixed(1)}s
-                           {generationAudit.usedFallback ? " • Used fallback" : ` • Received ${generationAudit.candidateCount} options`}
-                        </p>}
+                        {generatedOptions.length > 0 && generationAudit && <div className="flex items-center justify-center gap-1">
+                          <p className="text-xs text-muted-foreground">
+                            Using {generationAudit.model} • Generated in {((Date.now() - textGenerationStartTime) / 1000).toFixed(1)}s
+                            {generationAudit.usedFallback ? " • Used fallback" : ` • Received ${generationAudit.candidateCount} options`}
+                          </p>
+                          {generationAudit.usedFallback && (
+                            <FallbackTooltip 
+                              reason="content-filter"
+                              onRegenerate={handleGenerateText}
+                              isGenerating={isGenerating}
+                            />
+                          )}
+                        </div>}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-6">
