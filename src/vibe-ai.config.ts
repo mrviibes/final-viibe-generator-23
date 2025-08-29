@@ -195,7 +195,7 @@ export interface IdeogramHandoff {
 // =========================
 
 // Fixed negative prompt applied to all image generations - keep short and focused
-export const DEFAULT_NEGATIVE_PROMPT = "misspellings, distorted letters, typos, incorrect spelling, garbled text, unreadable text, watermark, logo, captions, duplicated words";
+export const DEFAULT_NEGATIVE_PROMPT = "misspellings, distorted letters, typos, incorrect spelling, garbled text, unreadable text, handwriting, cursive, script font, ligatures, broken kerning, cramped kerning, letter swaps, split letters, watermark, logo, captions, duplicated words";
 // Model fallback chains for retry strategy
 export const MODEL_FALLBACK_CHAINS = {
   text: [
