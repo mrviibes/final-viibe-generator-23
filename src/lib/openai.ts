@@ -125,6 +125,21 @@ export class OpenAIService {
         throw new Error(`No content received from backend API (finish_reason: ${finishReason})`);
       }
 
+      // Check if response was truncated and retry with higher token limit
+      if (finishReason === 'length' && (max_completion_tokens || max_tokens || 150) < 600) {
+        console.log('Backend response truncated, retrying with higher token limit...');
+        try {
+          return await this.callBackendAPI(messages, {
+            ...options,
+            max_completion_tokens: 600,
+            model
+          });
+        } catch (retryError) {
+          console.error('Backend retry with higher tokens failed:', retryError);
+          throw new Error('Response truncated - content too long for model');
+        }
+      }
+
       // Parse JSON response
       try {
         const parsed = JSON.parse(content);
@@ -133,6 +148,21 @@ export class OpenAIService {
       } catch (parseError) {
         console.error('JSON parse error from backend:', parseError);
         console.error('Raw content that failed to parse:', content);
+        
+        // If JSON parsing fails and we have token headroom, retry with higher limit
+        const currentTokens = max_completion_tokens || max_tokens || 150;
+        if (currentTokens < 600) {
+          console.log('Backend JSON parse failed, retrying with higher token limit...');
+          try {
+            return await this.callBackendAPI(messages, {
+              ...options,
+              max_completion_tokens: 600,
+              model
+            });
+          } catch (retryError) {
+            console.error('Backend retry with higher tokens failed:', retryError);
+          }
+        }
         
         // Clean content by removing common wrapping patterns
         let cleanedContent = content

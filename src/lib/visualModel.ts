@@ -509,7 +509,7 @@ export async function generateVisualRecommendations(
     // Primary attempt - use model from AI settings
     let result;
     const requestOptions: any = {
-      max_completion_tokens: 450, // Reduced tokens for faster generation
+      max_completion_tokens: 600, // Increased tokens to reduce truncation
       model: targetModel // Use model from AI settings
     };
     
@@ -546,7 +546,7 @@ export async function generateVisualRecommendations(
         try {
           // Use next model in smart fallback chain
           const retryRequestOptions: any = {
-            max_completion_tokens: 450,
+            max_completion_tokens: 600, // Keep higher token limit for retry
             model: nextModel || 'gpt-4.1-2025-04-14' // Fallback to gpt-4.1 if chain exhausted
           };
           
