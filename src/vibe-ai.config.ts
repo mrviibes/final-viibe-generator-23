@@ -1202,6 +1202,7 @@ export function buildVisualGeneratorMessages(inputs: any): Array<{role: string; 
   const userPrompt = `${category}>${subcategory}, ${tone}, ${visualStyle || '3d-animated'}
 Tags: ${tags.slice(0, 4).join(', ')}
 ${finalLine ? `JOKE/TEXT: "${finalLine}" - VISUAL CONCEPTS MUST MATCH THIS CONTENT AND TONE` : ''}
+${inputs.exactSceneMode ? `\nEXACT SCENE MODE ENABLED: Focus on literal, precise recreation of described scenes. Use specific details from the description to create faithful visual representations. Be descriptive and accurate to the source material.` : ''}
 
 TEXT ALIGNMENT REQUIREMENTS (CRITICAL):
 ${finalLine ? `- AT LEAST TWO concepts must directly reflect the exact content/semantics of: "${finalLine}"
@@ -1210,7 +1211,8 @@ ${finalLine ? `- AT LEAST TWO concepts must directly reflect the exact content/s
 - For LGBTQ/pride themes, include explicit visual cues: rainbow flags, male couples, pride parades, drag elements, wardrobe/mirror scenes
 - For "came out" or similar phrases, show supportive relationship scenes or pride celebration contexts
 - For cross-dressing themes, include wardrobe elements, mirrors, makeup, or tasteful costume details
-- Visual concepts MUST NOT be subtle - make the connection obvious and direct` : ''}
+- Visual concepts MUST NOT be subtle - make the connection obvious and direct
+${inputs.exactSceneMode ? '- EXACT SCENE RECREATION: Prioritize accuracy and literal interpretation over artistic creativity\n- Include specific scene details, character positioning, and environmental elements from the description' : ''}` : ''}
 
 REQUIRED OBJECTS/SUBJECTS (must be visible in each concept):
 - ${subcategory === 'Ice Hockey' ? 'hockey stick and puck' : 'relevant category objects'}

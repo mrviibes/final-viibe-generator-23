@@ -14,6 +14,7 @@ export interface VisualInputs {
   dimensions?: string; // square, 4:5, 9:16, etc.
   targetSlot?: string; // background-only, subject+background, object, singing
   backgroundPreset?: string; // minimal, urban, nature, etc.
+  exactSceneMode?: boolean; // Enable exact scene recreation
 }
 
 export interface VisualOption {
@@ -485,7 +486,7 @@ export async function generateVisualRecommendations(
 ): Promise<VisualResult> {
   // Auto-enrich inputs before processing
   const enrichedInputs = autoEnrichInputs(inputs);
-  const { category, subcategory, tone, tags, visualStyle, finalLine, specificEntity, subjectOption, dimensions } = enrichedInputs;
+  const { category, subcategory, tone, tags, visualStyle, finalLine, specificEntity, subjectOption, dimensions, exactSceneMode } = enrichedInputs;
   
     // Use centralized message builder
     const messages = buildVisualGeneratorMessages(enrichedInputs);

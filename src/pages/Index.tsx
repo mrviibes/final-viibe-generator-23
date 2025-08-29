@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Search, Loader2, AlertCircle, ArrowLeft, ArrowRight, X, Download, Settings } from "lucide-react";
 import { openAIService, OpenAISearchResult } from "@/lib/openai";
@@ -4153,6 +4154,7 @@ const Index = () => {
   // Background style and focus state
   const [backgroundPreset, setBackgroundPreset] = useState<string>('');
   const [targetSlot, setTargetSlot] = useState<string>('');
+  const [exactSceneMode, setExactSceneMode] = useState<boolean>(false);
 
   // Text speed locked to fast (removed state)
 
@@ -6305,10 +6307,29 @@ const Index = () => {
                         </Card>
                       </div>}
 
-                    {/* Subject description form for Design Myself */}
+                     {/* Subject description form for Design Myself */}
                     {selectedSubjectOption === "design-myself" && !isSubjectDescriptionConfirmed && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <div className="text-center mb-8">
                           <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Describe the visuals of your Vibe (100 characters max)</h2>
+                          
+                          {/* Exact Scene Mode Toggle */}
+                          <div className="flex items-center justify-center gap-3 mt-4 p-3 bg-card/50 rounded-lg border">
+                            <Switch
+                              id="exact-scene-mode"
+                              checked={exactSceneMode}
+                              onCheckedChange={setExactSceneMode}
+                            />
+                            <label htmlFor="exact-scene-mode" className="text-sm font-medium text-foreground cursor-pointer">
+                              Exact Scene Mode
+                            </label>
+                            <div className="group relative">
+                              <Info className="h-4 w-4 text-muted-foreground hover:text-foreground cursor-help" />
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-64 p-3 bg-popover text-popover-foreground text-xs rounded-lg shadow-lg border opacity-0 group-hover:opacity-100 transition-opacity z-50">
+                                <p className="font-medium mb-1">Exact Scene Mode:</p>
+                                <p>Perfect for recreating specific movie scenes. Describe exactly what you see: "Billy Madison classroom scene with chlorophyll discussion, students laughing, teacher at blackboard"</p>
+                              </div>
+                            </div>
+                          </div>
                         </div>
 
                         <div className="max-w-lg mx-auto">
@@ -6835,19 +6856,20 @@ const Index = () => {
                  const tone = selectedTextStyleObj?.name || 'Humorous';
                  const finalLine = selectedGeneratedOption || (isCustomTextConfirmed ? stepTwoText : undefined);
                  
-                   const visualResult = await generateVisualRecommendations({
-                     category,
-                     subcategory,
-                     tone: tone.toLowerCase(),
-                     tags: finalTags,
-                     visualStyle: selectedVisualStyle || undefined,
-                     finalLine,
-                     subjectOption: selectedSubjectOption || undefined,
-                     subjectDescription: subjectDescription || undefined,
-                     dimensions: selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || undefined,
-                     targetSlot: targetSlot || undefined,
-                     backgroundPreset: backgroundPreset || undefined
-                  }, 4);
+                    const visualResult = await generateVisualRecommendations({
+                      category,
+                      subcategory,
+                      tone: tone.toLowerCase(),
+                      tags: finalTags,
+                      visualStyle: selectedVisualStyle || undefined,
+                      finalLine,
+                      subjectOption: selectedSubjectOption || undefined,
+                      subjectDescription: subjectDescription || undefined,
+                      dimensions: selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || undefined,
+                      targetSlot: targetSlot || undefined,
+                      backgroundPreset: backgroundPreset || undefined,
+                      exactSceneMode: exactSceneMode
+                   }, 4);
                  
                  setVisualRecommendations(visualResult);
                  setIsLoadingRecommendations(false);
