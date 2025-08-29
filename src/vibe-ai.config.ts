@@ -1386,6 +1386,33 @@ export function containsExactPhrases(text: string, phrases: string[]): boolean {
   });
 }
 
+// Detect sale intent automatically
+export function detectSaleIntent(inputs: VibeInputs): boolean {
+  const saleKeywords = ['sale', 'off', '%', 'discount', 'bogo', 'free gift', 'code', 'ends soon', 'limited time', 'buy', 'spend'];
+  
+  // Check tags and exact wording tags
+  const allTags = [...(inputs.tags || []), ...(inputs.exactWordingTags || [])];
+  const hasTagSaleKeywords = allTags.some(tag => 
+    saleKeywords.some(keyword => tag.toLowerCase().includes(keyword))
+  );
+  
+  // Check if text content contains sale indicators
+  const textContent = [inputs.recipient_name, inputs.subcategory].join(' ').toLowerCase();
+  const hasTextSaleIndicators = /[\$%]|\d+%|\$\d+/.test(textContent) || 
+    saleKeywords.some(keyword => textContent.includes(keyword));
+  
+  // If any category with no tags, could be advertising
+  const isGenericAdvertisement = (!inputs.tags || inputs.tags.length === 0);
+  
+  const saleIntentDetected = hasTagSaleKeywords || hasTextSaleIndicators || isGenericAdvertisement;
+  
+  if (saleIntentDetected) {
+    console.log("🛒 Sale intent detected:", { hasTagSaleKeywords, hasTextSaleIndicators, isGenericAdvertisement });
+  }
+  
+  return saleIntentDetected;
+}
+
 // Builder for vibe generator chat messages
 export function buildVibeGeneratorMessages(inputs: VibeInputs): Array<{role: string; content: string}> {
   // Check for knock-knock jokes
@@ -1420,6 +1447,9 @@ Return only: {"lines":["joke1\\nwith\\nnewlines","joke2\\nwith\\nnewlines","joke
       { role: 'user', content: corePrompt }
     ];
   }
+  
+  // Detect sale intent
+  const hasSaleIntent = detectSaleIntent(inputs);
 
   // Original logic for non-knock-knock content
   const isMovie = inputs.category === "Pop Culture" && inputs.subcategory?.toLowerCase().includes("movie");
@@ -1476,14 +1506,27 @@ Return only: {"lines":["joke1\\nwith\\nnewlines","joke2\\nwith\\nnewlines","joke
     ? `\n• CRITICAL: Every single line MUST include these EXACT words/phrases verbatim: ${inputs.exactWordingTags.map(tag => `"${tag}"`).join(', ')}. If the phrase is long, output the phrase followed by 0–6 words max.`
     : '';
 
+  // Sale-focused prompt wiring
+  const saleRules = hasSaleIntent ? `
+
+RETAIL OFFER RULES (CRITICAL):
+• Include explicit offer language (e.g., "55% off", "Free gift on $150+", "BOGO", "Limited time")
+• Use clear CTA variants: "Hurry ends soon" / "Today only" / "Limited time" / "Shop now"
+• NO emojis, NO hashtags, NO unexplained abbreviations (never "HH" unless "Happy Hour" is in tags)
+• Keep symbols like %, +, $, numbers for offers
+• Generate 4 distinct sale styles: standard offer, urgency-driven, playful offer, minimal clean
+• Focus on clear, professional retail copy that sells effectively
+• No generic celebration elements unless specifically requested` : '';
+
   const corePrompt = `Generate 6 concise options under 100 chars each for:
 Category: ${inputs.category} > ${inputs.subcategory}
 Tone: ${inputs.tone}
 Tags: ${inputs.tags?.join(', ') || 'none'}
 ${inputs.exactWordingTags && inputs.exactWordingTags.length > 0 ? `Exact Words Required: ${inputs.exactWordingTags.join(', ')}` : ''}
 ${inputs.recipient_name && inputs.recipient_name !== "-" ? `Target: ${inputs.recipient_name}` : ''}
+${hasSaleIntent ? '\nSALE INTENT DETECTED: Focus on retail offers and clear sales messaging.' : ''}
 
-${tagRequirement}${exactWordingRequirement}${specialInstructions}
+${tagRequirement}${exactWordingRequirement}${specialInstructions}${saleRules}
 
 Return only: {"lines":["option1","option2","option3","option4","option5","option6"]}`;
 

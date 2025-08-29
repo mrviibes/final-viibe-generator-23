@@ -505,7 +505,7 @@ export class OpenAIService {
       
       // Enforce character limit and ensure exactly 4 options
       const processedOptions = options.map((option: string) => {
-        const cleaned = option.replace(/^["']|["']$/g, '').trim();
+        const cleaned = this.cleanVisibleOption(option.replace(/^["']|["']$/g, '').trim());
         return cleaned.length > characterLimit ? cleaned.slice(0, characterLimit) : cleaned;
       }).slice(0, 4);
 
@@ -531,6 +531,18 @@ export class OpenAIService {
         option.length > characterLimit ? option.slice(0, characterLimit) : option
       );
     }
+  }
+
+  // Clean visible options by removing emojis/hashtags and collapsing punctuation
+  private cleanVisibleOption(text: string): string {
+    return text
+      // Remove emojis and hashtags
+      .replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '')
+      .replace(/#\w+/g, '')
+      // Preserve %, +, $, en/em dashes but collapse multiple spaces/punctuation
+      .replace(/\s+/g, ' ')
+      .replace(/([.!?])\1+/g, '$1')
+      .trim();
   }
 }
 
