@@ -87,7 +87,7 @@ export type Category =
   | "Celebrations"
   | "Sports"
   | "Daily Life"
-  | "Vibes & Punchlines"
+  | "Anything Goes"
   | "Pop Culture"
   | "No Category";
 

@@ -40,9 +40,9 @@ const styleOptions = [{
   name: "Daily Life",
   description: "Everyday routines, hobbies, and situations"
 }, {
-  id: "vibes-punchlines",
-  name: "Vibes & Punchlines",
-  description: "Moods, self-talk, jokes, and formats"
+  id: "anything-goes",
+  name: "Anything Goes",
+  description: "Jokes, moods, randomness, weird stuff"
 }, {
   id: "pop-culture",
   name: "Pop Culture",
@@ -3355,458 +3355,453 @@ const dailyLifeOptions = [{
   id: "fire-drill",
   name: "Fire drill"
 }];
-const vibesPunchlinesOptions = [{
+const anythingGoesOptions = [{
   id: "dad-jokes",
-  name: "Dad Jokes",
-  subtitle: "Cheesy predictable puns"
-}, {
-  id: "daily-vibes",
-  name: "Daily Vibes",
-  subtitle: "Day-of-week jokes"
-}, {
-  id: "quotes",
-  name: "Quotes",
-  subtitle: "General, tone later"
+  name: "Dad jokes",
+  subtitle: ""
 }, {
   id: "one-liners",
-  name: "One-Liners",
-  subtitle: "Quick single jokes"
-}, {
-  id: "comebacks",
-  name: "Comebacks",
-  subtitle: "Witty fast retorts"
-}, {
-  id: "career-jokes",
-  name: "Career Jokes",
-  subtitle: "Work & office humor"
-}, {
-  id: "knock-knock-jokes",
-  name: "Knock-Knock Jokes",
-  subtitle: "Classic \"Who's there\""
-}, {
-  id: "puns-wordplay",
-  name: "Puns & Wordplay",
-  subtitle: "Clever double meanings"
-}, {
-  id: "self-deprecating",
-  name: "Self-Deprecating",
-  subtitle: "Jokes on yourself"
+  name: "One-liners",
+  subtitle: ""
 }, {
   id: "roasts",
   name: "Roasts",
-  subtitle: "Playful sharp burns"
+  subtitle: ""
 }, {
   id: "dark-humor",
-  name: "Dark Humor",
-  subtitle: "Morbid edgy jokes"
+  name: "Dark humor",
+  subtitle: ""
 }, {
-  id: "endings",
-  name: "Endings",
-  subtitle: "Funny closing lines"
+  id: "savage-comebacks",
+  name: "Savage comebacks",
+  subtitle: ""
 }, {
-  id: "life-tips",
-  name: "Life Tips",
-  subtitle: "Helpful witty advice"
+  id: "knock-knock-jokes",
+  name: "Knock-knock jokes",
+  subtitle: ""
 }, {
-  id: "affirmations",
-  name: "Affirmations",
-  subtitle: "Positive self-reminders"
+  id: "puns-wordplay",
+  name: "Puns & wordplay",
+  subtitle: ""
 }, {
-  id: "relationship-humor",
-  name: "Relationship Humor",
-  subtitle: "Dating, couple jokes"
+  id: "self-deprecating-jokes",
+  name: "Self-deprecating jokes",
+  subtitle: ""
 }, {
-  id: "family-jokes",
-  name: "Family Jokes",
-  subtitle: "Friends or relatives"
+  id: "thats-what-she-said-jokes",
+  name: "\"That's what she said\" jokes",
+  subtitle: ""
 }, {
-  id: "office-humor",
-  name: "Office Humor",
-  subtitle: "Workplace banter struggles"
+  id: "awkward-situation-humor",
+  name: "Awkward situation humor",
+  subtitle: ""
 }, {
-  id: "school-life",
-  name: "School Life",
-  subtitle: "Classroom study humor"
+  id: "happy",
+  name: "Happy",
+  subtitle: ""
 }, {
-  id: "food-jokes",
-  name: "Food Jokes",
-  subtitle: "Eating, cravings"
+  id: "sad",
+  name: "Sad",
+  subtitle: ""
 }, {
-  id: "coffee-humor",
-  name: "Coffee Humor",
-  subtitle: "Morning caffeine jokes"
+  id: "angry",
+  name: "Angry",
+  subtitle: ""
 }, {
-  id: "pet-humor",
-  name: "Pet Humor",
-  subtitle: "Cats, dogs, animals"
+  id: "tired",
+  name: "Tired",
+  subtitle: ""
 }, {
-  id: "tech-humor",
-  name: "Tech Humor",
-  subtitle: "Gadgets, glitches, online"
+  id: "overthinking",
+  name: "Overthinking",
+  subtitle: ""
 }, {
-  id: "social-media",
-  name: "Social Media",
-  subtitle: "TikTok, Instagram, viral content"
+  id: "lazy",
+  name: "Lazy",
+  subtitle: ""
 }, {
-  id: "pop-culture",
-  name: "Pop Culture",
-  subtitle: "Celebs, TV, music"
+  id: "stressed",
+  name: "Stressed",
+  subtitle: ""
 }, {
-  id: "classic-quotes",
-  name: "Classic Quotes",
-  subtitle: "Famous old lines"
+  id: "excited",
+  name: "Excited",
+  subtitle: ""
 }, {
-  id: "monday-blues",
-  name: "Monday Blues",
-  subtitle: "Dreading week start"
+  id: "awkward",
+  name: "Awkward",
+  subtitle: ""
 }, {
-  id: "friday-feeling",
-  name: "Friday Feeling",
-  subtitle: "Weekend hype laughs"
+  id: "relatable",
+  name: "Relatable",
+  subtitle: ""
 }, {
-  id: "sunday-vibes",
-  name: "Sunday Vibes",
-  subtitle: "Chill or dread"
+  id: "school",
+  name: "School",
+  subtitle: ""
 }, {
-  id: "absurd-humor",
-  name: "Absurd Humor",
-  subtitle: "Nonsense surreal jokes"
+  id: "homework",
+  name: "Homework",
+  subtitle: ""
 }, {
-  id: "parodies",
-  name: "Parodies",
-  subtitle: "Imitations with twist"
+  id: "teachers",
+  name: "Teachers",
+  subtitle: ""
 }, {
-  id: "satire-irony",
-  name: "Satire & Irony",
-  subtitle: "Social commentary humor"
+  id: "exams",
+  name: "Exams",
+  subtitle: ""
 }, {
-  id: "holiday-humor",
-  name: "Holiday Humor",
-  subtitle: "Seasonal festive laughs"
+  id: "college-life",
+  name: "College life",
+  subtitle: ""
 }, {
-  id: "parenting-humor",
-  name: "Parenting Humor",
-  subtitle: "Raising kids chaos"
+  id: "growing-up",
+  name: "Growing up",
+  subtitle: ""
 }, {
-  id: "travel-humor",
-  name: "Travel Humor",
-  subtitle: "Vacation trip fails"
+  id: "nostalgia-90s-2000s",
+  name: "Nostalgia (90s, 2000s)",
+  subtitle: ""
 }, {
-  id: "sports-fitness",
-  name: "Sports & Fitness",
-  subtitle: "Exercise, fan banter"
+  id: "childhood-memories",
+  name: "Childhood memories",
+  subtitle: ""
 }, {
-  id: "nostalgia-humor",
-  name: "Nostalgia Humor",
-  subtitle: "Childhood retro laughs"
+  id: "adulting-fails",
+  name: "Adulting fails",
+  subtitle: ""
 }, {
-  id: "internet-humor",
-  name: "Internet Humor",
-  subtitle: "Social trend jokes"
+  id: "work-struggles",
+  name: "Work struggles",
+  subtitle: ""
 }, {
-  id: "insults",
-  name: "Insults",
-  subtitle: "Burns, jabs, putdowns"
+  id: "astronomy",
+  name: "Astronomy",
+  subtitle: ""
 }, {
-  id: "tongue-twisters",
-  name: "Tongue Twisters",
-  subtitle: "Word challenges"
+  id: "astrology",
+  name: "Astrology",
+  subtitle: ""
 }, {
-  id: "riddles",
-  name: "Riddles",
-  subtitle: "Puzzle-style jokes"
+  id: "math",
+  name: "Math",
+  subtitle: ""
 }, {
-  id: "proverb-twists",
-  name: "Proverb Twists",
-  subtitle: "Old sayings flipped"
+  id: "physics",
+  name: "Physics",
+  subtitle: ""
+}, {
+  id: "chemistry",
+  name: "Chemistry",
+  subtitle: ""
+}, {
+  id: "biology",
+  name: "Biology",
+  subtitle: ""
+}, {
+  id: "psychology",
+  name: "Psychology",
+  subtitle: ""
+}, {
+  id: "history",
+  name: "History",
+  subtitle: ""
+}, {
+  id: "geography",
+  name: "Geography",
+  subtitle: ""
+}, {
+  id: "philosophy",
+  name: "Philosophy",
+  subtitle: ""
+}, {
+  id: "memes-about-memes",
+  name: "Memes about memes",
+  subtitle: ""
+}, {
+  id: "social-media-addiction",
+  name: "Social media addiction",
+  subtitle: ""
+}, {
+  id: "internet-slang",
+  name: "Internet slang",
+  subtitle: ""
+}, {
+  id: "gaming-jokes",
+  name: "Gaming jokes",
+  subtitle: ""
+}, {
+  id: "streaming-binges",
+  name: "Streaming binges",
+  subtitle: ""
+}, {
+  id: "ai-jokes",
+  name: "AI jokes",
+  subtitle: ""
+}, {
+  id: "tech-fails",
+  name: "Tech fails",
+  subtitle: ""
+}, {
+  id: "phones",
+  name: "Phones",
+  subtitle: ""
+}, {
+  id: "computers",
+  name: "Computers",
+  subtitle: ""
+}, {
+  id: "wifi-problems",
+  name: "Wifi problems",
+  subtitle: ""
+}, {
+  id: "conspiracy-theories",
+  name: "Conspiracy theories",
+  subtitle: ""
+}, {
+  id: "aliens",
+  name: "Aliens",
+  subtitle: ""
+}, {
+  id: "ghosts",
+  name: "Ghosts",
+  subtitle: ""
+}, {
+  id: "paranormal",
+  name: "Paranormal",
+  subtitle: ""
+}, {
+  id: "dreams",
+  name: "Dreams",
+  subtitle: ""
+}, {
+  id: "nightmares",
+  name: "Nightmares",
+  subtitle: ""
+}, {
+  id: "weird-habits",
+  name: "Weird habits",
+  subtitle: ""
+}, {
+  id: "embarrassing-moments",
+  name: "Embarrassing moments",
+  subtitle: ""
+}, {
+  id: "bad-luck",
+  name: "Bad luck",
+  subtitle: ""
 }, {
   id: "shower-thoughts",
-  name: "Shower Thoughts",
-  subtitle: "Odd clever ideas"
+  name: "\"Shower thoughts\"",
+  subtitle: ""
 }, {
-  id: "complaints",
-  name: "Complaints",
-  subtitle: "Overblown small problems"
+  id: "sarcasm",
+  name: "Sarcasm",
+  subtitle: ""
 }, {
-  id: "generational-humor",
-  name: "Generational Humor",
-  subtitle: "Gen Z vs Millennials"
+  id: "irony",
+  name: "Irony",
+  subtitle: ""
 }, {
-  id: "adulting-humor",
-  name: "Adulting Humor",
-  subtitle: "Grown-up struggles"
+  id: "existential-dread",
+  name: "Existential dread",
+  subtitle: ""
 }, {
-  id: "introvert-extrovert",
-  name: "Introvert Extrovert",
-  subtitle: "Social energy jokes"
-}, {
-  id: "self-care-humor",
-  name: "Self-Care Humor",
-  subtitle: "Lazy indulgent laughs"
-}, {
-  id: "grammar-humor",
-  name: "Grammar Humor",
-  subtitle: "Language punctuation fun"
-}, {
-  id: "pirate-jokes",
-  name: "Pirate Jokes",
-  subtitle: "Nautical \"Arrr\" puns"
-}, {
-  id: "fantasy-zombie",
-  name: "Fantasy & Zombie",
-  subtitle: "Geeky monster humor"
-}, {
-  id: "science-humor",
-  name: "Science Humor",
-  subtitle: "STEM nerdy jokes"
-}, {
-  id: "weather-humor",
-  name: "Weather Humor",
-  subtitle: "Forecast seasonal laughs"
-}, {
-  id: "karen-memes",
-  name: "Karen Memes",
-  subtitle: "Entitled stereotypes"
-}, {
-  id: "celebrity-satire",
-  name: "Celebrity Satire",
-  subtitle: "Mocking famous quirks"
-}, {
-  id: "fails",
-  name: "Fails",
-  subtitle: "Funny mishaps mistakes"
-}, {
-  id: "philosophy-twists",
-  name: "Philosophy Twists",
-  subtitle: "Deep silly flips"
-}, {
-  id: "fun-facts",
-  name: "Fun Facts",
-  subtitle: "Trivia with punchline"
-}, {
-  id: "emoji-humor",
-  name: "Emoji Humor",
-  subtitle: "Playing with symbols"
-}, {
-  id: "quote-mashups",
-  name: "Quote Mashups",
-  subtitle: "Mixed sayings"
-}, {
-  id: "innuendo-humor",
-  name: "Innuendo Humor",
-  subtitle: "Suggestive double meanings"
-}, {
-  id: "work-from-home",
-  name: "Work From Home",
-  subtitle: "Remote job fun"
-}, {
-  id: "health-wellness",
-  name: "Health & Wellness",
-  subtitle: "Fitness diet laughs"
-}, {
-  id: "late-night-thoughts",
-  name: "Late Night Thoughts",
-  subtitle: "Overtired musings"
-}, {
-  id: "instagram-ads",
-  name: "Instagram Ads",
-  subtitle: "Advertising, promotion, sponsored content"
-}, {
-  id: "facebook-marketing",
-  name: "Facebook Marketing",
-  subtitle: "Social media campaigns, business posts"
-}, {
-  id: "youtube-content",
-  name: "YouTube Content",
-  subtitle: "Video creation, channel growth"
-}, {
-  id: "tiktok-trends",
-  name: "TikTok Trends",
-  subtitle: "Viral videos, challenges, dances"
-}, {
-  id: "linkedin-professional",
-  name: "LinkedIn Professional",
-  subtitle: "Career posts, networking, business"
-}, {
-  id: "twitter-threads",
-  name: "Twitter Threads",
-  subtitle: "Tweet storms, viral takes"
-}, {
-  id: "brand-promotion",
-  name: "Brand Promotion",
-  subtitle: "Product marketing, endorsements"
-}, {
-  id: "influencer-content",
-  name: "Influencer Content",
-  subtitle: "Sponsored posts, collaborations"
-}, {
-  id: "e-commerce-sales",
-  name: "E-commerce Sales",
-  subtitle: "Online shopping, product launches"
-}, {
-  id: "digital-marketing",
-  name: "Digital Marketing",
-  subtitle: "Online campaigns, SEO, ads"
-}, {
-  id: "annoying-questions",
-  name: "Annoying Questions",
-  subtitle: "Nosy silly prods"
-}, {
-  id: "slang-lingo",
-  name: "Slang & Lingo",
-  subtitle: "Wordplay jokes"
-}, {
-  id: "mystery-puns",
-  name: "Mystery Puns",
-  subtitle: "Detective-style punchlines"
-}, {
-  id: "lightbulb-jokes",
-  name: "Lightbulb Jokes",
-  subtitle: "\"How many X\""
-}, {
-  id: "chuck-norris-jokes",
-  name: "Chuck Norris Jokes",
-  subtitle: "Absurd superhuman facts"
-}, {
-  id: "math-humor",
-  name: "Math Humor",
-  subtitle: "Number equation puns"
-}, {
-  id: "coding-jokes",
-  name: "Coding Jokes",
-  subtitle: "Programmer IT humor"
-}, {
-  id: "pet-peeves",
-  name: "Pet Peeves",
-  subtitle: "Shared annoyances"
-}, {
-  id: "apologies",
-  name: "Apologies",
-  subtitle: "Sorry not sorry"
-}, {
-  id: "awkward-comedy",
-  name: "Awkward Comedy",
-  subtitle: "Cringe relatable laughs"
-}, {
-  id: "trick-questions",
-  name: "Trick Questions",
-  subtitle: "Gotcha Q&A jokes"
+  id: "life-advice-gone-wrong",
+  name: "Life advice gone wrong",
+  subtitle: ""
 }, {
   id: "self-help-parody",
-  name: "Self-Help Parody",
-  subtitle: "Motivational spoofs"
+  name: "Self-help parody",
+  subtitle: ""
 }, {
-  id: "edgy-one-liners",
-  name: "Edgy One-Liners",
-  subtitle: "Risky quick jokes"
+  id: "overconfidence",
+  name: "Overconfidence",
+  subtitle: ""
 }, {
-  id: "burnout-humor",
-  name: "Burnout Humor",
-  subtitle: "Exhaustion jokes"
+  id: "procrastination",
+  name: "Procrastination",
+  subtitle: ""
 }, {
-  id: "ai-robot-jokes",
-  name: "AI Robot Jokes",
-  subtitle: "Future tech laughs"
+  id: "motivation-fake-or-real",
+  name: "Motivation (fake or real)",
+  subtitle: ""
 }, {
-  id: "gamer-memes",
-  name: "Gamer Memes",
-  subtitle: "Gaming culture fun"
+  id: "wisdom-quotes-with-a-twist",
+  name: "Wisdom quotes with a twist",
+  subtitle: ""
 }, {
-  id: "would-you-rather",
-  name: "Would You Rather",
-  subtitle: "Absurd choices"
+  id: "fortune-cookie-nonsense",
+  name: "Fortune-cookie nonsense",
+  subtitle: ""
 }, {
-  id: "cat-memes",
-  name: "Cat Memes",
-  subtitle: "Feline antics"
+  id: "coffee-addiction",
+  name: "Coffee addiction",
+  subtitle: ""
 }, {
-  id: "dog-memes",
-  name: "Dog Memes",
-  subtitle: "Canine silliness"
+  id: "pizza",
+  name: "Pizza",
+  subtitle: ""
 }, {
-  id: "dating-humor",
-  name: "Dating Humor",
-  subtitle: "Single romance laughs"
+  id: "junk-food",
+  name: "Junk food",
+  subtitle: ""
 }, {
-  id: "money-jokes",
-  name: "Money Jokes",
-  subtitle: "Broke rich jokes"
+  id: "healthy-food-shame",
+  name: "Healthy food shame",
+  subtitle: ""
 }, {
-  id: "toilet-humor",
-  name: "Toilet Humor",
-  subtitle: "Bathroom laughs"
+  id: "cooking-disasters",
+  name: "Cooking disasters",
+  subtitle: ""
 }, {
-  id: "astrology-memes",
-  name: "Astrology Memes",
-  subtitle: "Zodiac stereotypes"
+  id: "grocery-store-pain",
+  name: "Grocery store pain",
+  subtitle: ""
 }, {
-  id: "doctor-humor",
-  name: "Doctor Humor",
-  subtitle: "Medical profession laughs"
+  id: "fast-food-cravings",
+  name: "Fast food cravings",
+  subtitle: ""
 }, {
-  id: "stoner-humor",
-  name: "Stoner Humor",
-  subtitle: "Cannabis culture fun"
+  id: "snacks",
+  name: "Snacks",
+  subtitle: ""
 }, {
-  id: "bar-jokes",
-  name: "Bar Jokes",
-  subtitle: "Walks into..."
+  id: "eating-out",
+  name: "Eating out",
+  subtitle: ""
 }, {
-  id: "yo-mama-jokes",
-  name: "Yo Mama Jokes",
-  subtitle: "Insult classics"
+  id: "drinks-alcohol-soda-water",
+  name: "Drinks (alcohol, soda, water)",
+  subtitle: ""
 }, {
-  id: "clever-comebacks",
-  name: "Clever Comebacks",
-  subtitle: "Smart quick retorts"
+  id: "dating-fails",
+  name: "Dating fails",
+  subtitle: ""
 }, {
-  id: "anti-jokes",
-  name: "Anti-Jokes",
-  subtitle: "No punchline jokes"
+  id: "flirting",
+  name: "Flirting",
+  subtitle: ""
 }, {
-  id: "pick-up-lines",
-  name: "Pick-Up Lines",
-  subtitle: "Flirty cheesy openers"
+  id: "crushes",
+  name: "Crushes",
+  subtitle: ""
 }, {
-  id: "celebrations",
-  name: "Celebrations",
-  subtitle: "Joyful milestones"
+  id: "breakups",
+  name: "Breakups",
+  subtitle: ""
 }, {
-  id: "funny-rants",
-  name: "Funny Rants",
-  subtitle: "Angry but funny"
+  id: "marriage-jokes",
+  name: "Marriage jokes",
+  subtitle: ""
 }, {
-  id: "lawyer-jokes",
-  name: "Lawyer Jokes",
-  subtitle: "Legal profession laughs"
+  id: "parenting-fails",
+  name: "Parenting fails",
+  subtitle: ""
 }, {
-  id: "little-johnny",
-  name: "Little Johnny",
-  subtitle: "Kid cheeky lines"
+  id: "family-drama",
+  name: "Family drama",
+  subtitle: ""
 }, {
-  id: "pranks",
-  name: "Pranks",
-  subtitle: "Trick setups"
+  id: "friend-group-chaos",
+  name: "Friend group chaos",
+  subtitle: ""
 }, {
-  id: "heartbreak",
-  name: "Heartbreak",
-  subtitle: "Breakup lost love"
+  id: "roommates",
+  name: "Roommates",
+  subtitle: ""
 }, {
-  id: "party-humor",
-  name: "Party Humor",
-  subtitle: "Night out fun"
+  id: "in-laws",
+  name: "In-laws",
+  subtitle: ""
 }, {
-  id: "seasonal-events",
-  name: "Seasonal Events",
-  subtitle: "Big yearly happenings"
+  id: "bad-luck-mondays",
+  name: "Bad luck Mondays",
+  subtitle: ""
 }, {
-  id: "advertising",
-  name: "Advertising",
-  subtitle: "Marketing campaigns and ads"
+  id: "fridays",
+  name: "Fridays",
+  subtitle: ""
 }, {
-  id: "courier-jokes",
-  name: "Courier Jokes",
-  subtitle: "Delivery service humor"
+  id: "weekend-vibes",
+  name: "Weekend vibes",
+  subtitle: ""
+}, {
+  id: "procrastination-memes",
+  name: "Procrastination memes",
+  subtitle: ""
+}, {
+  id: "sleep-deprivation",
+  name: "Sleep deprivation",
+  subtitle: ""
+}, {
+  id: "why-am-i-like-this",
+  name: "\"Why am I like this?\"",
+  subtitle: ""
+}, {
+  id: "everyday-randomness",
+  name: "Everyday randomness",
+  subtitle: ""
+}, {
+  id: "sarcastic-hot-takes",
+  name: "Sarcastic hot takes",
+  subtitle: ""
+}, {
+  id: "no-context-jokes",
+  name: "\"No context\" jokes",
+  subtitle: ""
+}, {
+  id: "total-nonsense",
+  name: "Total nonsense",
+  subtitle: ""
+}];
+
+// Umbrella groups for "Anything Goes" navigation
+const anythingGoesGroups = [{
+  id: "jokes-formats",
+  name: "Jokes & Formats",
+  itemIds: ["dad-jokes", "one-liners", "roasts", "dark-humor", "savage-comebacks", "knock-knock-jokes", "puns-wordplay", "self-deprecating-jokes", "thats-what-she-said-jokes", "awkward-situation-humor"]
+}, {
+  id: "moods-feels",
+  name: "Moods & Feels",
+  itemIds: ["happy", "sad", "angry", "tired", "overthinking", "lazy", "stressed", "excited", "awkward", "relatable"]
+}, {
+  id: "school-education",
+  name: "School & Education", 
+  itemIds: ["school", "homework", "teachers", "exams", "college-life", "growing-up"]
+}, {
+  id: "nostalgia-memories",
+  name: "Nostalgia & Memories",
+  itemIds: ["nostalgia-90s-2000s", "childhood-memories", "adulting-fails", "work-struggles"]
+}, {
+  id: "science-academic",
+  name: "Science & Academic",
+  itemIds: ["astronomy", "astrology", "math", "physics", "chemistry", "biology", "psychology", "history", "geography", "philosophy"]
+}, {
+  id: "internet-tech",
+  name: "Internet & Tech",
+  itemIds: ["memes-about-memes", "social-media-addiction", "internet-slang", "gaming-jokes", "streaming-binges", "ai-jokes", "tech-fails", "phones", "computers", "wifi-problems"]
+}, {
+  id: "weird-random",
+  name: "Weird & Random",
+  itemIds: ["conspiracy-theories", "aliens", "ghosts", "paranormal", "dreams", "nightmares", "weird-habits", "embarrassing-moments", "bad-luck", "shower-thoughts"]
+}, {
+  id: "attitudes-vibes",
+  name: "Attitudes & Vibes",
+  itemIds: ["sarcasm", "irony", "existential-dread", "life-advice-gone-wrong", "self-help-parody", "overconfidence", "procrastination", "motivation-fake-or-real", "wisdom-quotes-with-a-twist", "fortune-cookie-nonsense"]
+}, {
+  id: "food-drinks",
+  name: "Food & Drinks",
+  itemIds: ["coffee-addiction", "pizza", "junk-food", "healthy-food-shame", "cooking-disasters", "grocery-store-pain", "fast-food-cravings", "snacks", "eating-out", "drinks-alcohol-soda-water"]
+}, {
+  id: "relationships-social",
+  name: "Relationships & Social",
+  itemIds: ["dating-fails", "flirting", "crushes", "breakups", "marriage-jokes", "parenting-fails", "family-drama", "friend-group-chaos", "roommates", "in-laws"]
+}, {
+  id: "time-miscellaneous",
+  name: "Time & Miscellaneous",
+  itemIds: ["bad-luck-mondays", "fridays", "weekend-vibes", "procrastination-memes", "sleep-deprivation", "why-am-i-like-this", "everyday-randomness", "sarcastic-hot-takes", "no-context-jokes", "total-nonsense"]
 }];
 const popCultureOptions = [{
   id: "celebrities",
@@ -4064,6 +4059,13 @@ const Index = () => {
     const stored = localStorage.getItem('remember_last_choices');
     return stored === 'true';
   });
+
+  // Backward compatibility: migrate old "vibes-punchlines" to "anything-goes"
+  useEffect(() => {
+    if (selectedStyle === 'vibes-punchlines') {
+      setSelectedStyle('anything-goes');
+    }
+  }, [selectedStyle]);
 
   // Load saved choices on component mount
   useEffect(() => {
@@ -4356,7 +4358,7 @@ const Index = () => {
       case "celebrations":
       case "sports":
       case "daily-life":
-      case "vibes-punchlines":
+      case "anything-goes":
         return !!selectedSubOption;
       default:
         return false;
@@ -4537,8 +4539,8 @@ const Index = () => {
         case 'daily-life':
           category = 'daily life';
           break;
-        case 'vibes-punchlines':
-          category = 'vibes and punchlines';
+        case 'anything-goes':
+          category = 'anything goes';
           break;
         case 'pop-culture':
           category = 'pop culture';
@@ -4663,8 +4665,8 @@ const Index = () => {
         case 'daily-life':
           category = 'daily life';
           break;
-        case 'vibes-punchlines':
-          category = 'vibes and punchlines';
+        case 'anything-goes':
+          category = 'anything goes';
           break;
         case 'pop-culture':
           category = 'pop culture';
@@ -5132,12 +5134,12 @@ const Index = () => {
                 }
               });
 
-              // Search vibes & punchlines
-              vibesPunchlinesOptions.forEach(option => {
+              // Search anything goes
+              anythingGoesOptions.forEach(option => {
                 if (option.name.toLowerCase().includes(searchTermLower) || option.subtitle.toLowerCase().includes(searchTermLower)) {
                   subcategoryResults.push({
-                    category: 'vibes-punchlines',
-                    categoryName: 'Vibes & Punchlines',
+                    category: 'anything-goes',
+                    categoryName: 'Anything Goes',
                     subcategory: option,
                     type: 'subcategory'
                   });
@@ -5233,8 +5235,8 @@ const Index = () => {
                   return 'Selected sport';
                 } else if (selectedStyle === 'daily-life') {
                   return 'Selected daily life activity';
-                } else if (selectedStyle === 'vibes-punchlines') {
-                  return 'Selected vibe';
+                } else if (selectedStyle === 'anything-goes') {
+                  return 'Selected anything goes tag';
                 } else if (selectedStyle === 'pop-culture') {
                   const popOption = popCultureOptions.find(p => p.id === selectedSubOption);
                   return popOption?.subtitle || 'Selected pop culture';
@@ -5446,9 +5448,9 @@ const Index = () => {
                       </ScrollArea>
                     </Card>}
                 </div>
-              </div> : selectedStyle === "vibes-punchlines" && !selectedSubOption ? <div className="selected-card mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              </div> : selectedStyle === "anything-goes" && !selectedSubOption ? <div className="selected-card mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="text-center mb-6">
-                  <p className="text-xl text-muted-foreground">Choose a specific vibe or punchline style</p>
+                  <p className="text-xl text-muted-foreground">Choose an Anything Goes tag</p>
                 </div>
                 
                 <div className="space-y-4">
@@ -5458,15 +5460,47 @@ const Index = () => {
                     <Input value={subOptionSearchTerm} onChange={e => setSubOptionSearchTerm(e.target.value)} onFocus={() => setIsSearchFocused(true)} onBlur={() => {
                   // Delay hiding the list to allow clicks to complete
                   setTimeout(() => setIsSearchFocused(false), 150);
-                }} placeholder="Search vibes & punchlines..." className="pl-10 text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
+                }} placeholder="Search Anything Goes..." className="pl-10 text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
                   </div>
 
-                  {/* Vibes & Punchlines List */}
+                  {/* Umbrella Groups (only show when not searching) */}
+                  {!isSearchFocused && subOptionSearchTerm.length === 0 && (
+                    <div className="space-y-3">
+                      {anythingGoesGroups.map(group => (
+                        <Card key={group.id} className="border-border">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium">{group.name}</CardTitle>
+                          </CardHeader>
+                          <CardContent className="pt-0">
+                            <div className="grid grid-cols-2 gap-2">
+                              {group.itemIds.map(itemId => {
+                                const option = anythingGoesOptions.find(opt => opt.id === itemId);
+                                if (!option) return null;
+                                return (
+                                  <div 
+                                    key={itemId} 
+                                    onClick={() => {
+                                      setSelectedSubOption(option.name);
+                                    }}
+                                    className="p-2 rounded border border-border hover:bg-accent/50 cursor-pointer transition-colors text-center"
+                                  >
+                                    <p className="text-xs font-medium text-card-foreground">{option.name}</p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Anything Goes List */}
                   {(isSearchFocused || subOptionSearchTerm.length > 0) && <Card className="max-h-96 overflow-hidden">
                       <ScrollArea className="h-96">
                         <div className="p-4 space-y-2">
                           {(() => {
-                      const filteredVibes = vibesPunchlinesOptions.filter(vibe => (vibe.name + " " + vibe.subtitle).toLowerCase().includes(subOptionSearchTerm.toLowerCase()));
+                      const filteredVibes = anythingGoesOptions.filter(vibe => (vibe.name + " " + vibe.subtitle).toLowerCase().includes(subOptionSearchTerm.toLowerCase()));
                       return filteredVibes.length > 0 ? filteredVibes.map(vibe => <div key={vibe.id} onClick={e => {
                         console.log('Vibe clicked:', vibe.name);
                         e.preventDefault();
@@ -5492,12 +5526,12 @@ const Index = () => {
                                 <div className="w-4 h-4 rounded-full border border-muted-foreground flex items-center justify-center">
                                   <span className="text-xs font-bold text-muted-foreground">+</span>
                                 </div>
-                                <p className="text-sm font-medium text-card-foreground">
-                                  Add "{subOptionSearchTerm.trim()}" as custom vibe
-                                </p>
-                              </div> : <div className="text-center py-8">
-                                <p className="text-muted-foreground">Start typing to search vibes & punchlines</p>
-                              </div>;
+                                 <p className="text-sm font-medium text-card-foreground">
+                                   Add "{subOptionSearchTerm.trim()}" as custom tag
+                                 </p>
+                               </div> : <div className="text-center py-8">
+                                 <p className="text-muted-foreground">Start typing to search Anything Goes</p>
+                               </div>;
                     })()}
                         </div>
                       </ScrollArea>
