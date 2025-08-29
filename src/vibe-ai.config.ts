@@ -26,6 +26,8 @@ export interface AIRuntimeOverrides {
   enableMagicPrompt?: boolean;
   ideogramModel?: 'V_2A_TURBO' | 'V_3';
   typographyStyle?: 'poster' | 'negative_space';
+  popCultureWebFacts?: boolean;
+  popCultureRecency?: 'month' | 'year' | 'all';
 }
 
 // Get runtime overrides from localStorage
@@ -1320,14 +1322,20 @@ Return as a JSON object with this exact format:
 }
 
 // Builder for general text generation
-export function buildGenerateTextMessages(params: {
-  tone: string;
-  category?: string;
-  subtopic?: string;
-  pick?: string;
-  tags?: string[];
-  characterLimit: number;
-}): Array<{role: string; content: string}> {
+export function buildGenerateTextMessages(
+  params: {
+    tone: string;
+    category?: string;
+    subtopic?: string;
+    pick?: string;
+    tags?: string[];
+    characterLimit: number;
+  },
+  retrievedFacts?: {
+    facts: string[];
+    sources?: Array<{ title: string; url: string; site: string }>;
+  }
+): Array<{role: string; content: string}> {
   const { tone, category, subtopic, pick, tags = [], characterLimit } = params;
   
   let contextParts = [];
@@ -1338,6 +1346,12 @@ export function buildGenerateTextMessages(params: {
   const context = contextParts.join(', ');
   
   let prompt = `Generate exactly 4 short ${tone.toLowerCase()} text options for: ${context}.`;
+  
+  // Add retrieved facts if available
+  if (retrievedFacts && retrievedFacts.facts.length > 0) {
+    const factsBlock = retrievedFacts.facts.slice(0, 6).map(fact => `- ${fact}`).join('\n');
+    prompt += `\n\nFACTS (use only these):\n${factsBlock}\n\nRules: Be specific and reference these facts. Name-drop with wit. No generic lines. Do not repeat tags verbatim.`;
+  }
   
   if (tags.length > 0) {
     // Apply semantic adapters for better AI direction

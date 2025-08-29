@@ -25,6 +25,7 @@ import {
   type VisualStyle,
   type Tone
 } from "@/vibe-ai.config";
+import { clearPopCultureCache } from "@/lib/popCultureRAG";
 
 export default function AiSettings() {
   const navigate = useNavigate();
@@ -160,6 +161,77 @@ export default function AiSettings() {
                 />
               </div>
 
+            </CardContent>
+          </Card>
+
+          {/* Pop Culture Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Pop Culture Intelligence</CardTitle>
+              <CardDescription>
+                Configure web fact retrieval for pop culture content generation.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label>Use Web Facts for Pop Culture</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Retrieve real facts from Wikipedia and other sources for pop culture topics
+                  </p>
+                </div>
+                <Switch
+                  checked={overrides.popCultureWebFacts !== false}
+                  onCheckedChange={(checked) => updateOverride('popCultureWebFacts', checked)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Recency Filter</Label>
+                <Select
+                  value={overrides.popCultureRecency || 'all'}
+                  onValueChange={(value) => updateOverride('popCultureRecency', value)}
+                  disabled={overrides.popCultureWebFacts === false}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="month">This Month</SelectItem>
+                    <SelectItem value="year">This Year</SelectItem>
+                    <SelectItem value="all">All Time</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground">
+                  Filter facts based on recency for more current references
+                </p>
+              </div>
+
+              {overrides.popCultureWebFacts !== false && (
+                <div className="flex items-start gap-2 p-3 rounded-md bg-muted">
+                  <Info className="h-4 w-4 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium">Cache Information</p>
+                    <p className="text-muted-foreground">
+                      Web facts are cached for 24 hours to improve speed. Use the reset button below to clear cache and fetch fresh data.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <Button
+                variant="outline"
+                onClick={() => {
+                  clearPopCultureCache();
+                  toast({
+                    title: "Cache Cleared",
+                    description: "Pop culture cache has been cleared. Fresh facts will be fetched on next use."
+                  });
+                }}
+                disabled={overrides.popCultureWebFacts === false}
+              >
+                Clear Pop Culture Cache
+              </Button>
             </CardContent>
           </Card>
 

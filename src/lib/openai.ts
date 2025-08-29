@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { buildPopCultureSearchPrompt, buildGenerateTextMessages, getEffectiveConfig, MODEL_DISPLAY_NAMES, getSmartFallbackChain } from "../vibe-ai.config";
+import { getPopCultureFacts, type PopCultureFact } from './popCultureRAG';
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -464,7 +465,29 @@ export class OpenAIService {
 
   async generateShortTexts(params: GenerateTextParams): Promise<string[]> {
     const { tone, category, characterLimit } = params;
-    const messages = buildGenerateTextMessages(params);
+    
+    let retrievedFacts: PopCultureFact[] = [];
+    
+    // For Pop Culture category or when tags are present, try to get facts
+    if (category === 'Pop Culture' || (params.tags && params.tags.length > 0)) {
+      try {
+        const factsResult = await getPopCultureFacts(
+          category || 'Pop Culture',
+          params.subtopic || '',
+          params.tags || [],
+          params.pick || ''
+        );
+        retrievedFacts = factsResult.facts;
+        console.log(`Retrieved ${retrievedFacts.length} pop culture facts`);
+      } catch (error) {
+        console.warn('Failed to retrieve pop culture facts:', error);
+      }
+    }
+
+    const messages = buildGenerateTextMessages(params, retrievedFacts.length > 0 ? {
+      facts: retrievedFacts.map(f => f.text),
+      sources: retrievedFacts.flatMap(f => f.sources).slice(0, 3)
+    } : undefined);
 
     try {
       // Use effective config to get the model from AI settings
