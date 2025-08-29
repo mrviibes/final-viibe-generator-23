@@ -232,7 +232,7 @@ export default function AiSettings() {
                   {!temperatureSupported && (
                     <Badge variant="secondary" className="gap-1">
                       <Info className="h-3 w-3" />
-                      Ignored by {currentModel.includes('gpt-5') ? 'GPT-5' : 'O3'}
+                      Ignored by GPT-4.1+
                     </Badge>
                   )}
                 </div>
@@ -242,7 +242,7 @@ export default function AiSettings() {
                     <AlertTriangle className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                     <div className="text-sm text-muted-foreground">
                       <p className="font-medium">Temperature Not Supported</p>
-                      <p>The selected model ({currentModel.includes('gpt-5') ? 'GPT-5' : 'O3'}) automatically optimizes creativity and ignores the temperature parameter.</p>
+                      <p>GPT-4.1 and newer models automatically optimize creativity and ignore the temperature parameter.</p>
                     </div>
                   </div>
                 )}
