@@ -3904,6 +3904,26 @@ const anythingGoesGroups = [{
   name: "Jokes & Formats",
   itemIds: ["dad-jokes", "one-liners", "roasts", "dark-humor", "savage-comebacks", "knock-knock-jokes", "puns-wordplay", "self-deprecating-jokes", "thats-what-she-said-jokes", "awkward-situation-humor"]
 }, {
+  id: "advertisements-platforms",
+  name: "Advertisements & Platforms",
+  itemIds: ["facebook-ads", "instagram-posts", "tiktok-skits", "youtube-prerolls", "billboards", "print-ads", "clickbait-headlines", "infomercials"]
+}, {
+  id: "careers-work-life",
+  name: "Careers & Work Life", 
+  itemIds: ["careers", "job-interviews", "office-politics", "tech-bros", "doctors-nurses", "lawyers", "artists-creators", "entrepreneurs-startups", "trades", "retail-fastfood-misery"]
+}, {
+  id: "travel-places",
+  name: "Travel & Places",
+  itemIds: ["airports", "road-trips", "hotels", "camping", "lost-in-translation"]
+}, {
+  id: "money-hustle",
+  name: "Money & Hustle",
+  itemIds: ["side-hustles", "investing-crypto", "broke-life", "shopping-splurges", "payday-celebrations"]
+}, {
+  id: "health-body",
+  name: "Health & Body",
+  itemIds: ["fitness-struggles", "gym-rats", "dieting-fails", "mental-health-moods", "aging-jokes"]
+}, {
   id: "moods-feels",
   name: "Moods & Feels",
   itemIds: ["happy", "sad", "angry", "tired", "overthinking", "lazy", "stressed", "excited", "awkward", "relatable"]
