@@ -192,7 +192,7 @@ export interface IdeogramHandoff {
 // =========================
 
 // Fixed negative prompt applied to all image generations
-export const DEFAULT_NEGATIVE_PROMPT = "misspellings, distorted letters, extra characters, typos, random symbols, unreadable fonts, cartoon style, flat colors, empty background, isolated subject, small text, hidden text";
+export const DEFAULT_NEGATIVE_PROMPT = "misspellings, distorted letters, extra characters, typos, random symbols, unreadable fonts, cartoon style, flat colors, empty background, isolated subject, small text, hidden text, watermark, logo, signature, credits, captions, subtitles, UI, URL, website text, duplicated words, repeated words";
 // Model fallback chains for retry strategy
 export const MODEL_FALLBACK_CHAINS = {
   text: [
@@ -879,9 +879,9 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     parts.push("Recreate this scene literally and accurately with authentic details from the source material.");
   }
   
-  // OCCASION/CATEGORY
-  if (handoff.category && handoff.subcategory_primary) {
-    parts.push(`Occasion: ${handoff.category}, ${handoff.subcategory_primary}${handoff.subcategory_secondary ? ` (${handoff.subcategory_secondary})` : ''}.`);
+  // SUBCATEGORY THEME (no "Occasion:" label)
+  if (handoff.subcategory_primary) {
+    parts.push(`${handoff.subcategory_primary} theme.`);
   }
   
   // MAIN SUBJECT
@@ -901,7 +901,7 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     background = visualParts.length >= 2 ? visualParts[1].trim() : `${handoff.category} themed background`;
   }
   if (!background) {
-    background = `${handoff.category || 'contextually appropriate'} themed background`;
+    background = `${handoff.subcategory_primary || 'contextually appropriate'} themed background`;
   }
   if (cleanBackground) {
     background = "clean, minimal background with high contrast for text";
@@ -929,13 +929,13 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   
   parts.push(`Background: ${background}.${negativeElements}`);
   
-  // PEOPLE INCLUSION (when recommended)
-  const peopleKeywords = ['friends', 'crowd', 'people', 'group', 'party', 'audience', 'performers', 'celebrating', 'family', 'parents', 'kids', 'children'];
+  // PEOPLE INCLUSION (when recommended or for Birthday)
+  const peopleKeywords = ['friends', 'crowd', 'people', 'group', 'party', 'audience', 'performers', 'celebrating', 'family', 'parents', 'kids', 'children', 'guests', 'selfie', 'selfies', 'group selfie', 'partygoers'];
   const needsPeople = peopleKeywords.some(keyword => 
     handoff.chosen_visual?.toLowerCase().includes(keyword) || 
     handoff.rec_subject?.toLowerCase().includes(keyword) ||
     handoff.rec_background?.toLowerCase().includes(keyword)
-  );
+  ) || handoff.subcategory_primary === "Birthday";
   if (needsPeople) {
     parts.push("Include multiple people clearly visible in the scene.");
   }
@@ -947,23 +947,22 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     finalStyle = "realistic";
   }
   if (finalStyle) {
-    parts.push(`Style: ${finalStyle}.`);
+    parts.push(`${finalStyle} style.`);
   }
   if (handoff.tone) {
-    parts.push(`Tone: ${handoff.tone}.`);
+    parts.push(`${handoff.tone} tone.`);
   }
   if (handoff.aspect_ratio) {
-    parts.push(`Format: ${handoff.aspect_ratio}.`);
+    parts.push(`${handoff.aspect_ratio} format.`);
   }
   
   // ENHANCED TEXT PLACEMENT with negative prompts
   if (handoff.key_line && handoff.key_line.trim()) {
-    // Default to negative_space for exact text with object scenes
-    const effectiveTypographyStyle = isObjectScene ? 'negative_space' : typographyStyle;
+    // Always include text placement guidance when EXACT TEXT is present
+    parts.push("Place text in natural negative space areas like sky, walls, or empty backgrounds. Use TOP, BOTTOM, LEFT, or RIGHT zones rather than always centering. Ensure high contrast and avoid overlapping with faces or main subjects.");
     
-    if (effectiveTypographyStyle !== 'poster') {
-      parts.push("Place text in natural negative space areas like sky, walls, or empty backgrounds. Use TOP, BOTTOM, LEFT, or RIGHT zones rather than always centering. Ensure high contrast and avoid overlapping with faces or main subjects.");
-    }
+    // Add safety line for EXACT TEXT
+    parts.push("Render only the EXACT TEXT string as the graphic text; do not add any additional labels, captions, or extra words.");
     
     // Build comprehensive negative prompt
     const negativePromptParts = [];
@@ -971,10 +970,10 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
       negativePromptParts.push(handoff.negative_prompt);
     }
     // Add text-specific negatives
-    negativePromptParts.push('misspellings, distorted letters, extra characters, typos, random symbols, unreadable fonts');
+    negativePromptParts.push(DEFAULT_NEGATIVE_PROMPT);
     
     if (negativePromptParts.length > 0) {
-      parts.push(`Negative prompt: ${negativePromptParts.join(', ')}`);
+      parts.push(`Avoid ${negativePromptParts.join(', ')}`);
     }
   }
   
