@@ -996,7 +996,7 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
       // Ultra-concise text marking for better subject focus
       parts.push(`EXACT TEXT: "${finalText}"`);
     } else {
-      parts.push(`EXACT TEXT: "${finalText}" - Render each letter precisely as provided, maintaining exact spelling and character placement`);
+      parts.push(`EXACT TEXT: "${finalText}"`);
     }
   }
   
@@ -1082,15 +1082,30 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   // Build standard prompt sections
   const sections = [];
   
-  // MAIN SUBJECT
+  // MAIN SUBJECT with theme emphasis
   let subject = handoff.rec_subject;
   if (!subject && handoff.chosen_visual) {
     const visualParts = handoff.chosen_visual.split(' - ');
     subject = visualParts.length >= 2 ? visualParts[0].trim() : handoff.chosen_visual;
   }
-  if (subject) sections.push(`Subject: ${subject}.`);
   
-  // BACKGROUND
+  // Enhanced theme-specific subject processing
+  if (subject) {
+    // Basketball theme emphasis - disambiguate "bench" and add sports context
+    if (handoff.subcategory_primary?.toLowerCase().includes('basketball') || 
+        subject.toLowerCase().includes('basketball') ||
+        subject.toLowerCase().includes('bench')) {
+      if (subject.toLowerCase().includes('bench') && !subject.toLowerCase().includes('basketball')) {
+        subject = `${subject} on basketball court with basketball hoop and teammates playing`;
+      } else if (!subject.toLowerCase().includes('basketball') && !subject.toLowerCase().includes('court')) {
+        subject = `${subject}, basketball court setting with hoop visible`;
+      }
+    }
+    
+    sections.push(`Subject: ${subject}.`);
+  }
+  
+  // BACKGROUND with theme emphasis
   let background = handoff.rec_background;
   if (!background && handoff.chosen_visual) {
     const visualParts = handoff.chosen_visual.split(' - ');
@@ -1102,9 +1117,16 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   if (cleanBackground) {
     background = "clean, minimal background with high contrast for text";
   }
-  if (handoff.subcategory_primary && !background.toLowerCase().includes(handoff.subcategory_primary.toLowerCase())) {
+  
+  // Enhanced basketball theme enforcement
+  if (handoff.subcategory_primary?.toLowerCase().includes('basketball')) {
+    if (!background.toLowerCase().includes('basketball') && !background.toLowerCase().includes('court')) {
+      background = `basketball court with ${background}, basketball hoop prominent`;
+    }
+  } else if (handoff.subcategory_primary && !background.toLowerCase().includes(handoff.subcategory_primary.toLowerCase())) {
     background = `${handoff.subcategory_primary} themed setting with ${background}`;
   }
+  
   sections.push(`Background: ${background}.`);
   
   // PEOPLE INCLUSION
@@ -1131,12 +1153,12 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     sections.push(`${styleDetails.join(', ')}.`);
   }
   
-  // TEXT PLACEMENT & NEGATIVE PROMPTS
+  // TEXT PLACEMENT & NEGATIVE PROMPTS (streamlined)
   if (handoff.key_line && handoff.key_line.trim()) {
-    sections.push("Place text in natural negative space areas. Use TOP, BOTTOM, LEFT, or RIGHT zones. Ensure high contrast and avoid overlapping with faces.");
-    sections.push("Render only the EXACT TEXT string as graphic text; no additional labels or captions.");
+    sections.push("Place text in natural negative space areas. Ensure high contrast and avoid overlapping with faces.");
     
-    const negatives = [handoff.negative_prompt, DEFAULT_NEGATIVE_PROMPT].filter(Boolean);
+    // Use enhanced negative prompt for exact text scenarios
+    const negatives = [handoff.negative_prompt, EXACT_TEXT_NEGATIVE_PROMPT].filter(Boolean);
     if (negatives.length > 0) {
       sections.push(`Avoid ${negatives.join(', ')}`);
     }
