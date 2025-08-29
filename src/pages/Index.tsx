@@ -3748,6 +3748,143 @@ const anythingGoesOptions = [{
   name: "Everyday randomness",
   subtitle: ""
 }, {
+  // Advertisements & Platforms
+  id: "facebook-ads",
+  name: "Facebook ads",
+  subtitle: ""
+}, {
+  id: "instagram-posts",
+  name: "Instagram posts",
+  subtitle: ""
+}, {
+  id: "tiktok-skits",
+  name: "TikTok skits",
+  subtitle: ""
+}, {
+  id: "youtube-prerolls",
+  name: "YouTube pre-rolls",
+  subtitle: ""
+}, {
+  id: "billboards",
+  name: "Billboards",
+  subtitle: ""
+}, {
+  id: "print-ads",
+  name: "Old-school print ads",
+  subtitle: ""
+}, {
+  id: "clickbait-headlines",
+  name: "Clickbait headlines",
+  subtitle: ""
+}, {
+  id: "infomercials",
+  name: "Infomercials",
+  subtitle: ""
+}, {
+  // Careers & Work Life
+  id: "careers",
+  name: "Careers (any job)",
+  subtitle: ""
+}, {
+  id: "job-interviews",
+  name: "Job interviews",
+  subtitle: ""
+}, {
+  id: "office-politics",
+  name: "Office politics",
+  subtitle: ""
+}, {
+  id: "tech-bros",
+  name: "Tech bros",
+  subtitle: ""
+}, {
+  id: "doctors-nurses",
+  name: "Doctors/nurses",
+  subtitle: ""
+}, {
+  id: "lawyers",
+  name: "Lawyers",
+  subtitle: ""
+}, {
+  id: "artists-creators",
+  name: "Artists/creators",
+  subtitle: ""
+}, {
+  id: "entrepreneurs-startups",
+  name: "Entrepreneurs/startups",
+  subtitle: ""
+}, {
+  id: "trades",
+  name: "Trades (construction, plumbers, mechanics)",
+  subtitle: ""
+}, {
+  id: "retail-fastfood-misery",
+  name: "Retail/fast food misery",
+  subtitle: ""
+}, {
+  // Travel & Places
+  id: "airports",
+  name: "Airports",
+  subtitle: ""
+}, {
+  id: "road-trips",
+  name: "Road trips",
+  subtitle: ""
+}, {
+  id: "hotels",
+  name: "Hotels",
+  subtitle: ""
+}, {
+  id: "camping",
+  name: "Camping",
+  subtitle: ""
+}, {
+  id: "lost-in-translation",
+  name: "Lost in translation jokes",
+  subtitle: ""
+}, {
+  // Money & Hustle
+  id: "side-hustles",
+  name: "Side hustles",
+  subtitle: ""
+}, {
+  id: "investing-crypto",
+  name: "Investing/crypto",
+  subtitle: ""
+}, {
+  id: "broke-life",
+  name: "Broke life",
+  subtitle: ""
+}, {
+  id: "shopping-splurges",
+  name: "Shopping splurges",
+  subtitle: ""
+}, {
+  id: "payday-celebrations",
+  name: "Payday celebrations",
+  subtitle: ""
+}, {
+  // Health & Body
+  id: "fitness-struggles",
+  name: "Fitness struggles",
+  subtitle: ""
+}, {
+  id: "gym-rats",
+  name: "Gym rats",
+  subtitle: ""
+}, {
+  id: "dieting-fails",
+  name: "Dieting fails",
+  subtitle: ""
+}, {
+  id: "mental-health-moods",
+  name: "Mental health moods (light/funny)",
+  subtitle: ""
+}, {
+  id: "aging-jokes",
+  name: "Aging jokes",
+  subtitle: ""
+}, {
   id: "sarcastic-hot-takes",
   name: "Sarcastic hot takes",
   subtitle: ""
