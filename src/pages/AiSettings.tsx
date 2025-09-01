@@ -25,7 +25,6 @@ import {
   type VisualStyle,
   type Tone
 } from "@/vibe-ai.config";
-import { clearPopCultureCache } from "@/lib/popCultureRAG";
 
 export default function AiSettings() {
   const navigate = useNavigate();
@@ -35,17 +34,47 @@ export default function AiSettings() {
 
   useEffect(() => {
     const current = getRuntimeOverrides();
-    // Clean up legacy model/temperature overrides
-    const cleanedOverrides = { ...current };
-    delete cleanedOverrides.model;
-    delete cleanedOverrides.temperature;
-    setOverrides(cleanedOverrides);
+    setOverrides(current);
   }, []);
+
+  // Get effective configuration with runtime overrides applied
+  const getEffectiveConfig = () => {
+    return {
+      ...AI_CONFIG,
+      spellcheck: {
+        ...AI_CONFIG.spellcheck,
+        enabled: overrides.spellcheckEnabled ?? AI_CONFIG.spellcheck.enabled
+      },
+      visual_defaults: {
+        ...AI_CONFIG.visual_defaults,
+        style: overrides.defaultVisualStyle ?? AI_CONFIG.visual_defaults.style
+      },
+      generation: {
+        ...AI_CONFIG.generation,
+        model: overrides.model ?? AI_CONFIG.generation.model,
+        temperature: overrides.temperature ?? AI_CONFIG.generation.temperature
+      }
+    };
+  };
+
+  const effectiveConfig = getEffectiveConfig();
 
   const updateOverride = (key: keyof AIRuntimeOverrides, value: any) => {
     const newOverrides = { ...overrides, [key]: value };
     setOverrides(newOverrides);
     setHasChanges(true);
+  };
+
+  // Use centralized temperature support check
+
+  const currentModel = overrides.model || AI_CONFIG.generation.model;
+  const temperatureSupported = isTemperatureSupported(currentModel);
+
+  // Clamp temperature to valid range
+  const handleTemperatureChange = (value: number | number[]) => {
+    const temp = Array.isArray(value) ? value[0] : value;
+    const clampedTemp = Math.max(0, Math.min(2, temp));
+    updateOverride('temperature', clampedTemp);
   };
 
   const saveChanges = () => {
@@ -111,6 +140,156 @@ export default function AiSettings() {
 
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="grid gap-6">
+          {/* Overview */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                Configuration Overview
+              </CardTitle>
+              <CardDescription>
+                Customize AI behavior and defaults. Changes are applied immediately to new generations.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4">
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <div>
+                    <p className="font-medium">Current Version</p>
+                    <p className="text-sm text-muted-foreground">AI Config {AI_CONFIG.version}</p>
+                  </div>
+                  <Badge variant="secondary">{AI_CONFIG.version}</Badge>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <div>
+                    <p className="font-medium">Active Model</p>
+                    <p className="text-sm text-muted-foreground">{MODEL_DISPLAY_NAMES[effectiveConfig.generation.model] || effectiveConfig.generation.model}</p>
+                  </div>
+                  <Badge variant={overrides.model ? "default" : "secondary"}>
+                    {overrides.model ? "Override" : "Default"}
+                  </Badge>
+                </div>
+                {/* Last Used Models (Read-only) */}
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground">Last Used Models</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex items-center justify-between p-2 bg-muted/50 rounded">
+                      <span className="text-xs font-medium">Text:</span>
+                      <Badge variant="outline" className="text-xs">
+                        {MODEL_DISPLAY_NAMES[localStorage.getItem('last_text_model') || effectiveConfig.generation.model] || 'Not set'}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between p-2 bg-muted/50 rounded">
+                      <span className="text-xs font-medium">Visuals:</span>
+                      <Badge variant="outline" className="text-xs">
+                        {MODEL_DISPLAY_NAMES[localStorage.getItem('last_visual_model') || effectiveConfig.visual_generation.model] || 'Not set'}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Model Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Model Configuration</CardTitle>
+              <CardDescription>
+                Control which AI model and parameters are used for text generation.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="model">AI Model</Label>
+                <Select
+                  value={overrides.model || AI_CONFIG.generation.model}
+                  onValueChange={(value) => updateOverride('model', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select model" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {AVAILABLE_MODELS.map(model => (
+                      <SelectItem key={model.value} value={model.value}>
+                        <div>
+                          <div className="font-medium">{model.label}</div>
+                          {model.isRecommended && (
+                            <div className="text-xs text-muted-foreground">Recommended</div>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="temperature">
+                    Temperature: {(overrides.temperature ?? AI_CONFIG.generation.temperature).toFixed(1)}
+                  </Label>
+                  {!temperatureSupported && (
+                    <Badge variant="secondary" className="gap-1">
+                      <Info className="h-3 w-3" />
+                      Ignored by {currentModel.includes('gpt-5') ? 'GPT-5' : 'O3'}
+                    </Badge>
+                  )}
+                </div>
+                
+                {!temperatureSupported && (
+                  <div className="flex items-start gap-2 p-3 bg-muted rounded-lg">
+                    <AlertTriangle className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-muted-foreground">
+                      <p className="font-medium">Temperature Not Supported</p>
+                      <p>The selected model ({currentModel.includes('gpt-5') ? 'GPT-5' : 'O3'}) automatically optimizes creativity and ignores the temperature parameter.</p>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="space-y-3">
+                  <Slider
+                    value={[overrides.temperature ?? AI_CONFIG.generation.temperature]}
+                    onValueChange={handleTemperatureChange}
+                    max={2}
+                    min={0}
+                    step={0.1}
+                    className={`w-full ${!temperatureSupported ? 'opacity-50' : ''}`}
+                    disabled={!temperatureSupported}
+                  />
+                  
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>0.0 (Focused)</span>
+                    <span>1.0 (Balanced)</span>
+                    <span>2.0 (Creative)</span>
+                  </div>
+                </div>
+                
+                <Input
+                  id="temperature"
+                  type="number"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  value={overrides.temperature ?? AI_CONFIG.generation.temperature}
+                  onChange={(e) => {
+                    const value = parseFloat(e.target.value);
+                    if (!isNaN(value)) handleTemperatureChange(value);
+                  }}
+                  className={!temperatureSupported ? 'opacity-50' : ''}
+                  disabled={!temperatureSupported}
+                  placeholder="0.0 - 2.0"
+                />
+                
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p><strong>Range:</strong> 0.0 to 2.0</p>
+                  <p><strong>Recommended:</strong> 0.3-0.7 for factual content, 0.7-1.2 for creative writing, 1.2-2.0 for experimental/artistic content</p>
+                  <p><strong>Note:</strong> GPT-4.1 models automatically optimize creativity and ignore this setting.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Content Settings */}
           <Card>
             <CardHeader>
@@ -161,77 +340,6 @@ export default function AiSettings() {
                 />
               </div>
 
-            </CardContent>
-          </Card>
-
-          {/* Pop Culture Settings */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Pop Culture Intelligence</CardTitle>
-              <CardDescription>
-                Configure web fact retrieval for pop culture content generation.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label>Use Web Facts for Pop Culture</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Retrieve real facts from Wikipedia and other sources for pop culture topics
-                  </p>
-                </div>
-                <Switch
-                  checked={overrides.popCultureWebFacts !== false}
-                  onCheckedChange={(checked) => updateOverride('popCultureWebFacts', checked)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Recency Filter</Label>
-                <Select
-                  value={overrides.popCultureRecency || 'all'}
-                  onValueChange={(value) => updateOverride('popCultureRecency', value)}
-                  disabled={overrides.popCultureWebFacts === false}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="month">This Month</SelectItem>
-                    <SelectItem value="year">This Year</SelectItem>
-                    <SelectItem value="all">All Time</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-sm text-muted-foreground">
-                  Filter facts based on recency for more current references
-                </p>
-              </div>
-
-              {overrides.popCultureWebFacts !== false && (
-                <div className="flex items-start gap-2 p-3 rounded-md bg-muted">
-                  <Info className="h-4 w-4 mt-0.5" />
-                  <div className="text-sm">
-                    <p className="font-medium">Cache Information</p>
-                    <p className="text-muted-foreground">
-                      Web facts are cached for 24 hours to improve speed. Use the reset button below to clear cache and fetch fresh data.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              <Button
-                variant="outline"
-                onClick={() => {
-                  clearPopCultureCache();
-                  toast({
-                    title: "Cache Cleared",
-                    description: "Pop culture cache has been cleared. Fresh facts will be fetched on next use."
-                  });
-                }}
-                disabled={overrides.popCultureWebFacts === false}
-              >
-                Clear Pop Culture Cache
-              </Button>
             </CardContent>
           </Card>
 
@@ -352,20 +460,6 @@ export default function AiSettings() {
                 </Select>
                 <p className="text-sm text-muted-foreground">
                   Poster style creates larger, more prominent text like the examples you prefer.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="magic-prompt"
-                    checked={overrides.enableMagicPrompt !== false}
-                    onCheckedChange={(checked) => updateOverride('enableMagicPrompt', checked)}
-                  />
-                  <Label htmlFor="magic-prompt">Magic Prompt (Ideogram)</Label>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Enhances image prompts with additional details for better visual results.
                 </p>
               </div>
             </CardContent>
