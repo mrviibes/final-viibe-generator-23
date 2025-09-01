@@ -147,8 +147,20 @@ export async function findBestProxy(): Promise<ProxySettings['type']> {
 }
 
 export async function generateIdeogramImage(request: IdeogramGenerateRequest): Promise<IdeogramGenerateResponse> {
-  // Use the model specified in the request (no automatic override)
-  const requestWithModel: IdeogramGenerateRequest = { ...request };
+  // Prioritize V_3 model for Pop Culture character scenes AND exact text
+  const isPopCultureCharacter = request.prompt.includes('Character:') && request.prompt.includes('Pop Culture');
+  const hasExactText = request.prompt.includes('EXACT TEXT:');
+  let requestWithModel: IdeogramGenerateRequest = { ...request };
+  
+  // Force V_3 and DESIGN style for exact text scenarios
+  if (hasExactText && request.model !== 'V_3') {
+    console.log(`🎯 EXACT TEXT detected - upgrading to V_3 model and DESIGN style for optimal text rendering`);
+    requestWithModel.model = 'V_3';
+    requestWithModel.style_type = 'DESIGN';
+  } else if (isPopCultureCharacter && request.model !== 'V_3') {
+    console.log(`🎭 Pop Culture character detected, upgrading to V_3 model for better character recognition`);
+    requestWithModel.model = 'V_3';
+  }
   
   // Always use backend API for V_3 model to ensure proper V3 endpoint usage
   const forceBackend = requestWithModel.model === 'V_3';
@@ -156,7 +168,7 @@ export async function generateIdeogramImage(request: IdeogramGenerateRequest): P
   // Try backend API first if enabled or if V_3 model
   if (useBackendAPI || forceBackend) {
     const apiPath = forceBackend ? 'backend (V3 model)' : 'backend';
-    console.log(`Calling Ideogram ${apiPath} - Model: ${request.model}, Style: ${request.style_type || 'AUTO'}, Prompt: ${request.prompt.substring(0, 50)}...`);
+    console.log(`Calling Ideogram ${apiPath} - Model: ${requestWithModel.model}, Style: ${requestWithModel.style_type || 'AUTO'}, Prompt: ${requestWithModel.prompt.substring(0, 50)}...`);
     
     try {
       const { data, error } = await supabase.functions.invoke('ideogram-generate', {
@@ -172,15 +184,25 @@ export async function generateIdeogramImage(request: IdeogramGenerateRequest): P
         throw new IdeogramAPIError('No data received from backend API');
       }
 
-      // Check for fallback notification and log V3 status
+      // Check for fallback notification and show user-friendly message if V3 fell back
       if (data._fallback_note) {
         console.log('⚠️ V3 unavailable, used fallback:', data._fallback_note);
+        if (isPopCultureCharacter) {
+          // Import toast dynamically to avoid circular dependency
+          import('../hooks/use-toast').then(({ toast }) => {
+            toast({
+              title: "V3 Model Temporarily Unavailable",
+              description: "Used faster model - character recognition may be less accurate",
+              duration: 5000
+            });
+          });
+        }
       } else if (data.endpoint_used && data.endpoint_used.startsWith('v3')) {
         console.log(`✅ V3 endpoint working (${data.endpoint_used})`);
       }
 
-      const modelUsed = data._fallback_note ? 'V_2A_TURBO (fallback)' : request.model;
-      console.log(`Backend Ideogram API success - Generated ${data.data?.length || 0} image(s) with Model: ${modelUsed}, Style: ${request.style_type || 'AUTO'}`);
+      const modelUsed = data._fallback_note ? 'V_2A_TURBO (fallback)' : requestWithModel.model;
+      console.log(`Backend Ideogram API success - Generated ${data.data?.length || 0} image(s) with Model: ${modelUsed}, Style: ${requestWithModel.style_type || 'AUTO'}`);
       return data as IdeogramGenerateResponse;
 
     } catch (error) {

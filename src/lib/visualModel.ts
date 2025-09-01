@@ -14,6 +14,7 @@ export interface VisualInputs {
   dimensions?: string; // square, 4:5, 9:16, etc.
   targetSlot?: string; // background-only, subject+background, object, singing
   backgroundPreset?: string; // minimal, urban, nature, etc.
+  exactSceneMode?: boolean; // Enable exact scene recreation
 }
 
 export interface VisualOption {
@@ -52,8 +53,15 @@ function autoEnrichInputs(inputs: VisualInputs): VisualInputs {
     enriched.tags = [...inputs.tags, ...categoryTags].slice(0, 6);
   }
   
-  // Pride/LGBTQ+ theme enhancement
-  if (inputs.finalLine) {
+  // Pride/LGBTQ+ theme enhancement - DISABLED for object-focused exact scenes
+  const isObjectScene = inputs.finalLine && (
+    inputs.finalLine.toLowerCase().includes('ruler') ||
+    inputs.finalLine.toLowerCase().includes('object') ||
+    inputs.finalLine.toLowerCase().includes('thing') ||
+    inputs.tags.some(tag => ['ruler', 'tool', 'object', 'item'].includes(tag.toLowerCase()))
+  );
+  
+  if (inputs.finalLine && !isObjectScene && !(inputs as any).exact_scene_mode) {
     const prideKeywords = ['pride', 'parade', 'rainbow', 'gay', 'lesbian', 'drag', 'queens', 'queer', 'lgbtq'];
     const hasPrideTheme = prideKeywords.some(keyword => 
       inputs.finalLine!.toLowerCase().includes(keyword) || 
@@ -316,6 +324,32 @@ function validateVisualOptions(options: VisualOption[], inputs: VisualInputs): V
   return dedupedOptions.slice(0, 4); // Ensure max 4 options
 }
 
+function postProcessVisualPrompt(prompt: string): string {
+  // Remove bracketed metadata that AI might include
+  let cleaned = prompt
+    .replace(/\[TAGS:.*?\]/gi, '')
+    .replace(/\[TEXT_SAFE_ZONE:.*?\]/gi, '')
+    .replace(/\[CONTRAST_PLAN:.*?\]/gi, '')
+    .replace(/\[NEGATIVE_PROMPT:.*?\]/gi, '')
+    .replace(/\[ASPECTS:.*?\]/gi, '')
+    .replace(/\[TEXT_HINT:.*?\]/gi, '')
+    .trim();
+  
+  // Split into sentences and keep only the first one if too long
+  const sentences = cleaned.split(/[.!?]+/).filter(s => s.trim());
+  if (sentences.length > 0 && sentences[0].trim().length > 0) {
+    // Take first sentence and ensure it's under ~20 words
+    const words = sentences[0].trim().split(/\s+/);
+    if (words.length > 20) {
+      cleaned = words.slice(0, 20).join(' ');
+    } else {
+      cleaned = sentences[0].trim();
+    }
+  }
+  
+  return cleaned;
+}
+
 function getSlotBasedFallbacks(inputs: VisualInputs): VisualOption[] {
   const { category, subcategory, tone, tags, visualStyle, finalLine, specificEntity, subjectOption, dimensions } = inputs;
   const primaryTags = tags.slice(0, 3).join(', ') || 'dynamic energy';
@@ -334,9 +368,9 @@ function getSlotBasedFallbacks(inputs: VisualInputs): VisualOption[] {
     // Documentary/Award theme fallback
     if (lowerFinalLine.includes('oscar') || lowerFinalLine.includes('award') || lowerFinalLine.includes('documentary')) {
       textAwareFallbacks.push({
-        subject: "Documentary poster motif with Oscar silhouette and subtle rainbow accents",
-        background: "Realistic studio or festival wall with soft vignette and empty central space",
-        prompt: `Documentary-style poster concept featuring an Oscar silhouette and subtle rainbow accents, realistic modern composition with clean central negative space for large text [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [TEXT_HINT: dark text]`,
+        subject: "Documentary poster with Oscar silhouette and rainbow accents",
+        background: "Clean studio wall with text space",
+        prompt: `Documentary poster with Oscar silhouette, subtle rainbow accents, clean background for text`,
         textAligned: true
       });
     }
@@ -345,16 +379,16 @@ function getSlotBasedFallbacks(inputs: VisualInputs): VisualOption[] {
     const lgbtqPhrases = ['gay', 'queer', 'lgbt', 'lgbtq', 'pride', 'came out', 'coming out', 'boyfriend', 'drag'];
     if (lgbtqPhrases.some(phrase => lowerFinalLine.includes(phrase))) {
       textAwareFallbacks.push({
-        subject: "Male couple holding hands with subtle rainbow pride accents",
-        background: "Urban setting or park with soft natural lighting and clear text space",
-        prompt: `Two men holding hands or embracing, subtle rainbow pride flag accents in background, warm natural lighting, urban or park setting with clear negative space for text [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [TEXT_HINT: dark text]`,
+        subject: "Male couple holding hands with rainbow pride accents",
+        background: "Urban setting with clear text space",
+        prompt: `Two men holding hands, rainbow pride flag accents, clear background for text`,
         textAligned: true
       });
       
       textAwareFallbacks.push({
-        subject: "Wardrobe and mirror scene with cross-dressing elements and rainbow accents",
-        background: "Clean dressing room with soft lighting, leaving open area for text",
-        prompt: `Realistic dressing room scene with tasteful wardrobe cues (heels, blazer-over-dress on hanger, lipstick on vanity), subtle rainbow color accents, uncluttered background with clear negative space for text [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [TEXT_HINT: dark text]`,
+        subject: "Dressing room with mixed clothing and rainbow accents",
+        background: "Clean room with clear text space",
+        prompt: `Dressing room with mixed clothing styles, rainbow color accents, clear background for text`,
         textAligned: true
       });
     }
@@ -362,9 +396,9 @@ function getSlotBasedFallbacks(inputs: VisualInputs): VisualOption[] {
     // Cross-dressing specific fallback
     if (lowerFinalLine.includes('cross') && !textAwareFallbacks.some(f => f.subject.includes('Wardrobe'))) {
       textAwareFallbacks.push({
-        subject: "Elegant wardrobe with mixed clothing styles and mirror reflection",
-        background: "Sophisticated dressing room with warm lighting",
-        prompt: `Elegant wardrobe with mix of masculine and feminine clothing, mirror with soft reflection, sophisticated dressing room atmosphere, warm lighting with clear text placement area [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [TEXT_HINT: dark text]`,
+        subject: "Wardrobe with mixed clothing and mirror",
+        background: "Dressing room with warm lighting",
+        prompt: `Wardrobe with mixed masculine and feminine clothing, mirror reflection, clear text area`,
         textAligned: true
       });
     }
@@ -388,22 +422,22 @@ function getDefaultFallbacks(inputs: VisualInputs): VisualOption[] {
       {
         subject: "Professional hockey player with stick in action pose",
         background: "ice rink arena with dramatic lighting and crowd in background",
-        prompt: `Professional hockey player mid-swing with hockey stick, puck visible in frame, ${tone} energy, ice rink arena with dramatic stadium lighting, cheering crowd in blurred background, action sports photography style, dynamic composition with negative space in upper area for text placement, high contrast lighting`
+        prompt: `Hockey player with stick, puck visible, ice rink arena with crowd background`
       },
       {
         subject: "Close-up of hockey stick and puck on ice surface",
         background: "ice rink with goal net and arena lights",
-        prompt: `Detailed close-up of professional hockey stick and black puck on pristine ice surface, goal net visible in background, ice rink arena lighting creating dramatic shadows, ${tone} mood, sports equipment photography, clean composition with clear space at top for text, reflective ice surface`
+        prompt: `Close-up hockey stick and puck on ice, goal net background`
       },
       {
         subject: "Hockey team celebration with sticks raised",
         background: "ice rink with victory lighting and cheering fans",
-        prompt: `Hockey team players celebrating victory with sticks raised high, multiple hockey sticks visible, ice rink setting with bright victory lighting, cheering fans in background stands, ${tone} celebration energy, group sports photography, wide shot with space on sides for text placement`
+        prompt: `Hockey team celebrating with sticks raised, cheering fans in background`
       },
       {
         subject: "Vintage hockey stick and puck with championship trophies",
         background: "classic ice rink with warm nostalgic lighting",
-        prompt: `Vintage wooden hockey stick and classic puck displayed with championship trophies, classic ice rink environment with warm nostalgic lighting, ${tone} sentimental mood, still life sports photography, traditional composition with clear background space for text overlay`
+        prompt: `Vintage hockey stick and puck with championship trophies, nostalgic lighting`
       }
     ];
   }
@@ -435,22 +469,22 @@ function getDefaultFallbacks(inputs: VisualInputs): VisualOption[] {
       {
         subject: "Prison bars texture overlay",
         background: `Dark jail cell background with dramatic ${tone} lighting`,
-        prompt: `Dark jail cell background with prison bars, dramatic ${tone} lighting, no text or typography [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: dark] [NEGATIVE_PROMPT: busy patterns, high-frequency texture, harsh shadows in center] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: light text]`
+        prompt: `Dark jail cell with prison bars, dramatic lighting`
       },
       {
         subject: `${entity}${needsPeople ? ` ${peopleContext}` : ''} silhouette behind bars`,
         background: `Prison setting with atmospheric lighting`,
-        prompt: `${entity}${needsPeople ? ` ${peopleContext}` : ''} silhouette behind prison bars positioned on left third, dramatic jail setting, ${tone} mood lighting [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: faces crossing center, busy patterns in center] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: light text]`
+        prompt: `${entity} silhouette behind prison bars, dramatic jail setting`
       },
       {
         subject: "Handcuffs and judge gavel symbols",
         background: `Minimal courtroom or legal backdrop`,
-        prompt: `Legal symbols like handcuffs and gavel anchored bottom third, minimal courtroom backdrop, ${tone} style [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: busy patterns, reflective glare in center] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: dark text]`
+        prompt: `Handcuffs and gavel symbols, minimal courtroom backdrop`
       },
       {
         subject: `${entity}${needsPeople ? ` ${peopleContext}` : ''} iconic moment reimagined`,
         background: `Stylized setting reflecting personality`,
-        prompt: `${entity}${needsPeople ? ` ${peopleContext}` : ''} iconic moment with ${tone} interpretation positioned off-center, stylized background reflecting their known traits [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: limbs crossing center, harsh shadows in safe zone] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: light text]`
+        prompt: `${entity} iconic moment, stylized background reflecting their traits`
       }
     ];
   }
@@ -459,22 +493,22 @@ function getDefaultFallbacks(inputs: VisualInputs): VisualOption[] {
     {
       subject: `Clean ${tone} background environment`,
       background: `${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${tone} ${visualStyle || 'modern'} environment showcasing ${primaryTags}`,
-      prompt: `${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${tone} ${visualStyle || 'modern'} environment showcasing ${primaryTags}, clean background with natural negative space for text [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: busy patterns, high-frequency texture, harsh shadows in center] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: dark text]`
+      prompt: `${tone} ${visualStyle || 'modern'} environment with ${primaryTags}, clean background`
     },
     {
       subject: `${needsPeople ? `${peopleContext} immersed in ` : ''}Dynamic ${occasion} action scene`,
       background: `${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${tone} atmosphere with ${primaryTags}${needsPeople ? ' and visible crowd' : ''}`,
-      prompt: `${needsPeople ? `${peopleContext} immersed in ` : ''}Dynamic ${occasion} action scene positioned on right third in ${randomEnergy} ${tone} atmosphere with ${primaryTags}${needsPeople ? ', multiple people clearly visible in background' : ''} [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: faces crossing center, busy patterns in center${needsPeople ? ', empty backgrounds' : ''}] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: light text]`
+      prompt: `Dynamic ${occasion} action scene with ${tone} atmosphere and ${primaryTags}`
     },
     {
       subject: `${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${occasion} objects and symbols`,
       background: `Bold ${tone} ${randomScene} with ${primaryTags} accents`,
-      prompt: `${randomEnergy.charAt(0).toUpperCase() + randomEnergy.slice(1)} ${occasion} objects and symbols anchored bottom third on bold ${tone} ${randomScene} with ${primaryTags} accents [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: reflective glare in center, busy patterns] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: dark text]`
+      prompt: `${occasion} objects and symbols with ${tone} background and ${primaryTags} accents`
     },
     {
       subject: `${needsPeople ? `${peopleContext} in` : 'Creative'} celebration atmosphere`,
       background: `Festive ${tone} environment with ${primaryTags} elements and vibrant colors`,
-      prompt: `${needsPeople ? `${peopleContext} in` : 'Creative'} celebration atmosphere positioned off-center with festive ${tone} environment, ${primaryTags} elements, vibrant colors and party elements [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: limbs crossing center, harsh shadows in safe zone] [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] [TEXT_HINT: light text]`
+      prompt: `Celebration atmosphere with festive ${tone} environment and ${primaryTags} elements`
     }
   ];
 }
@@ -485,7 +519,7 @@ export async function generateVisualRecommendations(
 ): Promise<VisualResult> {
   // Auto-enrich inputs before processing
   const enrichedInputs = autoEnrichInputs(inputs);
-  const { category, subcategory, tone, tags, visualStyle, finalLine, specificEntity, subjectOption, dimensions } = enrichedInputs;
+  const { category, subcategory, tone, tags, visualStyle, finalLine, specificEntity, subjectOption, dimensions, exactSceneMode } = enrichedInputs;
   
     // Use centralized message builder
     const messages = buildVisualGeneratorMessages(enrichedInputs);
@@ -509,7 +543,7 @@ export async function generateVisualRecommendations(
     // Primary attempt - use model from AI settings
     let result;
     const requestOptions: any = {
-      max_completion_tokens: 450, // Reduced tokens for faster generation
+      max_completion_tokens: 600, // Increased tokens to reduce truncation
       model: targetModel // Use model from AI settings
     };
     
@@ -546,7 +580,7 @@ export async function generateVisualRecommendations(
         try {
           // Use next model in smart fallback chain
           const retryRequestOptions: any = {
-            max_completion_tokens: 450,
+            max_completion_tokens: 600, // Keep higher token limit for retry
             model: nextModel || 'gpt-4.1-2025-04-14' // Fallback to gpt-4.1 if chain exhausted
           };
           
@@ -603,7 +637,7 @@ export async function generateVisualRecommendations(
       .map((opt: any) => ({
         subject: opt.subject || "",
         background: opt.background,
-        prompt: opt.prompt
+        prompt: postProcessVisualPrompt(opt.prompt)
       }));
 
     // Apply quality validation to reject vague options
