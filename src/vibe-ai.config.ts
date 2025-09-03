@@ -22,7 +22,7 @@ export interface AIRuntimeOverrides {
   defaultTone?: Tone;
   magicPromptEnabled?: boolean;
   ideogramModel?: 'V_2A_TURBO' | 'V_3';
-  typographyStyle?: 'poster' | 'negative_space' | 'subtle_caption';
+  typographyStyle?: 'negative-space' | 'meme-style' | 'lower-third' | 'side-bar' | 'badge-sticker' | 'subtle-caption';
   strictModelEnabled?: boolean;
   fastVisualsEnabled?: boolean;
 }
@@ -978,9 +978,17 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   
   // TYPOGRAPHY STYLE PLACEMENT (if present)
   if (handoff.key_line && handoff.key_line.trim()) {
-    if (typographyStyle === 'negative_space') {
+    if (typographyStyle === 'negative-space') {
       parts.push("Place text in natural negative space areas like sky, walls, or empty backgrounds. Use TOP, BOTTOM, LEFT, or RIGHT zones rather than always centering. Ensure high contrast and avoid overlapping with faces or main subjects. Reserve 30-40% of image area for text with clean separation.");
-    } else if (typographyStyle === 'subtle_caption') {
+    } else if (typographyStyle === 'meme-style') {
+      parts.push("Classic meme layout: white bold text with black outline at TOP and BOTTOM of image. Impact font style. High contrast against any background. Text zones should be 15-20% of image height at top and bottom edges.");
+    } else if (typographyStyle === 'lower-third') {
+      parts.push("Professional lower third banner: horizontal text bar in bottom 20% of image. Clean background bar or overlay with high contrast text. News/broadcast style presentation.");
+    } else if (typographyStyle === 'side-bar') {
+      parts.push("Vertical text panel on LEFT side: 25-30% of image width reserved for text. Clean sidebar design with strong contrast. Professional layout with clear separation from main image.");
+    } else if (typographyStyle === 'badge-sticker') {
+      parts.push("Decorative badge or sticker placement: circular, rectangular, or custom shaped frame for text. Positioned strategically without covering main subjects. Celebration/award style design.");
+    } else if (typographyStyle === 'subtle-caption') {
       parts.push("Render text as small caption: 8-12% of image width, positioned in corners/edges or clear negative space. Strong contrast required. Never cover faces or key subjects. Use corner placement, edge margins, or unobtrusive clear zones with perfect readability.");
     } else {
       parts.push("Design for poster-style text overlay with clear readable zones. Maintain strong visual hierarchy and text-background separation.");
@@ -1398,6 +1406,16 @@ BANNED ELEMENTS (CRITICAL - DO NOT INCLUDE):
 ${contextualBans.length > 0 ? `- STRICTLY FORBIDDEN: ${contextualBans.join(', ')}
 - These elements would create opposite/wrong meanings from the user's intent
 - Focus on the correct semantic interpretation of the text` : ''}
+
+TYPOGRAPHY STYLE PREFERENCE:
+${overrides.typographyStyle ? `- Layout style requested: ${overrides.typographyStyle}
+- Tailor [TEXT_SAFE_ZONE] directives to match this typography preference
+- For "negative-space": Use natural empty areas like sky, walls, backgrounds
+- For "meme-style": Reserve top and bottom zones for impact-style text  
+- For "lower-third": Dedicate bottom 20% for horizontal banner text
+- For "side-bar": Reserve left 25-30% for vertical text panel
+- For "badge-sticker": Include decorative frame or badge placement areas
+- For "subtle-caption": Use corner/edge placement with minimal text zones` : ''}
 
 TEXT ALIGNMENT REQUIREMENTS (CRITICAL):
 ${finalLine ? `- ALL 4 concepts must directly reflect the exact content/semantics of: "${finalLine}"

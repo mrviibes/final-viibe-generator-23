@@ -25,7 +25,7 @@ import { buildIdeogramPrompt, getAspectRatioForIdeogram, getStyleTypeForIdeogram
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
 import { normalizeTypography, suggestContractions, isTextMisspelled } from "@/lib/textUtils";
-import { BACKGROUND_PRESETS, getRuntimeOverrides, TONES, VISUAL_STYLES, DEFAULT_NEGATIVE_PROMPT } from "../vibe-ai.config";
+import { BACKGROUND_PRESETS, getRuntimeOverrides, setRuntimeOverrides, TONES, VISUAL_STYLES, DEFAULT_NEGATIVE_PROMPT } from "../vibe-ai.config";
 const styleOptions = [{
   id: "celebrations",
   name: "Celebrations",
@@ -3926,6 +3926,44 @@ const textStyleOptions = [{
   name: "Serious",
   description: "Respectful, formal, matter-of-fact"
 }];
+
+const textLayoutOptions = [{
+  id: "negative-space",
+  name: "Negative Space",
+  description: "Text carved out from the background",
+  promptTags: ["negative space typography", "cutout text", "knockout effect"],
+  bestFor: "Bold statements, titles"
+}, {
+  id: "meme-style",
+  name: "Meme Top/Bottom",
+  description: "Classic meme text at top and bottom",
+  promptTags: ["impact font", "white text", "black outline", "meme style"],
+  bestFor: "Humorous content"
+}, {
+  id: "lower-third",
+  name: "Lower Third Banner",
+  description: "Professional text bar at bottom",
+  promptTags: ["lower third", "news style", "banner text", "overlay"],
+  bestFor: "Professional announcements"
+}, {
+  id: "side-bar",
+  name: "Side Bar (Left)",
+  description: "Text panel on the left side",
+  promptTags: ["vertical text panel", "sidebar", "left placement"],
+  bestFor: "Lists, quotes"
+}, {
+  id: "badge-sticker",
+  name: "Badge/Sticker Callout",
+  description: "Text in a decorative badge or sticker",
+  promptTags: ["badge design", "sticker style", "callout", "decorative frame"],
+  bestFor: "Celebrations, awards"
+}, {
+  id: "subtle-caption",
+  name: "Subtle Caption",
+  description: "Minimal text overlay",
+  promptTags: ["subtle typography", "minimal text", "caption style", "clean overlay"],
+  bestFor: "Artistic, elegant content"
+}];
 const completionOptions = [{
   id: "ai-assist",
   name: "Option 1 - AI Assist",
@@ -4000,6 +4038,7 @@ const Index = () => {
   const [selectedSubOption, setSelectedSubOption] = useState<string | null>(null);
   const [selectedPick, setSelectedPick] = useState<string | null>(null);
   const [selectedTextStyle, setSelectedTextStyle] = useState<string | null>(null);
+  const [selectedTextLayout, setSelectedTextLayout] = useState<string | null>(null);
   const [selectedCompletionOption, setSelectedCompletionOption] = useState<string | null>(null);
   const [selectedVisualStyle, setSelectedVisualStyle] = useState<string | null>(null);
   const [selectedSubjectOption, setSelectedSubjectOption] = useState<string | null>(null);
@@ -4071,6 +4110,7 @@ const Index = () => {
     
     if (rememberChoices) {
       const savedTextStyle = localStorage.getItem('last_selected_text_style');
+      const savedTextLayout = localStorage.getItem('last_selected_text_layout');
       const savedVisualStyle = localStorage.getItem('last_selected_visual_style');
       
       if (savedTextStyle && textStyleOptions.find(opt => opt.id === savedTextStyle)) {
@@ -4081,6 +4121,10 @@ const Index = () => {
         if (defaultToneOption) {
           setSelectedTextStyle(defaultToneOption.id);
         }
+      }
+
+      if (savedTextLayout && textLayoutOptions.find(opt => opt.id === savedTextLayout)) {
+        setSelectedTextLayout(savedTextLayout);
       }
       
       if (savedVisualStyle && visualStyleOptions.find(opt => opt.id === savedVisualStyle)) {
@@ -4118,6 +4162,12 @@ const Index = () => {
   }, [selectedTextStyle, rememberChoices]);
 
   useEffect(() => {
+    if (rememberChoices && selectedTextLayout) {
+      localStorage.setItem('last_selected_text_layout', selectedTextLayout);
+    }
+  }, [selectedTextLayout, rememberChoices]);
+
+  useEffect(() => {
     if (rememberChoices && selectedVisualStyle) {
       localStorage.setItem('last_selected_visual_style', selectedVisualStyle);
     }
@@ -4131,6 +4181,7 @@ const Index = () => {
     if (!checked) {
       // Clear saved choices when disabled
       localStorage.removeItem('last_selected_text_style');
+      localStorage.removeItem('last_selected_text_layout');
       localStorage.removeItem('last_selected_visual_style');
     }
   };
@@ -4368,7 +4419,7 @@ const Index = () => {
 
   // Helper function to check if Step 2 is complete
   const isStep2Complete = (): boolean => {
-    if (!selectedTextStyle || !selectedCompletionOption) {
+    if (!selectedTextStyle || !selectedTextLayout || !selectedCompletionOption) {
       return false;
     }
 
@@ -4382,7 +4433,7 @@ const Index = () => {
       return stepTwoText.trim().length > 0 && isCustomTextConfirmed;
     }
 
-    // For "no-text" option, just need style and completion
+    // For "no-text" option, just need style, layout and completion
     return true;
   };
 
@@ -4418,7 +4469,7 @@ const Index = () => {
 
   // Check if text generation requirements are met
   const canGenerateText = () => {
-    if (!selectedTextStyle || !selectedCompletionOption) {
+    if (!selectedTextStyle || !selectedTextLayout || !selectedCompletionOption) {
       return false;
     }
     return true;
@@ -5744,10 +5795,28 @@ const Index = () => {
               if (selectedTextStyle) {
                 const textStyleData = textStyleOptions.find(s => s.id === selectedTextStyle);
                 selections.push({
-                  title: textStyleData?.name || '',
+                  title: `Text Style: ${textStyleData?.name || ''}`,
                   subtitle: textStyleData?.description || '',
                   onChangeSelection: () => {
                     setSelectedTextStyle(null);
+                    setSelectedTextLayout(null);
+                    setSelectedCompletionOption(null);
+                    setGeneratedOptions([]);
+                    setSelectedGeneratedOption(null);
+                    setIsCustomTextConfirmed(false);
+                    setStepTwoText("");
+                  }
+                });
+              }
+
+              // Add text layout selection
+              if (selectedTextLayout) {
+                const textLayoutData = textLayoutOptions.find(s => s.id === selectedTextLayout);
+                selections.push({
+                  title: `Text Layout: ${textLayoutData?.name || ''}`,
+                  subtitle: textLayoutData?.description || '',
+                  onChangeSelection: () => {
+                    setSelectedTextLayout(null);
                     setSelectedCompletionOption(null);
                     setGeneratedOptions([]);
                     setSelectedGeneratedOption(null);
@@ -5816,8 +5885,39 @@ const Index = () => {
             })()} />
                       </div>}
 
+                {/* Text Layout Selection */}
+                {selectedTextStyle && !selectedTextLayout ? <>
+                    <div className="text-center mb-6">
+                      <p className="text-xl text-muted-foreground">Choose your text layout style</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 justify-items-center max-w-6xl mx-auto">
+                      {textLayoutOptions.map(layout => 
+                        <Card key={layout.id} className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-1 hover:bg-accent/50 w-full" onClick={() => {
+                          setSelectedTextLayout(layout.id);
+                          // Set typography style in runtime overrides
+                          setRuntimeOverrides({ typographyStyle: layout.id as any });
+                        }}>
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-lg font-semibold text-card-foreground">
+                              {layout.name}
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <CardDescription className="text-sm text-muted-foreground mb-2">
+                              {layout.description}
+                            </CardDescription>
+                            <div className="text-xs text-muted-foreground/80">
+                              <strong>Best for:</strong> {layout.bestFor}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  </> : null}
+
                 {/* Completion Options */}
-                {!selectedCompletionOption ? <>
+                {selectedTextLayout && !selectedCompletionOption ? <>
                     <div className="text-center mb-6">
                       <p className="text-xl text-muted-foreground">Choose your option for completing your text</p>
                     </div>
@@ -5868,6 +5968,7 @@ const Index = () => {
                             <p className="font-medium mb-1">To generate text, please select:</p>
                             <ul className="text-xs space-y-1">
                               {!selectedTextStyle && <li>• Text style (tone)</li>}
+                              {!selectedTextLayout && <li>• Text layout style</li>}
                               {!selectedCompletionOption && <li>• Text completion option</li>}
                             </ul>
                           </div>
@@ -6589,6 +6690,10 @@ const Index = () => {
                       <tr>
                         <td className="p-3 text-sm">Tone</td>
                         <td className="p-3 text-sm">{selectedTextStyle ? textStyleOptions.find(ts => ts.id === selectedTextStyle)?.name : "Not selected"}</td>
+                      </tr>
+                      <tr className="border-b border-border/50">
+                        <td className="p-3 text-sm font-medium text-muted-foreground">Text Layout</td>
+                        <td className="p-3 text-sm">{selectedTextLayout ? textLayoutOptions.find(tl => tl.id === selectedTextLayout)?.name : "Not selected"}</td>
                       </tr>
                        <tr>
                          <td className="p-3 text-sm">Final Text</td>
