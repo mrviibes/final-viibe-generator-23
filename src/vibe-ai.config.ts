@@ -741,17 +741,18 @@ export function postProcessLine(line: string, tone: string, requiredTags?: strin
     }
   }
   
-  // Enforce savage tone quality - block joke-like content for savage (skip for knock-knock)
-  if (tone.toLowerCase() === 'savage' && !isKnockKnock) {
-    // Block obvious joke patterns that don't fit savage tone
-    if (cleaned.match(/^(why did|what do you call|knock knock)/i) || 
-        cleaned.match(/\?\!*$/i) ||
-        cleaned.match(/\bhaha\b|\blol\b|\bmeh\b/i)) {
-      return {
-        line: TONE_FALLBACKS.savage,
-        blocked: true,
-        reason: 'Not savage enough - too joke-like'
-      };
+    // Enforce savage tone quality - block joke-like content for savage (skip for knock-knock)
+    if (tone.toLowerCase() === 'savage' && !isKnockKnock) {
+      // Block obvious joke patterns that don't fit savage tone
+      if (cleaned.match(/^(why did|what do you call|knock knock)/i) || 
+          cleaned.match(/\?\!*$/i) ||
+          cleaned.match(/\bhaha\b|\blol\b|\bmeh\b/i)) {
+        return {
+          line: TONE_FALLBACKS.savage,
+          blocked: true,
+          reason: 'Not savage enough - too joke-like'
+        };
+      }
     }
   }
   

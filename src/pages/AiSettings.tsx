@@ -163,6 +163,78 @@ export default function AiSettings() {
                 />
               </div>
 
+              <Separator />
+
+              <div className="space-y-2">
+                <Label>Content Filter Strictness</Label>
+                <Select
+                  value={overrides.contentFilterStrictness || 'relaxed'}
+                  onValueChange={(value) => updateOverride('contentFilterStrictness', value as ContentFilterStrictness)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="strict">
+                      <div className="space-y-1">
+                        <div className="font-medium">Strict</div>
+                        <div className="text-sm text-muted-foreground">Maximum filtering (current behavior)</div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="relaxed">
+                      <div className="space-y-1">
+                        <div className="font-medium">Relaxed (Recommended)</div>
+                        <div className="text-sm text-muted-foreground">Balanced approach, fewer false positives</div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="off">
+                      <div className="space-y-1">
+                        <div className="font-medium">Off</div>
+                        <div className="text-sm text-muted-foreground">Minimal filtering, rely on model safety</div>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground">
+                  Controls how strictly content is filtered. "Relaxed" reduces fallback usage while maintaining safety.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Sensitive Tag Handling</Label>
+                <Select
+                  value={overrides.sensitiveTagHandling || 'warn-only'}
+                  onValueChange={(value) => updateOverride('sensitiveTagHandling', value as SensitiveTagHandling)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto-rewrite">
+                      <div className="space-y-1">
+                        <div className="font-medium">Auto-rewrite</div>
+                        <div className="text-sm text-muted-foreground">Automatically replace sensitive tags</div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="warn-only">
+                      <div className="space-y-1">
+                        <div className="font-medium">Warn Only (Recommended)</div>
+                        <div className="text-sm text-muted-foreground">Keep original tags but show warnings</div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="off">
+                      <div className="space-y-1">
+                        <div className="font-medium">Off</div>
+                        <div className="text-sm text-muted-foreground">No tag processing</div>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground">
+                  How to handle potentially sensitive tags. "Warn only" preserves your intent while providing feedback.
+                </p>
+              </div>
+
             </CardContent>
           </Card>
 

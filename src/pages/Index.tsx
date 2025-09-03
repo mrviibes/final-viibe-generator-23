@@ -4657,7 +4657,7 @@ const Index = () => {
     const trimmedTag = tag.trim();
     if (trimmedTag && !tags.includes(trimmedTag)) {
       const overrides = getRuntimeOverrides();
-      const tagHandling = overrides.sensitiveTagHandling ?? 'auto-rewrite';
+      const tagHandling = overrides.sensitiveTagHandling ?? 'warn-only';
       
       if (tagHandling === 'off') {
         // No sanitization - use exact tag
@@ -4921,7 +4921,7 @@ const Index = () => {
       
       // Preprocess tags for sensitive content before generation
       const overrides = getRuntimeOverrides();
-      const tagHandling = overrides.sensitiveTagHandling ?? 'auto-rewrite';
+      const tagHandling = overrides.sensitiveTagHandling ?? 'warn-only';
       
       const allTags = fallbackTags;
       let finalTags = allTags;
