@@ -44,20 +44,20 @@ export function getRuntimeOverrides(): AIRuntimeOverrides {
       }
     }
 
-    // Set fast defaults if not explicitly set
+    // Set defaults if not explicitly set (fastVisualsEnabled OFF for reliability)
     if (overrides.strictModelEnabled === undefined) {
       overrides.strictModelEnabled = true;
     }
     if (overrides.fastVisualsEnabled === undefined) {
-      overrides.fastVisualsEnabled = true;
+      overrides.fastVisualsEnabled = false; // Default OFF for reliability
     }
     
     return overrides;
   } catch {
-    // Set fast defaults as fallback
+    // Set defaults as fallback (fastVisualsEnabled OFF for reliability)
     const defaults = {
       strictModelEnabled: true,
-      fastVisualsEnabled: true
+      fastVisualsEnabled: false // Default OFF for reliability
     };
     setRuntimeOverrides(defaults);
     return defaults;

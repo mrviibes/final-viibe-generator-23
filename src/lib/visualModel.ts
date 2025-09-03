@@ -795,26 +795,21 @@ export async function generateVisualRecommendations(
           };
         }
       } catch (fastError) {
-        console.log(`⚡ Fast mode failed in ${Date.now() - startTime}ms, using fallbacks`);
-        const fallbacks = getSlotBasedFallbacks(enrichedInputs).slice(0, n);
-        return {
-          options: fallbacks,
-          model: targetModel, // Show actual selected model, not "fallback"
-          errorCode: 'FAST_TIMEOUT',
-          _debug: { fastMode: true, fallbackUsed: true, fallbackReason: 'local fallback' }
-        };
+        console.log(`⚡ Fast mode failed in ${Date.now() - startTime}ms, falling through to normal generation`);
+        // Fall through to normal generation instead of returning fallbacks immediately
       }
     }
     
-    console.log('🚀 Starting visual generation with optimized settings...');
+    // Normal generation (either fast mode disabled or fast mode failed)
+    console.log('🔄 Starting normal visual generation...');
     console.log(`🎨 Visual generation using model: ${targetModel}`);
     
     // Use centralized message builder for normal mode
     const messages = buildVisualGeneratorMessages(enrichedInputs);
     
-    // Create a timeout promise - allow retry chain even in strict mode for timeouts  
+    // Increased timeout for normal generation (was 15s, now 20s)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('TIMEOUT')), 12000); // 12s for primary attempt
+      setTimeout(() => reject(new Error('NORMAL_TIMEOUT')), 20000);
     });
 
     // Primary attempt - use model from AI settings

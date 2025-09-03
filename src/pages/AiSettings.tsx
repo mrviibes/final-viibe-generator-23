@@ -189,6 +189,19 @@ export default function AiSettings() {
 
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
+                  <Label>Fast visual recommendations</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Generate visual options faster (3-6s) but with less reliability. Recommended: OFF
+                  </p>
+                </div>
+                <Switch
+                  checked={overrides.fastVisualsEnabled ?? false}
+                  onCheckedChange={(checked) => updateOverride('fastVisualsEnabled', checked)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
                   <Label>Magic Prompt Enabled</Label>
                   <p className="text-sm text-muted-foreground">
                     Use enhanced prompt engineering for better results (Turbo/V2 only - ignored by V3)

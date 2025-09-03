@@ -9,8 +9,7 @@ const corsHeaders = {
 };
 
 const IDEOGRAM_API_BASE = 'https://api.ideogram.ai/generate';
-const IDEOGRAM_API_V3_BASE = 'https://api.ideogram.ai/v3/images';
-const IDEOGRAM_API_V3_ALT_BASE = 'https://api.ideogram.ai/v3/images/text-to-image';
+const V3_BASE_URL = 'https://api.ideogram.ai/v3';
 
 interface IdeogramGenerateRequest {
   prompt: string;
@@ -51,6 +50,7 @@ serve(async (req) => {
     let shouldRetryWithTurbo = false;
     let v3Attempts = 0;
     let endpointUsed = '';
+    let fallbackNote = '';
 
     const count = request.count || 1;
     
@@ -71,33 +71,99 @@ serve(async (req) => {
       if (modelToUse === 'V_3') {
         // Try V3 endpoint with enhanced fallback logic
         console.log('Using V3 endpoint for V_3 model');
-        endpointUsed = 'v3-primary';
         
-        const formData = new FormData();
-        formData.append('prompt', enhancePromptForV3ExactText(finalPrompt, isExactTextRequest));
-        formData.append('resolution', mapAspectRatioToResolution(request.aspect_ratio));
+        const v3Payload = {
+          prompt: enhancePromptForV3ExactText(finalPrompt, isExactTextRequest),
+          model: 'V_3',
+          style_type: request.style_type || 'GENERAL',
+          magic_prompt_option: 'OFF'
+        };
+        
+        // Add aspect ratio to resolution mapping
+        if (request.aspect_ratio) {
+          v3Payload.resolution = mapAspectRatioToResolution(request.aspect_ratio);
+        }
+        
+        if (request.seed !== undefined) v3Payload.seed = request.seed;
+        
+        // Try the text-to-image endpoint first (more specific)
+        try {
+          response = await fetch(`${V3_BASE_URL}/images/text-to-image`, {
+            method: 'POST',
+            headers: {
+              'Api-Key': ideogramApiKey,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(v3Payload),
+          });
+          
+          if (response.ok) {
+            endpointUsed = 'v3/images/text-to-image';
+            console.log('V3 text-to-image endpoint success');
+          } else {
+            console.log(`V3 text-to-image failed (${response.status}), trying v3/images`);
+            
+            // Fallback to the general v3/images endpoint
+            response = await fetch(`${V3_BASE_URL}/images`, {
+              method: 'POST',
+              headers: {
+                'Api-Key': ideogramApiKey,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(v3Payload),
+            });
+            
+            if (response.ok) {
+              endpointUsed = 'v3/images';
+              console.log('V3 general endpoint success');
+            } else {
+              const errorText = await response.text();
+              console.log(`All V3 endpoints failed (${response.status}): ${errorText}`);
+              
+              // Both V3 endpoints failed, fall back to V2A_TURBO
+              console.log('All V3 endpoints failed, falling back to V2A_TURBO');
+              modelToUse = 'V_2A_TURBO';
+              fallbackNote = `V3 endpoints unavailable (${response.status})`;
+            }
+          }
+        } catch (v3Error) {
+          console.log('V3 endpoints error:', v3Error);
+          console.log('Falling back to V2A_TURBO');
+          modelToUse = 'V_2A_TURBO';
+          fallbackNote = 'V3 network error';
+        }
+      }
+      
+      // If we're now using V2A_TURBO (either originally requested or fallback)
+      if (modelToUse === 'V_2A_TURBO') {
+        console.log('Using legacy endpoint for V2A_TURBO model');
+        endpointUsed = 'legacy-generate';
+        
+        payload = {
+          image_request: {
+            model: 'V_2A_TURBO',
+            prompt: finalPrompt,
+            style_type: request.style_type || 'AUTO',
+            magic_prompt_option: request.magic_prompt_option || 'AUTO'
+          }
+        };
+        
+        if (request.aspect_ratio) {
+          payload.image_request.aspect_ratio = request.aspect_ratio;
+        }
         
         if (request.seed !== undefined) {
-          formData.append('seed', request.seed.toString());
+          payload.image_request.seed = request.seed;
         }
         
-        if (request.style_type && request.style_type !== 'AUTO') {
-          formData.append('style_type', request.style_type);
-        }
-
-        headers = {
-          'Api-Key': ideogramApiKey,
-        };
-        requestBody = formData;
-        v3Attempts++;
-
-        response = await fetch(IDEOGRAM_API_V3_BASE, {
+        response = await fetch(IDEOGRAM_API_BASE, {
           method: 'POST',
-          headers,
-          body: requestBody,
+          headers: {
+            'Api-Key': ideogramApiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
         });
-
-        // Remove problematic alternate V3 endpoint - keep only primary V3
       } else {
         // Use legacy endpoint for other models
         console.log('Using legacy endpoint for model:', modelToUse);
