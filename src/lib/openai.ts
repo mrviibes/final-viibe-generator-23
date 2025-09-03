@@ -414,32 +414,32 @@ export class OpenAIService {
   }
 
   async searchPopCulture(category: string, searchTerm: string): Promise<OpenAISearchResult[]> {
-    const prompt = buildPopCultureSearchPrompt(category, searchTerm);
+    // Early return if no search term
+    if (!searchTerm || searchTerm.trim().length === 0) {
+      return [];
+    }
 
     try {
-      const result = await this.chatJSON([
-        { role: 'user', content: prompt }
-      ], {
-        max_completion_tokens: 500,
-        model: 'gpt-4.1-2025-04-14' // More reliable model
+      console.log('Searching pop culture for:', searchTerm, 'in category:', category);
+      
+      // Call our new pop-culture-search Edge Function
+      const { data, error } = await supabase.functions.invoke('pop-culture-search', {
+        body: {
+          category,
+          searchTerm: searchTerm.trim()
+        }
       });
 
-      // Post-process to ensure we have exactly 5 valid items
-      const suggestions = result?.suggestions || [];
-      const validSuggestions = suggestions.filter((item: any) => 
-        item && typeof item.title === 'string' && typeof item.description === 'string' &&
-        item.title.trim() && item.description.trim()
-      );
-
-      // If we don't have enough valid suggestions, pad with generic ones
-      while (validSuggestions.length < 5) {
-        validSuggestions.push({
-          title: `${category} suggestion ${validSuggestions.length + 1}`,
-          description: `Popular ${category.toLowerCase()} related to ${searchTerm}`
-        });
+      if (error) {
+        console.error('Pop culture search failed:', error);
+        throw new Error(error.message);
       }
 
-      return validSuggestions.slice(0, 5);
+      // Return the results from our Edge Function
+      const results = data?.results || [];
+      console.log(`Found ${results.length} search results`);
+      
+      return results.slice(0, 5);
     } catch (error) {
       console.error('Pop culture search failed:', error);
       

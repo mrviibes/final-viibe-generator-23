@@ -5893,7 +5893,7 @@ const Index = () => {
                       {!isPopSearching && popSearchResults.length > 0 && <>
                           <div className="text-center mb-4">
                             <p className="text-sm text-muted-foreground">
-                              Found {popSearchResults.length} results from OpenAI's extensive database
+                              Found {popSearchResults.length} results
                             </p>
                           </div>
                           <Card className="max-h-96 overflow-hidden">
