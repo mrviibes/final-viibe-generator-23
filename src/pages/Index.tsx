@@ -5232,29 +5232,60 @@ const Index = () => {
     }
   };
 
-  // Independent pop culture search handler
+  // Independent pop culture search handler with stale response protection
+  const popSearchRequestId = useRef(0);
   const handlePopSearch = async (searchTerm: string) => {
     if (!searchTerm.trim() || !selectedSubOption) return;
+    
+    // Check if this subcategory is supported
+    const categoryLower = selectedSubOption.toLowerCase();
+    const isSupportedCategory = 
+      categoryLower.includes('celebrities') || categoryLower.includes('celebrity') || 
+      categoryLower.includes('actor') || categoryLower.includes('actress') ||
+      categoryLower.includes('movie') || categoryLower.includes('film') ||
+      categoryLower.includes('tv') || categoryLower.includes('show') || categoryLower.includes('series') ||
+      categoryLower.includes('music') || categoryLower.includes('song') || categoryLower.includes('artist') || categoryLower.includes('band') ||
+      categoryLower.includes('book') || categoryLower.includes('literature');
+    
+    if (!isSupportedCategory) {
+      console.log('Skipping pop culture search for unsupported category:', selectedSubOption);
+      return;
+    }
+    
     if (!openAIService.hasApiKey()) {
       if (!openAIService.isUsingBackend()) {
         setShowApiKeyDialog(true);
         return;
       }
     }
+    
+    // Generate unique request ID to handle stale responses
+    const currentRequestId = ++popSearchRequestId.current;
+    
     setIsPopSearching(true);
     setPopSearchError("");
     setPopSearchResults([]);
     try {
       const results = await openAIService.searchPopCulture(selectedSubOption, searchTerm);
-      setPopSearchResults(results);
+      
+      // Only update results if this is still the latest request
+      if (currentRequestId === popSearchRequestId.current) {
+        setPopSearchResults(results);
+      }
     } catch (error) {
-      console.error('Pop culture search error:', error);
-      setPopSearchError(error instanceof Error ? error.message : 'Search failed');
-      if (error instanceof Error && error.message.includes('API key')) {
-        setShowApiKeyDialog(true);
+      // Only show error if this is still the latest request
+      if (currentRequestId === popSearchRequestId.current) {
+        console.error('Pop culture search error:', error);
+        setPopSearchError(error instanceof Error ? error.message : 'Search failed');
+        if (error instanceof Error && error.message.includes('API key')) {
+          setShowApiKeyDialog(true);
+        }
       }
     } finally {
-      setIsPopSearching(false);
+      // Only clear loading state if this is still the latest request
+      if (currentRequestId === popSearchRequestId.current) {
+        setIsPopSearching(false);
+      }
     }
   };
   const handlePopSearchInputChange = (value: string) => {

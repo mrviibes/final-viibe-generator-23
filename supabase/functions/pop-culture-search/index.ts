@@ -16,6 +16,21 @@ interface SearchResponse {
   total: number;
 }
 
+// Helper function to add timeout to fetch requests
+async function timedFetch(url: string, timeout = 2000): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -33,36 +48,18 @@ serve(async (req) => {
       });
     }
 
-    // Search Wikipedia using the correct API endpoint
-    try {
-      const wikiSearchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(searchTerm)}&format=json&origin=*&srlimit=5`;
-      const wikiResponse = await fetch(wikiSearchUrl);
-      
-      if (wikiResponse.ok) {
-        const wikiData = await wikiResponse.json();
-        if (wikiData.query && wikiData.query.search) {
-          for (const page of wikiData.query.search.slice(0, 3)) {
-            results.push({
-              title: page.title,
-              description: page.snippet ? page.snippet.replace(/<[^>]*>/g, '') : `Wikipedia article about ${page.title}`
-            });
-          }
-        }
-      }
-    } catch (error) {
-      console.log('Wikipedia search failed:', error.message);
-    }
+    const categoryLower = category?.toLowerCase() || '';
 
-    // For celebrities, search actors and musicians specifically
-    if (category?.toLowerCase().includes('celebrities') || category?.toLowerCase().includes('celebrity') || category?.toLowerCase().includes('actor') || category?.toLowerCase().includes('actress')) {
+    // Category-specific searches only - no Wikipedia for all categories
+    if (categoryLower.includes('celebrities') || categoryLower.includes('celebrity') || categoryLower.includes('actor') || categoryLower.includes('actress')) {
       // Search TVMaze for actors
       try {
         const tvMazeUrl = `https://api.tvmaze.com/search/people?q=${encodeURIComponent(searchTerm)}`;
-        const tvResponse = await fetch(tvMazeUrl);
+        const tvResponse = await timedFetch(tvMazeUrl);
         
         if (tvResponse.ok) {
           const tvData = await tvResponse.json();
-          for (const item of tvData.slice(0, 2)) {
+          for (const item of tvData.slice(0, 3)) {
             if (item.person) {
               const person = item.person;
               results.push({
@@ -78,8 +75,8 @@ serve(async (req) => {
 
       // Search iTunes for musicians
       try {
-        const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=musicArtist&limit=2`;
-        const itunesResponse = await fetch(itunesUrl);
+        const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=musicArtist&limit=3`;
+        const itunesResponse = await timedFetch(itunesUrl);
         
         if (itunesResponse.ok) {
           const itunesData = await itunesResponse.json();
@@ -97,19 +94,19 @@ serve(async (req) => {
       }
     }
 
-    // For movies, search iTunes API
-    if (category?.toLowerCase().includes('movie') || category?.toLowerCase().includes('film')) {
+    // For movies, search iTunes API only
+    else if (categoryLower.includes('movie') || categoryLower.includes('film')) {
       try {
-        const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=movie&limit=3`;
-        const itunesResponse = await fetch(itunesUrl);
+        const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=movie&limit=6`;
+        const itunesResponse = await timedFetch(itunesUrl);
         
         if (itunesResponse.ok) {
           const itunesData = await itunesResponse.json();
           if (itunesData.results) {
-            for (const movie of itunesData.results.slice(0, 2)) {
+            for (const movie of itunesData.results) {
               results.push({
                 title: movie.trackName || movie.collectionName,
-                description: `${movie.primaryGenreName || 'Movie'} from ${new Date(movie.releaseDate).getFullYear()}`
+                description: `Movie${movie.releaseDate ? ` • ${new Date(movie.releaseDate).getFullYear()}` : ''}${movie.primaryGenreName ? ` • ${movie.primaryGenreName}` : ''}`
               });
             }
           }
@@ -119,20 +116,20 @@ serve(async (req) => {
       }
     }
 
-    // For TV shows, search TVMaze
-    if (category?.toLowerCase().includes('tv') || category?.toLowerCase().includes('show') || category?.toLowerCase().includes('series')) {
+    // For TV shows, search TVMaze only
+    else if (categoryLower.includes('tv') || categoryLower.includes('show') || categoryLower.includes('series')) {
       try {
         const tvMazeUrl = `https://api.tvmaze.com/search/shows?q=${encodeURIComponent(searchTerm)}`;
-        const tvResponse = await fetch(tvMazeUrl);
+        const tvResponse = await timedFetch(tvMazeUrl);
         
         if (tvResponse.ok) {
           const tvData = await tvResponse.json();
-          for (const item of tvData.slice(0, 2)) {
+          for (const item of tvData.slice(0, 6)) {
             if (item.show) {
               const show = item.show;
               results.push({
                 title: show.name,
-                description: `${show.type || 'TV Show'}${show.genres?.length ? ` • ${show.genres.slice(0, 2).join(', ')}` : ''}`
+                description: `TV Show${show.premiered ? ` • ${new Date(show.premiered).getFullYear()}` : ''}${show.genres && show.genres.length > 0 ? ` • ${show.genres[0]}` : ''}`
               });
             }
           }
@@ -142,19 +139,19 @@ serve(async (req) => {
       }
     }
 
-    // For music, search iTunes music
-    if (category?.toLowerCase().includes('music') || category?.toLowerCase().includes('song') || category?.toLowerCase().includes('artist')) {
+    // For music, search iTunes music only
+    else if (categoryLower.includes('music') || categoryLower.includes('song') || categoryLower.includes('artist') || categoryLower.includes('band')) {
       try {
-        const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=song&limit=3`;
-        const itunesResponse = await fetch(itunesUrl);
+        const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=musicArtist&limit=6`;
+        const itunesResponse = await timedFetch(itunesUrl);
         
         if (itunesResponse.ok) {
           const itunesData = await itunesResponse.json();
           if (itunesData.results) {
-            for (const track of itunesData.results.slice(0, 2)) {
+            for (const artist of itunesData.results) {
               results.push({
-                title: `${track.trackName} by ${track.artistName}`,
-                description: `${track.primaryGenreName || 'Music'} • ${track.collectionName || 'Single'}`
+                title: artist.artistName,
+                description: `Musical Artist • ${artist.primaryGenreName || 'Music'}`
               });
             }
           }
@@ -164,20 +161,20 @@ serve(async (req) => {
       }
     }
 
-    // For books, search Google Books API
-    if (category?.toLowerCase().includes('book') || category?.toLowerCase().includes('literature')) {
+    // For books, search Google Books API only
+    else if (categoryLower.includes('book') || categoryLower.includes('literature')) {
       try {
-        const booksUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(searchTerm)}&maxResults=3`;
-        const booksResponse = await fetch(booksUrl);
+        const booksUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(searchTerm)}&maxResults=6`;
+        const booksResponse = await timedFetch(booksUrl);
         
         if (booksResponse.ok) {
           const booksData = await booksResponse.json();
           if (booksData.items) {
-            for (const book of booksData.items.slice(0, 2)) {
+            for (const book of booksData.items) {
               const volumeInfo = book.volumeInfo;
               results.push({
                 title: volumeInfo.title,
-                description: `Book by ${volumeInfo.authors?.join(', ') || 'Unknown Author'}${volumeInfo.publishedDate ? ` • ${volumeInfo.publishedDate.split('-')[0]}` : ''}`
+                description: `Book${volumeInfo.authors ? ` • by ${volumeInfo.authors[0]}` : ''}${volumeInfo.publishedDate ? ` • ${volumeInfo.publishedDate.split('-')[0]}` : ''}`
               });
             }
           }
@@ -190,14 +187,17 @@ serve(async (req) => {
     // Remove duplicates based on title similarity
     const uniqueResults = results.filter((result, index, arr) => 
       arr.findIndex(r => r.title.toLowerCase() === result.title.toLowerCase()) === index
-    ).slice(0, 8);
+    );
+
+    // Limit to 6 total results for faster loading
+    const limitedResults = uniqueResults.slice(0, 6);
 
     const response: SearchResponse = {
-      results: uniqueResults,
-      total: uniqueResults.length
+      results: limitedResults,
+      total: limitedResults.length
     };
 
-    console.log(`Found ${uniqueResults.length} search results for "${searchTerm}"`);
+    console.log(`Found ${limitedResults.length} search results for "${searchTerm}" in category "${category}"`);
 
     return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
