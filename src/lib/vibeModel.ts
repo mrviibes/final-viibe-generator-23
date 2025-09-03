@@ -257,8 +257,8 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
       
       // Validate through same filter as API candidates
       const processedCandidate = postProcessLine(nextCandidate, inputs.tone, inputs.tags || []);
-      if (processedCandidate && !finalCandidates.includes(processedCandidate)) {
-        finalCandidates.push(processedCandidate);
+      if (!processedCandidate.blocked && !finalCandidates.includes(processedCandidate.line)) {
+        finalCandidates.push(processedCandidate.line);
       } else {
         finalCandidates.push(`${nextCandidate} energy`);
       }
