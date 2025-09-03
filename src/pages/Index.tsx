@@ -4178,8 +4178,6 @@ const Index = () => {
   const [customHeight, setCustomHeight] = useState<string>("");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState<string>("");
-  const [exactWordingTags, setExactWordingTags] = useState<string[]>([]);
-  const [exactWordingTagInput, setExactWordingTagInput] = useState<string>("");
   const [sensitiveTagNotices, setSensitiveTagNotices] = useState<Record<string, boolean>>({});
   const [lastSanitizedTags, setLastSanitizedTags] = useState<SensitiveTagResult[]>([]);
   const [textGenerationStartTime, setTextGenerationStartTime] = useState<number>(0);
@@ -4679,19 +4677,6 @@ const Index = () => {
   };
 
   // Handle exact wording tags
-  const handleAddExactWordingTag = (tag: string) => {
-    const trimmedTag = tag.trim();
-    if (trimmedTag && !exactWordingTags.includes(trimmedTag)) {
-      setExactWordingTags([...exactWordingTags, trimmedTag]);
-    }
-    setExactWordingTagInput("");
-  };
-  const handleExactWordingTagInputKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault();
-      handleAddExactWordingTag(exactWordingTagInput);
-    }
-  };
 
   // Sensitive tag handlers
   const handleSensitiveTagReplace = (originalTag: string, newTag: string) => {
@@ -4723,9 +4708,6 @@ const Index = () => {
     // Enable allude mode for the next generation
     setUseAlludeMode(true);
     handleGenerateText();
-  };
-  const removeExactWordingTag = (tagToRemove: string) => {
-    setExactWordingTags(exactWordingTags.filter(tag => tag !== tagToRemove));
   };
 
   // Handle adding subject tags
@@ -4761,10 +4743,6 @@ const Index = () => {
       setTags([...tags, tagInput.trim()]);
       setTagInput("");
     }
-    if (exactWordingTagInput.trim()) {
-      setExactWordingTags([...exactWordingTags, exactWordingTagInput.trim()]);
-      setExactWordingTagInput("");
-    }
     if (subjectTagInput.trim()) {
       setSubjectTags([...subjectTags, subjectTagInput.trim()]);
       setSubjectTagInput("");
@@ -4775,7 +4753,7 @@ const Index = () => {
       // Build inputs using the same mapping logic as text generation
       let category = '';
       let subcategory = '';
-      let finalTags = [...tags, ...exactWordingTags, ...subjectTags];
+      let finalTags = [...tags, ...subjectTags];
       console.log('🎨 Visual generation started with tags:', {
         tags,
         subjectTags,
@@ -4891,13 +4869,41 @@ const Index = () => {
       let subcategory = '';
       // Auto-commit pending tag inputs before generating - use current state
       const currentTags = tagInput.trim() ? [...tags, tagInput.trim()] : tags;
-      const currentExactWordingTags = exactWordingTagInput.trim() ? [...exactWordingTags, exactWordingTagInput.trim()] : exactWordingTags;
       
       // Clear inputs after committing
       if (tagInput.trim()) setTagInput("");
-      if (exactWordingTagInput.trim()) setExactWordingTagInput("");
-      // Preprocess tags for sensitive content before generation - use current tags
-      const allTags = [...currentTags, ...currentExactWordingTags];
+      
+      // Add smart fallback tags when user leaves tag box empty
+      let fallbackTags = [...currentTags];
+      if (fallbackTags.length === 0) {
+        // Generate default tags based on subcategory and selected pick
+        if (selectedStyle === 'celebrations' && selectedSubOption) {
+          // Extract clean tag from celebration subcategory
+          const cleanTag = selectedSubOption
+            .replace(/-us$/, '') // Remove "-us" suffix
+            .replace(/-united-states$/, '') // Remove "-united-states" suffix  
+            .replace(/-day$/, '') // Remove "-day" suffix
+            .replace(/-eve$/, '') // Remove "-eve" suffix
+            .replace(/-party$/, '') // Remove "-party" suffix
+            .replace(/\([^)]*\)/g, '') // Remove parentheses content
+            .replace(/-/g, ' ') // Replace hyphens with spaces
+            .trim();
+          if (cleanTag) fallbackTags.push(cleanTag);
+        } else if (selectedStyle === 'pop-culture' && selectedPick) {
+          // Use the selected celebrity/movie/show/song as default tag
+          fallbackTags.push(selectedPick);
+        } else if (selectedSubOption) {
+          // For other categories, use normalized subcategory name
+          const cleanTag = selectedSubOption
+            .replace(/-/g, ' ') // Replace hyphens with spaces
+            .replace(/\([^)]*\)/g, '') // Remove parentheses content
+            .trim();
+          if (cleanTag) fallbackTags.push(cleanTag);
+        }
+      }
+      
+      // Preprocess tags for sensitive content before generation
+      const allTags = fallbackTags;
       const sanitizedTagResults = rewriteSensitiveTags(allTags);
       const finalTags = sanitizedTagResults.map(result => result.replacement);
       const sanitizedTags = sanitizedTagResults.filter(result => result.wasSanitized);
@@ -4905,13 +4911,11 @@ const Index = () => {
       // Store sanitized tags for audit display
       setLastSanitizedTags(sanitizedTags);
       
-      console.log('🏷️ Text generation started with tags:', currentTags, 'exact wording:', currentExactWordingTags);
+      console.log('🏷️ Text generation started with tags:', currentTags);
       console.log('🏷️ Sanitized tags:', sanitizedTags);
       console.log('🏷️ Current tags state:', {
         tags: currentTags,
-        exactWordingTags: currentExactWordingTags,
-        tagsLength: currentTags.length,
-        exactWordingLength: currentExactWordingTags.length
+        tagsLength: currentTags.length
       });
       console.log('🏷️ Final tags for processing:', finalTags);
 
@@ -4969,10 +4973,8 @@ const Index = () => {
         subcategory,
         tone: tone.toLowerCase(),
         tags: finalTagsForGeneration,
-        exactWordingTags: exactWordingTags,
         originalTags: tags,
-        tagCount: finalTagsForGeneration.length,
-        exactWordingCount: exactWordingTags.length
+        tagCount: finalTagsForGeneration.length
       });
 
       // Ensure we have at least the basic tags
@@ -4985,7 +4987,6 @@ const Index = () => {
         subcategory,
         tone: tone as any,
         tags: finalTagsForGeneration,
-        exactWordingTags: currentExactWordingTags,
         recipient_name: selectedPick || "-",
         retryMode: useAlludeMode ? 'allude-dont-quote' : undefined
       }, 4);
@@ -6271,15 +6272,6 @@ const Index = () => {
                              </TooltipContent>
                            </Tooltip>
                          </div>
-                         <Input value={exactWordingTagInput} onChange={e => setExactWordingTagInput(e.target.value)} onKeyDown={handleExactWordingTagInputKeyDown} placeholder="55% Off + Free Gift on $150+ – Hurry, ends soon!" className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
-                        
-                        {/* Display Exact Wording Tags */}
-                        {exactWordingTags.length > 0 && <div className="flex flex-wrap gap-2 justify-center">
-                            {exactWordingTags.map((tag, index) => <Badge key={index} variant="outline" className="px-3 py-1 text-sm flex items-center gap-1 border-primary/50 text-primary">
-                                "{tag}"
-                                <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => removeExactWordingTag(tag)} />
-                              </Badge>)}
-                          </div>}
                       </div>
 
                       {/* Generate Button */}
