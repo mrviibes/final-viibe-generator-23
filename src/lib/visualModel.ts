@@ -124,6 +124,17 @@ function autoEnrichInputs(inputs: VisualInputs): VisualInputs {
     }
   }
   
+  // Add typography-aware zone - enforced for all styles
+  if (!enriched.tags.some(tag => tag.includes('TEXT_SAFE_ZONE'))) {
+    const dynamicZone = inputs.typographyStyle === 'subtle-caption' 
+      ? '[TEXT_SAFE_ZONE: corner] [MAX_TEXT_AREA: 5%] [SIZE: small]'
+      : inputs.typographyStyle === 'badge-sticker'
+      ? '[TEXT_SAFE_ZONE: badge corner] [SIZE: small-medium]'
+      : '[TEXT_SAFE_ZONE: natural empty area]';
+    
+    enriched.tags = [...enriched.tags, dynamicZone].slice(0, 8);
+  }
+  
   return enriched;
 }
 
@@ -355,7 +366,48 @@ function validateVisualOptions(options: VisualOption[], inputs: VisualInputs): V
     return true;
   });
   
-  const validOptions = preprocessed.filter(opt => {
+  // Enhanced validation for subtle-caption - ensure small, corner placement
+  let subtleCaptionFiltered = preprocessed;
+  if (inputs.typographyStyle === 'subtle-caption') {
+    subtleCaptionFiltered = preprocessed.filter(option => {
+      const prompt = option.prompt.toLowerCase();
+      const background = option.background.toLowerCase();
+      const subject = option.subject?.toLowerCase() || '';
+      
+      // Block options that suggest large, center, or prominent text placement
+      const blockedIndicators = [
+        'large text', 'big text', 'prominent text', 'bold text', 'massive text',
+        'center', 'centered', 'middle', 'main focus', 'dominant', 'primary focus',
+        'billboard', 'banner', 'headline', 'title card', 'hero text', 'huge text',
+        'covers', 'overlays', 'spans across', 'fills', 'takes up', 'dominates'
+      ];
+      
+      const hasBlockedContent = blockedIndicators.some(indicator => 
+        prompt.includes(indicator) || background.includes(indicator) || subject.includes(indicator)
+      );
+      
+      if (hasBlockedContent) {
+        console.log(`❌ Filtered large text concept for subtle-caption: ${option.prompt}`);
+        return false;
+      }
+      
+      return true;
+    });
+    
+    // If all options were filtered out, create guaranteed small caption fallback
+    if (subtleCaptionFiltered.length === 0) {
+      console.log('⚠️ All options filtered for subtle-caption, using guaranteed small fallback');
+      subtleCaptionFiltered = [{
+        subject: 'simple scene with open corner space',
+        background: 'clean minimal background with clear corner area', 
+        prompt: 'simple composition designed for small corner text, minimal elements, corner text space guaranteed',
+        subcategoryAligned: false,
+        textAligned: false
+      }];
+    }
+  }
+  
+  const validOptions = subtleCaptionFiltered.filter(opt => {
     // Reject if prompt is too short or vague
     if (!opt.prompt || opt.prompt.length < 15) {
       console.log(`Rejecting option with short prompt: ${opt.prompt}`);

@@ -97,18 +97,7 @@ serve(async (req) => {
           body: requestBody,
         });
 
-        // If primary V3 fails with 404, try alternate V3 endpoint
-        if (!response.ok && response.status === 404 && v3Attempts === 1) {
-          console.log('⚠️ Primary V3 endpoint returned 404, trying alternate V3 route');
-          endpointUsed = 'v3-alternate';
-          v3Attempts++;
-          
-          response = await fetch(IDEOGRAM_API_V3_ALT_BASE, {
-            method: 'POST',
-            headers,
-            body: requestBody,
-          });
-        }
+        // Remove problematic alternate V3 endpoint - keep only primary V3
       } else {
         // Use legacy endpoint for other models
         console.log('Using legacy endpoint for model:', modelToUse);
@@ -158,6 +147,10 @@ serve(async (req) => {
           shouldRetryWithTurbo = true;
         } else {
           let errorMessage = `HTTP ${response.status}`;
+          let errorCode = 'UNKNOWN_ERROR';
+          let sanitizedPreview = '';
+          let blockedTerms: string[] = [];
+          
           try {
             const errorData = JSON.parse(errorText);
             errorMessage = errorData.error?.message || errorMessage;
@@ -165,9 +158,32 @@ serve(async (req) => {
             errorMessage = errorText || errorMessage;
           }
 
-          // Handle specific error cases
-          if (response.status === 400 && errorText.includes('content_filtering')) {
-            errorMessage = 'Content was filtered by Ideogram. Try rephrasing your prompt.';
+          // Handle specific error cases with structured responses
+          if (response.status === 422 || (response.status === 400 && errorText.includes('safety'))) {
+            errorCode = 'SAFETY_FILTER';
+            errorMessage = 'Content flagged by safety filters. Try using different wording.';
+            // Basic sanitization suggestions
+            const sensitiveTerms = ['boner', 'pamela anderson', 'explicit'];
+            const foundTerms = sensitiveTerms.filter(term => 
+              finalPrompt.toLowerCase().includes(term.toLowerCase())
+            );
+            if (foundTerms.length > 0) {
+              blockedTerms = foundTerms;
+              sanitizedPreview = finalPrompt.replace(/boner/gi, 'crush').replace(/pamela anderson/gi, 'celebrity');
+            }
+            
+            // Return structured error for UI handling
+            return new Response(JSON.stringify({
+              success: false,
+              error_code: errorCode,
+              message: errorMessage,
+              blocked_terms: blockedTerms,
+              sanitized_preview: sanitizedPreview,
+              suggestions: ['Try using gentler language', 'Replace explicit terms with euphemisms', 'Focus on the mood rather than specific content']
+            }), {
+              status: 200, // Return 200 so Supabase doesn't mask the response
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
           } else if (response.status === 429) {
             errorMessage = 'Rate limit exceeded. Please try again later.';
           } else if (response.status === 401) {

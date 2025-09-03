@@ -171,6 +171,11 @@ export async function generateIdeogramImage(request: IdeogramGenerateRequest): P
         throw new IdeogramAPIError(`Backend API error: ${error.message}`);
       }
 
+      // Check for structured safety filter response
+      if (data && !data.data && data.error_code === 'SAFETY_FILTER') {
+        throw new IdeogramAPIError(JSON.stringify(data), 422);
+      }
+
       if (!data) {
         throw new IdeogramAPIError('No data received from backend API');
       }

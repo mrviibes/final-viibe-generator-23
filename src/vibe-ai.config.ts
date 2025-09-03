@@ -272,12 +272,12 @@ export const AI_CONFIG = {
   generation: {
     max_candidates: 6,
     temperature: 0.7,
-    max_tokens: 120, // Reduced for faster generation
+    max_tokens: 80, // Further reduced for speed
     model: 'gpt-4.1-2025-04-14' // GPT-4.1 only
   },
   visual_generation: {
-    max_tokens: 450, // Reduced for faster concepts
-    fast_max_tokens: 160, // For ultra-fast 3-4.5s generation
+    max_tokens: 350, // Reduced for faster concepts 
+    fast_max_tokens: 120, // For ultra-fast generation
     model: 'gpt-4o-mini' // Fast mini model by default
   }
 };
@@ -917,27 +917,17 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     parts.push(`Format: ${handoff.aspect_ratio} with balanced composition.`);
   }
   
-  // ENHANCED QUALITY DIRECTIVES
-  parts.push("HIGH QUALITY: Professional photography lighting, rich saturated colors, sharp focus, detailed textures, cinematic composition.");
-  parts.push("CONTRAST OPTIMIZATION: Ensure strong color contrast between subject and background for optimal text readability.");
+  // ENHANCED QUALITY DIRECTIVES (compact)
+  parts.push("HIGH QUALITY, professional composition");
+  parts.push("CONTRAST: strong color contrast for text readability");
   
-  // TYPOGRAPHY STYLE PLACEMENT (if present)
+  // TYPOGRAPHY STYLE PLACEMENT (compact version) 
   if (handoff.key_line && handoff.key_line.trim()) {
-    if (typographyStyle === 'negative-space') {
-      parts.push("Place text in natural negative space areas like sky, walls, or empty backgrounds. Use TOP, BOTTOM, LEFT, or RIGHT zones rather than always centering. Ensure high contrast and avoid overlapping with faces or main subjects. Reserve 30-40% of image area for text with clean separation.");
-    } else if (typographyStyle === 'meme-style') {
-      parts.push("Classic meme layout: white bold text with black outline at TOP and BOTTOM of image. Impact font style. High contrast against any background. Text zones should be 15-20% of image height at top and bottom edges.");
-    } else if (typographyStyle === 'lower-third') {
-      parts.push("Professional lower third banner: horizontal text bar in bottom 20% of image. Clean background bar or overlay with high contrast text. News/broadcast style presentation.");
-    } else if (typographyStyle === 'side-bar') {
-      parts.push("Vertical text panel on LEFT side: 25-30% of image width reserved for text. Clean sidebar design with strong contrast. Professional layout with clear separation from main image.");
-    } else if (typographyStyle === 'badge-sticker') {
-      parts.push("Decorative badge or sticker placement: circular, rectangular, or custom shaped frame for text. Positioned strategically without covering main subjects. Celebration/award style design.");
-    } else if (typographyStyle === 'subtle-caption') {
-      parts.push("Render text as small caption: 8-12% of image width, positioned in corners/edges or clear negative space. Strong contrast required. Never cover faces or key subjects. Use corner placement, edge margins, or unobtrusive clear zones with perfect readability.");
-    } else {
-      parts.push("Design for poster-style text overlay with clear readable zones. Maintain strong visual hierarchy and text-background separation.");
-    }
+    const typographyZone = getTypographyStyleZone(typographyStyle);
+    const typographyConstraints = getTypographyStyleConstraints(typographyStyle);
+    
+    parts.push(typographyZone);
+    parts.push(typographyConstraints);
   }
   
   // GLOBAL NEGATIVE PROMPT ENFORCEMENT
@@ -970,6 +960,45 @@ export function getStyleTypeForIdeogram(visualStyle: string): 'AUTO' | 'GENERAL'
   };
   
   return styleMap[visualStyle?.toLowerCase()] || 'AUTO';
+}
+
+// Typography helper functions for compact prompt building
+export function getTypographyStyleZone(typography: string): string {
+  switch (typography) {
+    case 'negative-space':
+      return 'TEXT ZONE: natural empty areas, TOP/BOTTOM/LEFT/RIGHT placement';
+    case 'meme-style':
+      return 'TEXT ZONE: TOP and BOTTOM bands, classic meme style';
+    case 'lower-third':
+      return 'TEXT ZONE: bottom 20% banner area';
+    case 'side-bar':
+      return 'TEXT ZONE: left 25-30% vertical panel';
+    case 'badge-sticker':
+      return 'TEXT ZONE: badge/sticker placement, avoid covering subjects';
+    case 'subtle-caption':
+      return 'TEXT ZONE: small corner placement, unobtrusive';
+    default:
+      return 'TEXT ZONE: poster-style overlay with clear separation';
+  }
+}
+
+export function getTypographyStyleConstraints(typography: string): string {
+  switch (typography) {
+    case 'negative-space':
+      return '[ZONE: natural empty area] [TEXT_AREA: 30-40%] [NO_OVERLAP]';
+    case 'meme-style':
+      return '[TOP/BOTTOM] [HEIGHT: 15-20%] [IMPACT STYLE] [OUTLINE]';
+    case 'lower-third':
+      return '[BANNER: bottom 20%] [HIGH CONTRAST]';
+    case 'side-bar':
+      return '[LEFT PANEL: 25-30%] [CLEAR SEPARATION]';
+    case 'badge-sticker':
+      return '[BADGE] [DO NOT COVER SUBJECT] [SIZE: small-medium]';
+    case 'subtle-caption':
+      return '[CORNER] [MAX_TEXT_AREA: 5%] [SIZE: small] [NO_OVERLAP]';
+    default:
+      return '[BALANCED LAYOUT] [CLEAR TEXT SPACE]';
+  }
 }
 
 // =========================
