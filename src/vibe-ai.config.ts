@@ -754,7 +754,6 @@ export function postProcessLine(line: string, tone: string, requiredTags?: strin
         };
       }
     }
-  }
   
   // Only block meta/instructional tags, allow content tags like 'christmas', 'birthday', etc.
   const metaTags = ['meta', 'instruction', 'system', 'prompt', 'generate', 'create', 'format', 'json', 'array'];
