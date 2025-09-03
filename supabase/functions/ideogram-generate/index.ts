@@ -439,8 +439,19 @@ function normalizePromptForIdeogram(prompt: string): string {
 function enhancePromptForV3ExactText(prompt: string, isExactText: boolean): string {
   if (!isExactText) return prompt;
   
-  // For exact text requests, emphasize typography and clarity
-  const basePrompt = prompt.replace(/EXACT TEXT:\s*/i, '');
+  // Aggressively strip any remaining colon-labeled sections that could create microtext
+  let cleanedPrompt = prompt
+    // Remove common label patterns that create microtext
+    .replace(/\b(Occasion|Subject|Background|Style|Tone|Format|TEXT ZONE|TEXT QUALITY|READABILITY):\s*[^.]*\./gi, '')
+    // Remove bracketed instructions
+    .replace(/\[[^\]]*\]/g, ' ')
+    // Clean up multiple spaces and periods
+    .replace(/\s+/g, ' ')
+    .replace(/\.+/g, '.')
+    .trim();
   
-  return `${basePrompt}. Typography-focused render with clean, readable text placement. High contrast text against background. Professional text rendering quality. Render ONLY the specified text; no other text, captions, logos, watermarks, signatures, credits, or small print anywhere in the image.`;
+  // Re-append the critical safety instruction
+  cleanedPrompt += '. Render ONLY the specified text; absolutely no other text, captions, logos, watermarks, signatures, credits, small print, or microtext anywhere in the image.';
+  
+  return cleanedPrompt;
 }
