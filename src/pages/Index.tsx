@@ -6260,12 +6260,17 @@ const Index = () => {
                               {!selectedCompletionOption && <li>• Text completion option</li>}
                             </ul>
                           </div>}
-                        <Button variant="brand" className="px-8 py-3 text-base font-medium rounded-lg" onClick={handleGenerateText} disabled={isGenerating || !canGenerateText()}>
-                          {isGenerating ? <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Generating...
-                            </> : "Generate Text Now"}
-                        </Button>
+                        <div className="flex flex-col items-center gap-2">
+                          <Badge variant="secondary" className="text-xs font-medium px-2 py-1">
+                            Model: GPT-4.1
+                          </Badge>
+                          <Button variant="brand" className="px-8 py-3 text-base font-medium rounded-lg" onClick={handleGenerateText} disabled={isGenerating || !canGenerateText()}>
+                            {isGenerating ? <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Generating...
+                              </> : "Generate Text Now"}
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>}
