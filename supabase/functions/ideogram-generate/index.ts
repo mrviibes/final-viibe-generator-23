@@ -439,19 +439,20 @@ function normalizePromptForIdeogram(prompt: string): string {
 function enhancePromptForV3ExactText(prompt: string, isExactText: boolean): string {
   if (!isExactText) return prompt;
   
-  // Aggressively strip any remaining colon-labeled sections that could create microtext
-  let cleanedPrompt = prompt
-    // Remove common label patterns that create microtext
-    .replace(/\b(Occasion|Subject|Background|Style|Tone|Format|TEXT ZONE|TEXT QUALITY|READABILITY):\s*[^.]*\./gi, '')
-    // Remove bracketed instructions
-    .replace(/\[[^\]]*\]/g, ' ')
-    // Clean up multiple spaces and periods
-    .replace(/\s+/g, ' ')
-    .replace(/\.+/g, '.')
-    .trim();
+  // Remove bracketed tags, colon labels, and microtext-inducing fragments
+  let enhanced = prompt
+    .replace(/\[[^\]]*\]/g, '')                    // Remove all bracketed tags
+    .replace(/\b[A-Z_]+:\s*/g, '')                 // Remove colon-labeled headings
+    .replace(/\s+Render ONLY this text[^.]*\./gi, '')
+    .replace(/\s+Do NOT add any other words[^.]*\./gi, '')
+    .replace(/\s+ID:\d+_\d+/gi, '')               // Remove ID tags
+    .replace(/\s+PERFECT_SPELLING/gi, '')          // Remove quality tags
+    .replace(/\s+CRISP_FONT/gi, '')
+    .trim()
+    .replace(/\s+/g, ' ');                        // Normalize spacing
+    
+  // Re-append the safety directive
+  enhanced += ' Render exactly the specified text with no additions.';
   
-  // Re-append the critical safety instruction
-  cleanedPrompt += '. Render ONLY the specified text; absolutely no other text, captions, logos, watermarks, signatures, credits, small print, or microtext anywhere in the image.';
-  
-  return cleanedPrompt;
+  return enhanced;
 }

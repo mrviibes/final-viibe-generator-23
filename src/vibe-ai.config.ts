@@ -205,8 +205,8 @@ export interface IdeogramHandoff {
 // 2) Feature Flags and Constants  
 // =========================
 
-// Enhanced negative prompt with stronger text quality controls
-export const DEFAULT_NEGATIVE_PROMPT = "misspellings, spelling errors, typos, distorted letters, corrupted text, extra characters, random symbols, unreadable fonts, blurry text, warped text, backwards text, upside down text, gibberish text, overlapping text, crowded composition, low contrast text, pixelated text, cut off text, partial text, incomplete words, text artifacts, malformed letters, wrong fonts, invisible text, faded text, watermarks, signatures, logos, credits, footnotes, subtitles, taglines, small print, lorem ipsum, microtext, extra text, duplicated text, brand text, UI text, unrequested captions";
+// Shortened negative prompt for more focused generation
+export const DEFAULT_NEGATIVE_PROMPT = "misspellings, blurry text, watermarks, logos, extra text, microtext, low contrast";
 // Model fallback chains for retry strategy
 export const MODEL_FALLBACK_CHAINS = {
   text: [
@@ -879,25 +879,15 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   // EXACT TEXT RENDERING (if present) with enhanced quality controls
   if (handoff.key_line && handoff.key_line.trim()) {
     const cleanText = handoff.key_line.replace(/[""]/g, '"').replace(/['']/g, "'").replace(/[—–]/g, '-').trim();
-    parts.push(`EXACT TEXT: "${cleanText}" [PERFECT_SPELLING] [CRISP_FONT] [ID:${uniqueId}]`);
-    parts.push('Render ONLY this text. Do NOT add any other words, captions, logos, watermarks, signatures, credits, or small print anywhere in the image.');
+    parts.push(`"${cleanText}" as exact text only`);
     
-    // For EXACT TEXT: use label-free descriptions to prevent microtext
-    if (handoff.category && handoff.subcategory_primary) {
-      parts.push(`This is for ${handoff.category}, ${handoff.subcategory_primary}${handoff.subcategory_secondary ? ` (${handoff.subcategory_secondary})` : ''}.`);
-    }
-    
-    // MAIN SUBJECT without labels
+    // Compact scene description
     let subject = handoff.rec_subject;
     if (!subject && handoff.chosen_visual) {
       const visualParts = handoff.chosen_visual.split(' - ');
       subject = visualParts.length >= 2 ? visualParts[0].trim() : handoff.chosen_visual;
     }
-    if (subject) {
-      parts.push(`The scene features ${subject}.`);
-    }
     
-    // BACKGROUND without labels
     let background = handoff.rec_background;
     if (!background && handoff.chosen_visual) {
       const visualParts = handoff.chosen_visual.split(' - ');
@@ -909,7 +899,8 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     if (cleanBackground) {
       background = "clean, minimal background with high contrast for text";
     }
-    parts.push(`The background should be ${background}.`);
+    
+    parts.push(`${subject || handoff.category} scene with ${background}.`);
   } else {
     // Non-EXACT TEXT: use original labeling format
     // OCCASION/CATEGORY
@@ -955,39 +946,13 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   
   // COMPOSITION & STYLE WITH ENHANCED DIRECTIVES
   if (handoff.key_line && handoff.key_line.trim()) {
-    // For EXACT TEXT: use label-free style descriptions
-    if (handoff.visual_style) {
-      parts.push(`Rendered in ${handoff.visual_style} style with professional quality, rich colors and detailed textures.`);
-    }
-    if (handoff.tone) {
-      parts.push(`The overall feeling should be ${handoff.tone} with emotional depth and visual impact.`);
-    }
-    if (handoff.aspect_ratio) {
-      parts.push(`Use ${handoff.aspect_ratio} format with balanced composition.`);
-    }
+    // Compact style and tone
+    const styleDesc = `${handoff.visual_style || 'realistic'} style, ${handoff.tone || 'dynamic'} tone`;
+    parts.push(`${styleDesc}, ${handoff.aspect_ratio || 'square'} format.`);
     
-    // ENHANCED QUALITY DIRECTIVES with composition variety
-    const varietyKeywords = [
-      'dynamic angles', 'creative perspective', 'bold composition',
-      'innovative layout', 'fresh viewpoint', 'original framing'
-    ];
-    const varietyBoost = varietyKeywords[Math.floor(Math.random() * varietyKeywords.length)];
-    
-    parts.push(`HIGH QUALITY, professional composition, ${varietyBoost}`);
-    parts.push("Strong color contrast for text readability is essential");
-    
-    // ENHANCED TYPOGRAPHY STYLE PLACEMENT with text quality controls (no labels)
-    const typographyZone = getTypographyStyleZone(typographyStyle);
+    // Typography constraints
     const typographyConstraints = getTypographyStyleConstraints(typographyStyle);
-    
-    // Convert labeled instructions to natural language
-    const cleanTypographyZone = typographyZone.replace(/TEXT ZONE:\s*/i, '').replace(/\[|\]/g, '');
-    const cleanTypographyConstraints = typographyConstraints.replace(/\[|\]/g, '');
-    
-    parts.push(`Place text using ${cleanTypographyZone}`);
-    parts.push(cleanTypographyConstraints);
-    parts.push("Perfect spelling, clear fonts, no distortion required");
-    parts.push("High contrast background, crisp edges, proper spacing essential");
+    parts.push(typographyConstraints);
   } else {
     // Non-EXACT TEXT: use original labeling format
     if (handoff.visual_style) {
