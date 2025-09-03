@@ -99,26 +99,56 @@ async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: st
   }
 }
 
-// Helper function to generate tone-specific phrase candidates
-function phraseCandidates(tone: string, tags?: string[]): string[] {
-  // Include up to first two tags to help with validation
-  const tagSuffix = tags && tags.length > 0 ? ` ${tags.slice(0, 2).join(' ')}` : '';
+// Helper function to calculate sentence quality score for ranking
+function sentenceQualityScore(line: string, tone: string): number {
+  let score = 0;
   
+  // Word count preference (7+ words is good)
+  const wordCount = line.trim().split(/\s+/).length;
+  if (wordCount >= 7) score += 30;
+  else if (wordCount >= 5) score += 15;
+  else score -= 10; // Penalty for very short lines
+  
+  // Punctuation presence (indicates complete sentences)
+  if (/[.!?]/.test(line)) score += 20;
+  
+  // Clause markers (complexity indicators)
+  if (/[,;—-]/.test(line)) score += 10;
+  
+  // Penalty for slogan patterns
+  const sloganPatterns = [
+    /\b(vibes?|energy|mode)\s+(activated?|on|ready|engaged)\b/i,
+    /\b(maximum|pure|zero)\s+(effort|intensity|chill)\b/i,
+    /\benergy\s*$/i,
+    /\bvibes?\s*(only|activated)\b/i,
+    /\bmode\s+(on|activated)\b/i
+  ];
+  
+  for (const pattern of sloganPatterns) {
+    if (pattern.test(line)) {
+      score -= 15; // Strong penalty for slogan-like phrases
+    }
+  }
+  
+  return score;
+}
+
+// Helper function to generate tone-specific phrase candidates (no tags appended)
+function phraseCandidates(tone: string, tags?: string[]): string[] {
   const toneMap: Record<string, string[]> = {
-    humorous: ['Hilarious vibes only', 'Comedy gold incoming', 'Laugh track ready', 'Funny bone activated'],
-    sarcastic: ['Oh, absolutely perfect', 'Well, this is fantastic', 'Clearly the best choice', 'Obviously brilliant'],
-    savage: ['No mercy shown', 'Brutally honest moment', 'Pure intensity', 'Maximum effort'],
-    witty: ['Clever comeback ready', 'Sharp wit engaged', 'Smartly crafted', 'Intelligence on display'],
-    playful: ['Fun times ahead', 'Playful energy activated', 'Good vibes flowing', 'Cheerful moment incoming'],
-    romantic: ['Love in the air', 'Heart eyes activated', 'Romance mode on', 'Sweetness overload'],
-    motivational: ['Success mindset engaged', 'Determination activated', 'Victory mode on', 'Champions only'],
-    nostalgic: ['Memory lane vibes', 'Throwback feels', 'Classic moment', 'Vintage energy'],
-    mysterious: ['Secrets revealed slowly', 'Mystery mode activated', 'Enigma engaged', 'Curiosity sparked'],
-    confident: ['Boss energy activated', 'Confidence on full', 'Self-assured vibes', 'Power mode engaged']
+    humorous: ['Comedy finds you when you least expect it.', 'Laughter is the best medicine, apparently.', 'Funny things happen to serious people.', 'Humor is timing, and timing is everything.'],
+    sarcastic: ['Oh, absolutely perfect timing as always.', 'Well, this is exactly what we needed.', 'Clearly the universe has a sense of humor.', 'Obviously this was going to happen.'],
+    savage: ['No mercy, no excuses, just results.', 'Brutally honest conversations change everything.', 'Reality hits harder than expectations.', 'Truth hurts, but lies hurt more.'],
+    witty: ['Clever minds think outside the obvious.', 'Sharp wit cuts through the nonsense.', 'Intelligence shows up in small moments.', 'Smart choices lead to better stories.'],
+    playful: ['Fun happens when you stop overthinking.', 'Playful hearts find joy in everything.', 'Good vibes attract better experiences.', 'Cheerful moments make the best memories.'],
+    romantic: ['Love finds you in unexpected places.', 'Hearts connect when minds align perfectly.', 'Romance blooms in ordinary moments.', 'Sweet gestures speak louder than words.'],
+    sentimental: ['Feelings matter more than we admit.', 'Heartfelt moments stay with us forever.', 'Emotional connections run deeper than logic.', 'Touching memories shape our future.'],
+    nostalgic: ['Yesterday\'s memories become today\'s treasures.', 'Past experiences light up present moments.', 'Vintage souls appreciate timeless beauty.', 'Memory lane leads to happy places.'],
+    inspirational: ['Dreams become reality through consistent action.', 'Success starts with believing in yourself.', 'Greatness lives inside ordinary people.', 'Motivation turns possibilities into achievements.'],
+    serious: ['Professional excellence requires constant dedication.', 'Business success demands strategic thinking.', 'Focused effort produces measurable results.', 'Serious commitment leads to lasting change.']
   };
   
-  const basePhrases = toneMap[tone.toLowerCase()] || toneMap.humorous;
-  return basePhrases.map(phrase => `${phrase}${tagSuffix}`);
+  return toneMap[tone.toLowerCase()] || toneMap.humorous;
 }
 
 export async function generateCandidates(inputs: VibeInputs, n: number = 4): Promise<VibeResult> {

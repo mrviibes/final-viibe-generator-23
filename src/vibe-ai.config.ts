@@ -1199,7 +1199,12 @@ ${inputs.recipient_name && inputs.recipient_name !== "-" ? `Target: ${inputs.rec
 
 ${tagRequirement}${specialInstructions}
 
-IMPORTANT: Never generate meta phrases like "Short and witty like you asked", "As requested", "Here you go", or any commentary about the request. Only generate direct, usable content lines.
+QUALITY REQUIREMENTS:
+• Each option must be a complete sentence with a subject and verb, using natural punctuation
+• Avoid generic slogans like 'X energy', 'Y vibes', 'mode activated', or 'Boss energy'
+• No hashtags or quotation marks
+• Never generate meta phrases like "Short and witty like you asked", "As requested", "Here you go", or any commentary about the request
+• Only generate direct, usable content lines
 
 Return only: {"lines":["option1","option2","option3","option4","option5","option6"]}`;
 
