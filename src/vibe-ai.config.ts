@@ -616,6 +616,15 @@ export function postProcessLine(
     .replace(/^["']|["']$/g, '')  // Remove quotes
     .replace(/^\d+[\.\)\-]\s*/, '') // Remove numbering
     .replace(/^[•\-\*]\s*/, '')     // Remove bullet points
+    .replace(/[—–]/g, (match, offset, string) => {
+      // If surrounded by spaces, replace with comma + space
+      if (offset > 0 && offset < string.length - 1 && 
+          string[offset - 1] === ' ' && string[offset + 1] === ' ') {
+        return ', ';
+      }
+      // Otherwise replace with regular hyphen
+      return '-';
+    })
     .trim();
 
   // Handle knock-knock format preservation

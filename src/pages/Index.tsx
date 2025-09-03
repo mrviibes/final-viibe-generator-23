@@ -5710,8 +5710,8 @@ const Index = () => {
 
         {currentStep === 2 && <>
             <div className="text-center mb-12">
-              <div className="flex items-center justify-between max-w-6xl mx-auto mb-6">
-                <h2 className="text-2xl md:text-3xl font-semibold text-foreground">Create Your Text Content</h2>
+              <div className="flex flex-col items-center justify-center max-w-6xl mx-auto mb-6">
+                <h2 className="text-2xl md:text-3xl font-semibold text-foreground text-center">Create Your Text Content</h2>
                 {/* Remember choices toggle hidden for now */}
                 {false && <div className="flex items-center gap-3 text-sm">
                   <label htmlFor="remember-choices" className="text-muted-foreground cursor-pointer">
