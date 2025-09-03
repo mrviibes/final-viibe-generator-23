@@ -5848,27 +5848,10 @@ const Index = () => {
                 {/* Show AI Assist form when selected and no options generated yet */}
                 {selectedCompletionOption === "ai-assist" && generatedOptions.length === 0 && <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div className="text-center mb-6">
-                      <p className="text-xl text-muted-foreground">Add tags for content generation</p>
+                      <p className="text-xl text-muted-foreground">Add exact keywords for content generation</p>
                     </div>
 
                     <div className="max-w-lg mx-auto space-y-6">
-                      {/* General Tags Input */}
-                      <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
-                        <div className="text-center">
-                          <label className="text-sm font-medium text-foreground">General Tags (give AI direction for text)</label>
-                          <p className="text-xs text-muted-foreground mt-1">Theme, vibe, direction (movie quotes, birthday, funny)</p>
-                        </div>
-                        <Input value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={handleTagInputKeyDown} placeholder="Enter general tags (press Enter or comma to add)" className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
-                        
-                        {/* Display General Tags */}
-                        {tags.length > 0 && <div className="flex flex-wrap gap-2 justify-center">
-                            {tags.map((tag, index) => <Badge key={index} variant="secondary" className="px-3 py-1 text-sm flex items-center gap-1">
-                                {tag}
-                                <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => removeTag(tag)} />
-                              </Badge>)}
-                          </div>}
-                      </div>
-
                       {/* Exact Text Tags Input */}
                       <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-200">
                         <div className="text-center">
