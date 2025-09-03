@@ -11,8 +11,6 @@
     - v1.1.0 added runtime overrides system
 */
 
-import { advancedSpellCheck, validateGrammar, containsDerogatory } from './lib/textUtils';
-
 // Runtime overrides (stored in localStorage)
 export interface AIRuntimeOverrides {
   model?: string;
@@ -23,13 +21,8 @@ export interface AIRuntimeOverrides {
   defaultVisualStyle?: VisualStyle;
   defaultTone?: Tone;
   magicPromptEnabled?: boolean;
-  enableMagicPrompt?: boolean;
   ideogramModel?: 'V_2A_TURBO' | 'V_3';
   typographyStyle?: 'poster' | 'negative_space';
-  popCultureWebFacts?: boolean;
-  popCultureRecency?: 'month' | 'year' | 'all';
-  contentFilterStrictness?: ContentFilterStrictness;
-  sensitiveTagHandling?: SensitiveTagHandling;
 }
 
 // Get runtime overrides from localStorage
@@ -94,14 +87,11 @@ export type Category =
   | "Celebrations"
   | "Sports"
   | "Daily Life"
-  | "Careers"
-  | "Anything Goes"
+  | "Vibes & Punchlines"
   | "Pop Culture"
   | "No Category";
 
 export type AspectPreset = "Square" | "Landscape" | "Portrait" | "Custom";
-export type ContentFilterStrictness = 'strict' | 'relaxed' | 'off';
-export type SensitiveTagHandling = 'auto-rewrite' | 'warn-only' | 'off';
 
 export interface AspectRatioSpec {
   preset: AspectPreset;
@@ -155,14 +145,12 @@ export interface OutputSchema {
 export interface VibeInputs extends Partial<UserInputs> {
   // Backward compatibility mappings
   exactWordingTags?: string[]; // Support exact wording tags
-  retryMode?: 'allude-dont-quote' | 'anti-echo'; // Add retry mode support
 }
 
 export interface VibeCandidate {
   line: string;
   blocked: boolean;
   reason?: string;
-  hasBannedExactWords?: boolean;
 }
 
 export interface VibeResult {
@@ -180,9 +168,6 @@ export interface VibeResult {
     originalModel?: string;
     originalModelDisplayName?: string;
     spellingFiltered?: number;
-    usedBackupPrompt?: boolean;
-    usedAntiEcho?: boolean;
-    sanitizedTags?: Array<{ original: string; replacement: string; reason: string; }>;
   };
 }
 
@@ -204,108 +189,26 @@ export interface IdeogramHandoff {
 // 2) Feature Flags and Constants  
 // =========================
 
-// Sensitive tag detection and rewriting system
-export interface SensitiveTagResult {
-  original: string;
-  replacement: string;
-  reason: string;
-  wasSanitized: boolean;
-}
-
-export function rewriteSensitiveTags(tags: string[]): SensitiveTagResult[] {
-  return tags.map(tag => {
-    const lowerTag = tag.toLowerCase().trim();
-    
-    // Pattern: "[name] is so gay" or similar derogatory usage
-    const derogatoryGayPattern = /(.+)\s+is\s+so\s+gay/i;
-    const match = derogatoryGayPattern.exec(tag);
-    
-    if (match) {
-      const name = match[1];
-      return {
-        original: tag,
-        replacement: `${name} is fabulous`,
-        reason: 'Converted derogatory usage to positive expression',
-        wasSanitized: true
-      };
-    }
-    
-    // Check for other potentially problematic phrases
-    const problematicPatterns = [
-      { pattern: /\b(retard|retarded)\b/i, replacement: 'silly', reason: 'Replaced ableist language' },
-      { pattern: /\b(lame)\b/i, replacement: 'uncool', reason: 'Replaced ableist language' },
-      { pattern: /\b(crazy|insane)\b/i, replacement: 'wild', reason: 'Replaced mental health language' }
-    ];
-    
-    for (const { pattern, replacement, reason } of problematicPatterns) {
-      if (pattern.test(lowerTag)) {
-        return {
-          original: tag,
-          replacement: tag.replace(pattern, replacement),
-          reason,
-          wasSanitized: true
-        };
-      }
-    }
-    
-    // No sanitization needed
-    return {
-      original: tag,
-      replacement: tag,
-      reason: '',
-      wasSanitized: false
-    };
-  });
-}
-
-export function getSensitiveTagSuggestions(tag: string): string[] {
-  const lowerTag = tag.toLowerCase();
-  
-  if (lowerTag.includes('gay')) {
-    return ['fabulous', 'camp', 'theatrical', 'pride'];
-  }
-  
-  if (lowerTag.includes('crazy') || lowerTag.includes('insane')) {
-    return ['wild', 'chaotic', 'unpredictable', 'intense'];
-  }
-  
-  if (lowerTag.includes('lame')) {
-    return ['uncool', 'boring', 'disappointing', 'weak'];
-  }
-  
-  return ['stylish', 'dramatic', 'expressive', 'bold'];
-}
-
-// Fixed negative prompt applied to all image generations - keep short and focused
-export const DEFAULT_NEGATIVE_PROMPT = "misspellings, distorted letters, typos, incorrect spelling, garbled text, unreadable text, handwriting, cursive, script font, ligatures, broken kerning, cramped kerning, letter swaps, split letters, watermark, logo, captions, duplicated words";
-
-// Enhanced negative prompt for exact text scenarios
-export const EXACT_TEXT_NEGATIVE_PROMPT = "misspellings, distorted letters, typos, incorrect spelling, garbled text, unreadable text, handwriting, cursive, script font, ligatures, broken kerning, cramped kerning, letter swaps, split letters, watermark, logo, captions, duplicated words, blurry text, unclear typography, text bleeding, overlapping text, shadow text effects, beveled text, 3D text distortion";
+// Fixed negative prompt applied to all image generations
+export const DEFAULT_NEGATIVE_PROMPT = "misspellings, distorted letters, extra characters, typos, random symbols, unreadable fonts, cartoon style, flat colors, empty background, isolated subject, small text, hidden text";
 // Model fallback chains for retry strategy
 export const MODEL_FALLBACK_CHAINS = {
   text: [
-    'gpt-4.1-2025-04-14',
-    'gpt-5-mini-2025-08-07',
-    'gpt-5-2025-08-07'
+    'gpt-4.1-2025-04-14'
   ],
   visual: [
-    'gpt-4.1-2025-04-14',
-    'gpt-5-mini-2025-08-07'
+    'gpt-4.1-2025-04-14'
   ]
 };
 
 // Available models for UI
 export const AVAILABLE_MODELS = [
-  { value: 'gpt-4.1-2025-04-14', label: 'GPT-4.1', isRecommended: true },
-  { value: 'gpt-5-mini-2025-08-07', label: 'GPT-5 Mini', isRecommended: false },
-  { value: 'gpt-5-2025-08-07', label: 'GPT-5', isRecommended: false }
+  { value: 'gpt-4.1-2025-04-14', label: 'GPT-4.1', isRecommended: true }
 ];
 
 // Friendly model names for display
 export const MODEL_DISPLAY_NAMES: Record<string, string> = {
-  'gpt-4.1-2025-04-14': 'GPT-4.1',
-  'gpt-5-mini-2025-08-07': 'GPT-5 Mini',
-  'gpt-5-2025-08-07': 'GPT-5'
+  'gpt-4.1-2025-04-14': 'GPT-4.1'
 };
 
 export const AI_CONFIG = {
@@ -339,11 +242,11 @@ export const AI_CONFIG = {
     max_candidates: 6,
     temperature: 0.7,
     max_tokens: 400,
-    model: 'gpt-4.1-2025-04-14' // Default to GPT-4.1
+    model: 'gpt-4.1-2025-04-14' // Default to GPT-4.1 as requested
   },
   visual_generation: {
     max_tokens: 450, // Reduced for faster concepts
-    model: 'gpt-4.1-2025-04-14' // Default to GPT-4.1
+    model: 'gpt-4.1-2025-04-14' // Default to GPT-4.1 as requested
   }
 };
 
@@ -394,15 +297,13 @@ export const SYSTEM_PROMPTS = {
   vibe_generator: `You are a witty, creative copywriter specializing in short-form content. 
 Your task is to write 6 distinct options that vary significantly in structure, theme, and wording while maintaining the specified tone.
 Make each option distinctly different - avoid repeating similar phrases, structures, or concepts.
-CRITICAL: Do NOT echo user tags verbatim. Use the spirit and meaning of tags without repeating the exact words.
-Focus on proper grammar, natural flow, and complete thoughts. Avoid broken sentences or nonsensical word combinations.
 Always output valid JSON only.`,
 
-  visual_generator: `Generate 4 visual concepts for graphics that MUST align with the provided text and tone. Be ultra-concise.
+  visual_generator: `Generate 4 visual concepts for graphics that MUST align with the provided text and tone. Be concise.
 
 RULES:
 - Return ONLY valid JSON - no markdown, no extra text
-- Each prompt: ONE SENTENCE, maximum ~20 words
+- Each prompt: 40-60 words maximum
 - Generate exactly 4 diverse visual concepts
 - CRITICAL: Visual concepts MUST relate to the provided text/joke content and tone
 - Provide exactly one background-only concept and 3 distinct subject+background concepts
@@ -416,7 +317,7 @@ Format:
     {
       "subject": "brief description (optional for background-only)",
       "background": "brief description", 
-      "prompt": "ultra-concise prompt (~20 words max)"
+      "prompt": "concise prompt (40-60 words)"
     }
   ]
 }`
@@ -438,14 +339,14 @@ export const BANNED_WORDS = [
 ];
 
 export const TONE_FALLBACKS: Record<string, string> = {
-  humorous: "Life's too short for boring moments",
-  savage: "Excellence is the only standard",
-  sentimental: "Cherishing every meaningful moment",
-  nostalgic: "Taking a trip down memory lane",
-  romantic: "Love fills every heartbeat",
-  inspirational: "Dreams become reality with action",
-  playful: "Ready for some fun adventures",
-  serious: "Reflecting on life's important moments"
+  humorous: "Short and witty like you asked",
+  savage: "Bold and direct as requested",
+  sentimental: "Heartfelt message coming right up",
+  nostalgic: "Memory lane vibes activated",
+  romantic: "Sweet words in progress",
+  inspirational: "Motivational mode engaged",
+  playful: "Fun and light as ordered",
+  serious: "Thoughtful message loading"
 };
 
 // =========================
@@ -580,12 +481,8 @@ function spellcheck(s: string): string[] {
 }
 
 export function postProcessLine(line: string, tone: string, requiredTags?: string[], options?: { allowNewlines?: boolean; format?: 'knockknock'; exactWordingTags?: string[] }): VibeCandidate {
-  
   // Trim spaces
   let cleaned = line.trim();
-  
-  // Apply grammar and idiom fixes first
-  cleaned = applyIdiomsAndContractions(cleaned);
   
   // Handle knock-knock format
   const isKnockKnock = options?.format === 'knockknock';
@@ -632,47 +529,19 @@ export function postProcessLine(line: string, tone: string, requiredTags?: strin
   
   // Apply text normalization and fixes
   cleaned = normalizeTypography(cleaned);
+  cleaned = applyIdiomsAndContractions(cleaned);
   
-  // Enhanced spellcheck and grammar validation
-  const spellResults = advancedSpellCheck(cleaned);
-  const grammarResults = validateGrammar(cleaned);
+  // Fix common text generation errors
+  // Remove duplicate words (e.g., "to beance to become" -> "to become")
+  cleaned = cleaned.replace(/\b(\w+)\s+\w*\1/gi, '$1');
   
-  // Block if too many spelling/grammar issues
-  if (spellResults.score < 0.7 || spellResults.issues.length > 2) {
-    return {
-      line: TONE_FALLBACKS[tone.toLowerCase()] || TONE_FALLBACKS.humorous,
-      blocked: true,
-      reason: `Spelling issues: ${spellResults.issues.slice(0, 2).join(', ')}`
-    };
-  }
+  // Fix repeated "to" patterns specifically
+  cleaned = cleaned.replace(/\bto\s+\w*to\b/gi, 'to');
   
-  // Block if grammar is severely broken
-  if (!grammarResults.hasBasicStructure || grammarResults.issues.length > 1) {
-    return {
-      line: TONE_FALLBACKS[tone.toLowerCase()] || TONE_FALLBACKS.humorous,
-      blocked: true,
-      reason: `Grammar issues: ${grammarResults.issues.slice(0, 1).join(', ')}`
-    };
-  }
-  
-  // Safety check for derogatory content
-  if (containsDerogatory(cleaned)) {
-    return {
-      line: TONE_FALLBACKS[tone.toLowerCase()] || TONE_FALLBACKS.humorous,
-      blocked: true,
-      reason: 'Contains inappropriate content'
-    };
-  }
-  
-  // Fix adjacent duplicate words only (safer approach)
-  const words = cleaned.split(' ');
-  for (let i = 0; i < words.length - 1; i++) {
-    if (words[i] === words[i + 1] && words[i].length > 2) {
-      words.splice(i + 1, 1);
-      i--; // Check the same position again
-    }
-  }
-  cleaned = words.join(' ');
+  // Fix common spelling errors specific to generation
+  cleaned = cleaned.replace(/\basement\b/gi, 'basement')
+    .replace(/\bcarrer\b/gi, 'career')
+    .replace(/\bskils\b/gi, 'skills');
   
   // Remove double spaces and clean up
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
@@ -683,20 +552,14 @@ export function postProcessLine(line: string, tone: string, requiredTags?: strin
     cleaned = cleaned.slice(0, maxLength);
   }
   
-  // Check for banned words in exact wording tags and mask them
-  const hasBannedExactWords = options?.exactWordingTags?.some(tag => 
-    BANNED_WORDS.some(word => tag.toLowerCase().includes(word.toLowerCase()))
-  );
-  
-  // Check for banned words in the generated text
+  // Check for banned words
   const lowerCleaned = cleaned.toLowerCase();
   for (const word of BANNED_WORDS) {
     if (lowerCleaned.includes(word)) {
       return {
         line: TONE_FALLBACKS[tone.toLowerCase()] || TONE_FALLBACKS.humorous,
         blocked: true,
-        reason: `Contains banned word: ${word}`,
-        hasBannedExactWords // Pass this info for special handling
+        reason: `Contains banned word: ${word}`
       };
     }
   }
@@ -710,89 +573,44 @@ export function postProcessLine(line: string, tone: string, requiredTags?: strin
     };
   }
   
-  // Early quality guard - block lines that are too short or generic
-  const wordCount = cleaned.split(' ').filter(w => w.length > 0).length;
-  if (wordCount < 3 || cleaned.length < 12) {
-    return {
-      line: TONE_FALLBACKS[tone.toLowerCase()] || TONE_FALLBACKS.humorous,
-      blocked: true,
-      reason: 'Too short'
-    };
-  }
-  
-  // Block generic closer patterns (exact phrase + generic suffix)
-  const genericCloserPatterns = [
-    /— go for it$/i,
-    /— let's go$/i,
-    /— you got this$/i,
-    /— nice$/i,
-    /— good$/i,
-    /— yes$/i,
-    /— cool$/i
-  ];
-  
-  for (const pattern of genericCloserPatterns) {
-    if (pattern.test(cleaned)) {
+  // Enforce savage tone quality - block joke-like content for savage (skip for knock-knock)
+  if (tone.toLowerCase() === 'savage' && !isKnockKnock) {
+    // Block obvious joke patterns that don't fit savage tone
+    if (cleaned.match(/^(why did|what do you call|knock knock)/i) || 
+        cleaned.match(/\?\!*$/i) ||
+        cleaned.match(/\bhaha\b|\blol\b|\bmeh\b/i)) {
       return {
-        line: TONE_FALLBACKS[tone.toLowerCase()] || TONE_FALLBACKS.humorous,
+        line: TONE_FALLBACKS.savage,
         blocked: true,
-        reason: 'Generic closer'
+        reason: 'Not savage enough - too joke-like'
       };
     }
   }
   
-    // Enforce savage tone quality - block joke-like content for savage (skip for knock-knock)
-    if (tone.toLowerCase() === 'savage' && !isKnockKnock) {
-      // Block obvious joke patterns that don't fit savage tone
-      if (cleaned.match(/^(why did|what do you call|knock knock)/i) || 
-          cleaned.match(/\?\!*$/i) ||
-          cleaned.match(/\bhaha\b|\blol\b|\bmeh\b/i)) {
-        return {
-          line: TONE_FALLBACKS.savage,
-          blocked: true,
-          reason: 'Not savage enough - too joke-like'
-        };
-      }
-    }
-  
-  // Only block meta/instructional tags, allow content tags like 'christmas', 'birthday', etc.
-  const metaTags = ['meta', 'instruction', 'system', 'prompt', 'generate', 'create', 'format', 'json', 'array'];
+  // Block if general tags appear verbatim in the text
   const generalTags = requiredTags?.filter(tag => 
-    !options?.exactWordingTags?.includes(tag) &&
-    metaTags.some(metaTag => tag.toLowerCase().includes(metaTag))
+    !options?.exactWordingTags?.includes(tag)
   ) || [];
   
   for (const tag of generalTags) {
-    if (lowerCleaned.includes(tag.toLowerCase())) {
+    // Only enforce for tags with length >= 4 to avoid false positives
+    if (tag.length >= 4 && lowerCleaned.includes(tag.toLowerCase())) {
       return {
         line: TONE_FALLBACKS[tone.toLowerCase()] || TONE_FALLBACKS.humorous,
         blocked: true,
-        reason: `Contains meta tag verbatim: ${tag}`
+        reason: `Contains general tag verbatim: ${tag}`
       };
     }
   }
 
-  // Check exact wording requirements with special handling for banned words
+  // Check exact wording requirements FIRST (strict enforcement)
   if (options?.exactWordingTags && options.exactWordingTags.length > 0) {
     const missingExactWords = options.exactWordingTags.filter(exactTag => {
       const lowerTag = exactTag.toLowerCase().trim();
       const lowerCleaned = cleaned.toLowerCase();
       
-      // If this exact tag contains banned words, don't require it
-      const hasBannedWord = BANNED_WORDS.some(word => lowerTag.includes(word.toLowerCase()));
-      if (hasBannedWord) {
-        return false; // Don't consider this a missing requirement
-      }
-      
-      // Normalize both strings by removing quotes and backticks for comparison
-      const normalizeForComparison = (str: string) => 
-        str.replace(/['""`]/g, '').replace(/\s+/g, ' ').trim();
-      
-      const normalizedTag = normalizeForComparison(lowerTag);
-      const normalizedCleaned = normalizeForComparison(lowerCleaned);
-      
       // Must be exact match (whole word or phrase)
-      return !normalizedCleaned.includes(normalizedTag);
+      return !lowerCleaned.includes(lowerTag);
     });
     
     if (missingExactWords.length > 0) {
@@ -804,8 +622,56 @@ export function postProcessLine(line: string, tone: string, requiredTags?: strin
     }
   }
 
-  // Skip tag coverage checks entirely - too restrictive
-  // Allow all content through as long as it passes other filters
+  // Check tag coverage for important tags (skip visual-only tags) - relaxed approach
+  if (generalTags && generalTags.length > 0) {
+    const visualOnlyTags = ['person', 'people', 'group', 'man', 'woman', 'male', 'female'];
+    const contentTags = generalTags.filter(tag => !visualOnlyTags.includes(tag.toLowerCase()));
+    
+    if (contentTags.length > 0) {
+      // Create a simple synonyms map for common terms
+      const synonymsMap: Record<string, string[]> = {
+        'work': ['job', 'career', 'office', 'workplace', 'employment'],
+        'job': ['work', 'career', 'employment', 'position'],
+        'career': ['work', 'job', 'profession', 'employment'],
+        'birthday': ['bday', 'birth', 'celebration', 'party'],
+        'party': ['celebration', 'bash', 'gathering', 'event'],
+        'funny': ['hilarious', 'comedy', 'humor', 'joke', 'laughter'],
+        'movie': ['film', 'cinema', 'flick'],
+        'music': ['song', 'album', 'band', 'artist'],
+        'love': ['romance', 'relationship', 'dating', 'crush'],
+        'food': ['eat', 'meal', 'cooking', 'restaurant', 'dining']
+      };
+      
+      // Extract keywords from tags and check for matches with synonyms
+      const hasTagCoverage = contentTags.some(tag => {
+        const lowerTag = tag.toLowerCase();
+        
+        // Direct match
+        if (lowerCleaned.includes(lowerTag)) return true;
+        
+        // Check for synonyms
+        const synonyms = synonymsMap[lowerTag] || [];
+        if (synonyms.some(synonym => lowerCleaned.includes(synonym))) return true;
+        
+        // Check for partial word matches (e.g., "birthday" matches "birth")
+        if (lowerTag.length > 4) {
+          const rootWord = lowerTag.slice(0, -2); // Remove last 2 chars for partial match
+          if (lowerCleaned.includes(rootWord)) return true;
+        }
+        
+        return false;
+      });
+      
+      if (!hasTagCoverage) {
+        // Don't block for tag issues - just mark it
+        return {
+          line: cleaned,
+          blocked: false,
+          reason: `Partial tag coverage: ${contentTags.join(', ')}`
+        };
+      }
+    }
+  }
   
   return {
     line: cleaned,
@@ -819,22 +685,15 @@ export function postProcessLine(line: string, tone: string, requiredTags?: strin
 function getFallbackVariants(tone: string, category: string, subcategory: string): string[] {
   const baseFallback = TONE_FALLBACKS[tone.toLowerCase()] || TONE_FALLBACKS.humorous;
   
-  // Create contextual variations based on category and subcategory
-  const contextualPhrases = {
-    birthday: ['Another year wiser', 'Celebrating you today', 'Age is just a number', 'Party time approaches'],
-    work: ['Grinding never stops', 'Professional mode activated', 'Career goals loading', 'Success in progress'],
-    sports: ['Game time mentality', 'Victory lap incoming', 'Champions train daily', 'Athletic excellence'],
-    movie: ['Blockbuster moment', 'Plot twist ahead', 'Credits rolling soon', 'Scene stealer alert'],
-    default: [baseFallback, `${baseFallback} today`, `${baseFallback} vibes`, `${baseFallback} energy`]
-  };
+  // Create 4 distinct variations based on tone and context
+  const variations = [
+    baseFallback,
+    `${baseFallback} today`,
+    `${baseFallback} vibes`,
+    `${baseFallback} energy`
+  ];
   
-  // Match subcategory to contextual phrases
-  const key = subcategory?.toLowerCase().includes('birthday') ? 'birthday' :
-             subcategory?.toLowerCase().includes('work') || subcategory?.toLowerCase().includes('job') ? 'work' :
-             category?.toLowerCase().includes('sports') ? 'sports' :
-             subcategory?.toLowerCase().includes('movie') ? 'movie' : 'default';
-  
-  return contextualPhrases[key] || contextualPhrases.default;
+  return variations;
 }
 
 function phraseCandidates(u: UserInputs): string[] {
@@ -961,8 +820,7 @@ export const BACKGROUND_PRESETS: BackgroundPreset[] = [
   { id: 'luxury', name: 'Luxury Style', keywords: ['luxury interior', 'marble columns', 'gold accents', 'upscale setting'], textSafeZone: 'right', style: 'elegant luxury' },
   { id: 'cosmic', name: 'Space & Cosmic', keywords: ['starry night', 'galaxy background', 'cosmic setting', 'space theme'], textSafeZone: 'bottom', style: 'cosmic wonder' },
   { id: 'industrial', name: 'Industrial Edge', keywords: ['industrial setting', 'metal backdrop', 'warehouse vibe', 'concrete industrial'], textSafeZone: 'corners', style: 'industrial grit' },
-  { id: 'artistic', name: 'Creative Studio', keywords: ['art studio', 'creative workspace', 'artistic chaos', 'paint splatter'], textSafeZone: 'left', style: 'artistic freedom' },
-  { id: 'dispensary', name: 'Cannabis Dispensary', keywords: ['modern dispensary interior', 'stylish cannabis store shelves', 'trendy marijuana retail space', 'clean dispensary background'], textSafeZone: 'top', style: 'modern retail' }
+  { id: 'artistic', name: 'Creative Studio', keywords: ['art studio', 'creative workspace', 'artistic chaos', 'paint splatter'], textSafeZone: 'left', style: 'artistic freedom' }
 ];
 
 export function getBackgroundPreset(presetId: string): BackgroundPreset | null {
@@ -972,136 +830,18 @@ export function getBackgroundPreset(presetId: string): BackgroundPreset | null {
 // =========================
 // 9) Ideogram-specific Functions
 // =========================
-
-// Interface for concise mode options
-export interface ConciseModeOptions {
-  enabled: boolean;
-  textZone?: 'TOP' | 'BOTTOM' | 'LEFT' | 'RIGHT' | 'NATURAL';
-  strongerSubjectLock?: boolean;
-}
-
-// Enhanced exact text detection and formatting
-function hasExactTextRequirement(prompt: string): boolean {
-  return prompt.includes('EXACT TEXT:') || 
-         prompt.includes('exact spelling') ||
-         prompt.includes('precise text') ||
-         prompt.includes('word-for-word');
-}
-
-function formatExactTextPrompt(prompt: string): string {
-  if (!hasExactTextRequirement(prompt)) return prompt;
-  
-  // Extract exact text if present
-  const exactTextMatch = prompt.match(/EXACT TEXT:\s*["']([^"']+)["']/);
-  if (exactTextMatch) {
-    const exactText = exactTextMatch[1];
-    
-    // Strong emphasis on exact spelling
-    const enhancedPrompt = prompt.replace(
-      /EXACT TEXT:\s*["'][^"']+["']/,
-      `EXACT TEXT: "${exactText}" - Render each letter precisely as provided, maintaining exact spelling and character placement`
-    );
-    
-    // Add typography guidance
-    return enhancedPrompt + `. Use clear, readable typography with high contrast. Place text in natural negative space areas. Use TOP, BOTTOM, LEFT, or RIGHT zones. Ensure high contrast and avoid overlapping with faces. Render only the EXACT TEXT string as graphic text; no additional labels or captions.`;
-  }
-  
-  return prompt;
-}
-
-export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: boolean = false, conciseMode?: ConciseModeOptions): string {
+export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: boolean = false): string {
   const parts: string[] = [];
   const overrides = getRuntimeOverrides();
-  const typographyStyle = overrides.typographyStyle || 'poster';
+  const typographyStyle = overrides.typographyStyle || 'poster'; // Default to poster style
   
-  // Use concise mode if specified
-  const isConciseMode = conciseMode?.enabled || false;
-  
-  // EXACT TEXT RENDERING (if present) - PUT FIRST for priority
+  // EXACT TEXT RENDERING (if present) - Remove redundant "EXACT TEXT:" prefix
   if (handoff.key_line && handoff.key_line.trim()) {
-    const cleanText = handoff.key_line
-      .replace(/[""]/g, '"')
-      .replace(/['']/g, "'")
-      .replace(/[—–]/g, '-')
-      .replace(/[^\x00-\x7F]/g, '') // Remove non-ASCII characters
-      .trim();
+    const cleanText = handoff.key_line.replace(/[""]/g, '"').replace(/['']/g, "'").replace(/[—–]/g, '-').trim();
+    // Remove redundant "EXACT TEXT:" prefix that users might include
     const finalText = cleanText.replace(/^EXACT TEXT:\s*["']?/i, '').replace(/["']$/, '');
-    
-    if (isConciseMode) {
-      // Ultra-concise text marking for better subject focus
-      parts.push(`EXACT TEXT: "${finalText}"`);
-    } else {
-      parts.push(`EXACT TEXT: "${finalText}"`);
-    }
+    parts.push(`EXACT TEXT: "${finalText}"`);
   }
-  
-  if (isConciseMode) {
-    // CONCISE MODE: Subject-first, minimal prompting
-    const conciseParts = [];
-    
-    // MAIN SUBJECT (prioritized and locked)
-    let subject = handoff.rec_subject;
-    if (!subject && handoff.chosen_visual) {
-      const visualParts = handoff.chosen_visual.split(' - ');
-      subject = visualParts.length >= 2 ? visualParts[0].trim() : handoff.chosen_visual;
-    }
-    
-    if (subject) {
-      if (conciseMode?.strongerSubjectLock) {
-        conciseParts.push(`${subject} (main focus)`);
-      } else {
-        conciseParts.push(subject);
-      }
-    }
-    
-    // BACKGROUND (minimal)
-    let background = handoff.rec_background;
-    if (!background && handoff.chosen_visual) {
-      const visualParts = handoff.chosen_visual.split(' - ');
-      background = visualParts.length >= 2 ? visualParts[1].trim() : `${handoff.subcategory_primary} setting`;
-    }
-    if (!background) {
-      background = `${handoff.subcategory_primary} setting`;
-    }
-    if (cleanBackground) {
-      background = "clean background";
-    }
-    conciseParts.push(background);
-    
-    // STYLE (compressed)
-    if (handoff.visual_style) {
-      conciseParts.push(`${handoff.visual_style} style`);
-    }
-    if (handoff.tone) {
-      conciseParts.push(`${handoff.tone} tone`);
-    }
-    
-    // TEXT ZONE (specific placement)
-    if (handoff.key_line && conciseMode?.textZone) {
-      if (conciseMode.textZone === 'NATURAL') {
-        conciseParts.push("text in natural negative space");
-      } else {
-        conciseParts.push(`text in ${conciseMode.textZone} zone`);
-      }
-    }
-    
-    // Context-aware negative prompts (minimal)
-    if (handoff.key_line) {
-      const contextNegatives = [];
-      if (subject?.toLowerCase().includes('trophy') || subject?.toLowerCase().includes('award')) {
-        contextNegatives.push("misspellings", "distorted letters");
-      } else {
-        contextNegatives.push("text errors");
-      }
-      if (contextNegatives.length > 0) {
-        conciseParts.push(`avoid ${contextNegatives.join(', ')}`);
-      }
-    }
-    
-    return conciseParts.join(', ') + '.';
-  }
-  
-  // STANDARD MODE: Full detailed prompting (existing logic)
   
   // CHARACTER IDENTITY CUES for Pop Culture
   if (handoff.category === "Pop Culture" && handoff.subcategory_secondary) {
@@ -1114,93 +854,81 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     parts.push("Recreate this scene literally and accurately with authentic details from the source material.");
   }
   
-  // Build standard prompt sections
-  const sections = [];
+  // OCCASION/CATEGORY
+  if (handoff.category && handoff.subcategory_primary) {
+    parts.push(`Occasion: ${handoff.category}, ${handoff.subcategory_primary}${handoff.subcategory_secondary ? ` (${handoff.subcategory_secondary})` : ''}.`);
+  }
   
-  // MAIN SUBJECT with theme emphasis
+  // MAIN SUBJECT
   let subject = handoff.rec_subject;
   if (!subject && handoff.chosen_visual) {
     const visualParts = handoff.chosen_visual.split(' - ');
     subject = visualParts.length >= 2 ? visualParts[0].trim() : handoff.chosen_visual;
   }
-  
-  // Enhanced theme-specific subject processing
   if (subject) {
-    // Basketball theme emphasis - disambiguate "bench" and add sports context
-    if (handoff.subcategory_primary?.toLowerCase().includes('basketball') || 
-        subject.toLowerCase().includes('basketball') ||
-        subject.toLowerCase().includes('bench')) {
-      if (subject.toLowerCase().includes('bench') && !subject.toLowerCase().includes('basketball')) {
-        subject = `${subject} on basketball court with basketball hoop and teammates playing`;
-      } else if (!subject.toLowerCase().includes('basketball') && !subject.toLowerCase().includes('court')) {
-        subject = `${subject}, basketball court setting with hoop visible`;
-      }
-    }
-    
-    sections.push(`Subject: ${subject}.`);
+    parts.push(`Subject: ${subject}.`);
   }
   
-  // BACKGROUND with theme emphasis
+  // BACKGROUND WITH ON-THEME ELEMENTS + SCENE-SPECIFIC NEGATIVE PROMPTS
   let background = handoff.rec_background;
   if (!background && handoff.chosen_visual) {
     const visualParts = handoff.chosen_visual.split(' - ');
-    background = visualParts.length >= 2 ? visualParts[1].trim() : `${handoff.subcategory_primary || 'contextually appropriate'} themed background`;
+    background = visualParts.length >= 2 ? visualParts[1].trim() : `${handoff.category} themed background`;
   }
   if (!background) {
-    background = `${handoff.subcategory_primary || 'contextually appropriate'} themed background`;
+    background = `${handoff.category || 'contextually appropriate'} themed background`;
   }
   if (cleanBackground) {
     background = "clean, minimal background with high contrast for text";
   }
   
-  // Enhanced basketball theme enforcement
-  if (handoff.subcategory_primary?.toLowerCase().includes('basketball')) {
-    if (!background.toLowerCase().includes('basketball') && !background.toLowerCase().includes('court')) {
-      background = `basketball court with ${background}, basketball hoop prominent`;
-    }
-  } else if (handoff.subcategory_primary && !background.toLowerCase().includes(handoff.subcategory_primary.toLowerCase())) {
-    background = `${handoff.subcategory_primary} themed setting with ${background}`;
+  // Add scene-specific negative prompts for sports interior scenes
+  let negativeElements = '';
+  if (handoff.category === 'Sports' && background && background.toLowerCase().includes('locker')) {
+    negativeElements = ' Avoid stadium, field, scoreboard, jumbotron, outdoor sports venue.';
   }
   
-  sections.push(`Background: ${background}.`);
+  parts.push(`Background: ${background}.${negativeElements}`);
   
-  // PEOPLE INCLUSION
-  const peopleKeywords = ['friends', 'crowd', 'people', 'group', 'party', 'audience', 'performers', 'celebrating', 'family', 'parents', 'kids', 'children', 'guests', 'selfie', 'selfies', 'group selfie', 'partygoers'];
+  // PEOPLE INCLUSION (when recommended)
+  const peopleKeywords = ['friends', 'crowd', 'people', 'group', 'party', 'audience', 'performers', 'celebrating', 'family', 'parents', 'kids', 'children'];
   const needsPeople = peopleKeywords.some(keyword => 
     handoff.chosen_visual?.toLowerCase().includes(keyword) || 
     handoff.rec_subject?.toLowerCase().includes(keyword) ||
     handoff.rec_background?.toLowerCase().includes(keyword)
-  ) || handoff.subcategory_primary === "Birthday";
+  );
   if (needsPeople) {
-    sections.push("Include multiple people clearly visible in the scene.");
+    parts.push("Include multiple people clearly visible in the scene.");
   }
   
-  // STYLE, TONE, FORMAT
-  const styleDetails = [];
+  // COMPOSITION & STYLE
   let finalStyle = handoff.visual_style;
+  // Force realistic style for Pop Culture character scenes
   if (handoff.category === "Pop Culture" && handoff.subcategory_secondary && !finalStyle) {
     finalStyle = "realistic";
   }
-  if (finalStyle) styleDetails.push(`${finalStyle} style`);
-  if (handoff.tone) styleDetails.push(`${handoff.tone} tone`);
-  if (handoff.aspect_ratio) styleDetails.push(`${handoff.aspect_ratio} format`);
-  if (styleDetails.length > 0) {
-    sections.push(`${styleDetails.join(', ')}.`);
+  if (finalStyle) {
+    parts.push(`Style: ${finalStyle}.`);
+  }
+  if (handoff.tone) {
+    parts.push(`Tone: ${handoff.tone}.`);
+  }
+  if (handoff.aspect_ratio) {
+    parts.push(`Format: ${handoff.aspect_ratio}.`);
   }
   
-  // TEXT PLACEMENT & NEGATIVE PROMPTS (streamlined)
+  // ENHANCED TEXT PLACEMENT with negative prompts
   if (handoff.key_line && handoff.key_line.trim()) {
-    sections.push("Place text in natural negative space areas. Ensure high contrast and avoid overlapping with faces.");
-    
-    // Use enhanced negative prompt for exact text scenarios
-    const negatives = [handoff.negative_prompt, EXACT_TEXT_NEGATIVE_PROMPT].filter(Boolean);
-    if (negatives.length > 0) {
-      sections.push(`Avoid ${negatives.join(', ')}`);
+    if (typographyStyle !== 'poster') {
+      parts.push("Place text in natural negative space areas like sky, walls, or empty backgrounds. Use TOP, BOTTOM, LEFT, or RIGHT zones rather than always centering. Ensure high contrast and avoid overlapping with faces or main subjects.");
+    }
+    // Add negative prompt for text placement
+    if (handoff.negative_prompt) {
+      parts.push(`Negative prompt: ${handoff.negative_prompt}`);
     }
   }
   
-  // Join all parts: EXACT TEXT first, then sections
-  return [...parts, ...sections].join('\n');
+  return parts.join(' ');
 }
 
 export function getAspectRatioForIdeogram(aspectRatio: string): 'ASPECT_10_16' | 'ASPECT_16_10' | 'ASPECT_9_16' | 'ASPECT_16_9' | 'ASPECT_3_2' | 'ASPECT_2_3' | 'ASPECT_4_3' | 'ASPECT_3_4' | 'ASPECT_1_1' | 'ASPECT_1_3' | 'ASPECT_3_1' {
@@ -1215,12 +943,7 @@ export function getAspectRatioForIdeogram(aspectRatio: string): 'ASPECT_10_16' |
   return ratioMap[aspectRatio] || 'ASPECT_16_9';
 }
 
-export function getStyleTypeForIdeogram(visualStyle: string, prompt?: string): 'AUTO' | 'GENERAL' | 'REALISTIC' | 'DESIGN' | 'RENDER_3D' | 'ANIME' {
-  // Force DESIGN style when exact text is present for better typography
-  if (prompt && (prompt.includes('EXACT TEXT:') || prompt.includes('exact spelling') || prompt.includes('precise text'))) {
-    console.log('🎯 EXACT TEXT detected - forcing DESIGN style for optimal text rendering');
-    return 'DESIGN';
-  }
+export function getStyleTypeForIdeogram(visualStyle: string): 'AUTO' | 'GENERAL' | 'REALISTIC' | 'DESIGN' | 'RENDER_3D' | 'ANIME' {
   const styleMap: Record<string, 'AUTO' | 'GENERAL' | 'REALISTIC' | 'DESIGN' | 'RENDER_3D' | 'ANIME'> = {
     'realistic': 'REALISTIC',
     'cartoon': 'ANIME',
@@ -1390,153 +1113,6 @@ export function getStyleKeywords(visualStyle?: string): string {
   return styles[visualStyle || '3d-animated'] || 'modern visual style';
 }
 
-// Hard-include composer for exact phrase enforcement
-export function composeHardInclude(exactPhrases: string[], tone: string, extraTags: string[] = []): string[] {
-  if (!exactPhrases.length) return [];
-  
-  const combinePhrase = exactPhrases.join(' ');
-  const characterBudget = 100;
-  
-  // Check if phrase is short and needs micro-template wrapping
-  const words = combinePhrase.split(' ').filter(w => w.length > 0);
-  const isShortPhrase = words.length < 2 || combinePhrase.length < 10;
-  
-  if (isShortPhrase) {
-    // Use tone-specific micro-templates for short phrases
-    const microTemplates: Record<string, string[]> = {
-      savage: [
-        `${combinePhrase}, step up or step aside.`,
-        `Standards > talk, ${combinePhrase}.`,
-        `${combinePhrase} spoke volumes.`,
-        `${combinePhrase}, prove yourself.`
-      ],
-      playful: [
-        `${combinePhrase} showed up—now make it fun.`,
-        `${combinePhrase} brought the energy today.`,
-        `${combinePhrase} entered the chat.`,
-        `${combinePhrase} joined the party.`
-      ],
-      inspirational: [
-        `${combinePhrase}, prove it today.`,
-        `${combinePhrase} demands excellence.`,
-        `${combinePhrase} rises to the challenge.`,
-        `${combinePhrase} makes dreams happen.`
-      ],
-      serious: [
-        `${combinePhrase}, deliver results.`,
-        `${combinePhrase} requires focus.`,
-        `${combinePhrase} means business.`,
-        `${combinePhrase} sets the standard.`
-      ],
-      humorous: [
-        `${combinePhrase} walked into a bar...`,
-        `${combinePhrase} has entered the building.`,
-        `${combinePhrase} stole the show.`,
-        `${combinePhrase} broke the internet.`
-      ],
-      sentimental: [
-        `${combinePhrase} warms the heart.`,
-        `${combinePhrase} brings back memories.`,
-        `${combinePhrase} means everything.`,
-        `${combinePhrase} touches the soul.`
-      ],
-      nostalgic: [
-        `${combinePhrase} takes us back.`,
-        `${combinePhrase} reminds us of better days.`,
-        `${combinePhrase} brings back the magic.`,
-        `${combinePhrase} captures those moments.`
-      ],
-      romantic: [
-        `${combinePhrase} makes hearts flutter.`,
-        `${combinePhrase} sparks the romance.`,
-        `${combinePhrase} creates perfect moments.`,
-        `${combinePhrase} writes love stories.`
-      ]
-    };
-    
-    const templates = microTemplates[tone.toLowerCase()] || [
-      `${combinePhrase} makes a statement.`,
-      `${combinePhrase} stands out today.`,
-      `${combinePhrase} gets attention.`,
-      `${combinePhrase} delivers impact.`
-    ];
-    
-    return templates.map(t => t.slice(0, characterBudget));
-  }
-  
-  // For longer phrases, use enhanced suffixes but avoid generic closers
-  const remaining = characterBudget - combinePhrase.length;
-  const enhancedSuffixOptions: Record<string, string[]> = {
-    savage: ["speaks truth.", "drops reality.", "delivers facts.", "sets records straight."],
-    playful: ["brings the vibes.", "makes it memorable.", "adds the spark.", "creates the magic."],
-    inspirational: ["ignites potential.", "fuels greatness.", "drives success.", "builds legends."],
-    serious: ["demands attention.", "requires action.", "sets standards.", "delivers results."],
-    humorous: ["breaks the internet.", "steals the spotlight.", "brings the laughs.", "wins the day."],
-    sentimental: ["touches hearts.", "creates memories.", "brings warmth.", "spreads love."],
-    nostalgic: ["brings back memories.", "captures the essence.", "relives the magic.", "honors the past."],
-    romantic: ["creates magic moments.", "writes love stories.", "sparks connections.", "builds romance."]
-  };
-  
-  const suffixes = enhancedSuffixOptions[tone.toLowerCase()] || ["makes an impact.", "stands out.", "gets noticed.", "delivers value."];
-  
-  const variations = [
-    combinePhrase,
-    remaining > 20 ? `${combinePhrase} ${suffixes[0]}` : combinePhrase,
-    remaining > 25 ? `${combinePhrase} ${suffixes[1]}` : combinePhrase,
-    remaining > 22 ? `${combinePhrase} ${suffixes[2]}` : combinePhrase
-  ];
-  
-  return variations.map(v => v.slice(0, characterBudget));
-}
-
-// Normalize text for matching (remove quotes, backticks, extra spaces)
-export function normalizeTextForMatching(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/["""''`]/g, '')
-    .replace(/[—–-]/g, '-')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-// Check if text contains exact phrases (normalized matching)
-export function containsExactPhrases(text: string, phrases: string[]): boolean {
-  if (!phrases.length) return true;
-  
-  const normalizedText = normalizeTextForMatching(text);
-  return phrases.every(phrase => {
-    const normalizedPhrase = normalizeTextForMatching(phrase);
-    return normalizedText.includes(normalizedPhrase);
-  });
-}
-
-// Detect sale intent automatically
-export function detectSaleIntent(inputs: VibeInputs): boolean {
-  const saleKeywords = ['sale', 'off', '%', 'discount', 'bogo', 'free gift', 'code', 'ends soon', 'limited time', 'buy', 'spend'];
-  
-  // Check tags and exact wording tags
-  const allTags = [...(inputs.tags || []), ...(inputs.exactWordingTags || [])];
-  const hasTagSaleKeywords = allTags.some(tag => 
-    saleKeywords.some(keyword => tag.toLowerCase().includes(keyword))
-  );
-  
-  // Check if text content contains sale indicators
-  const textContent = [inputs.recipient_name, inputs.subcategory].join(' ').toLowerCase();
-  const hasTextSaleIndicators = /[\$%]|\d+%|\$\d+/.test(textContent) || 
-    saleKeywords.some(keyword => textContent.includes(keyword));
-  
-  // If any category with no tags, could be advertising
-  const isGenericAdvertisement = (!inputs.tags || inputs.tags.length === 0);
-  
-  const saleIntentDetected = hasTagSaleKeywords || hasTextSaleIndicators || isGenericAdvertisement;
-  
-  if (saleIntentDetected) {
-    console.log("🛒 Sale intent detected:", { hasTagSaleKeywords, hasTextSaleIndicators, isGenericAdvertisement });
-  }
-  
-  return saleIntentDetected;
-}
-
 // Builder for vibe generator chat messages
 export function buildVibeGeneratorMessages(inputs: VibeInputs): Array<{role: string; content: string}> {
   // Check for knock-knock jokes
@@ -1571,9 +1147,6 @@ Return only: {"lines":["joke1\\nwith\\nnewlines","joke2\\nwith\\nnewlines","joke
       { role: 'user', content: corePrompt }
     ];
   }
-  
-  // Detect sale intent
-  const hasSaleIntent = detectSaleIntent(inputs);
 
   // Original logic for non-knock-knock content
   const isMovie = inputs.category === "Pop Culture" && inputs.subcategory?.toLowerCase().includes("movie");
@@ -1597,59 +1170,12 @@ Return only: {"lines":["joke1\\nwith\\nnewlines","joke2\\nwith\\nnewlines","joke
   }
 
   const tagRequirement = inputs.tags && inputs.tags.length > 0 
-    ? (() => {
-  // Apply semantic adapters for better AI direction
-        const semanticAdapters: Record<string, string> = {
-          'gay': 'Use expressive, dramatic, and fabulously confident language',
-          'flamboyant': 'Make it bold, theatrical, and dramatically expressive',
-          'marijuana': 'Keep it chill, relaxed, and laid-back in tone',
-          'weed': 'Use mellow, peaceful, and relaxed vibes',
-          'cannabis': 'Maintain a calm, chill, and zen-like atmosphere',
-          'drunk': 'Add uninhibited, party-ready, celebratory energy',
-          'alcohol': 'Include festive, social, and cheers-worthy spirit',
-          'savage': 'Be fierce, unapologetic, and confidently direct',
-          'dark': 'Add mysterious, edgy, and intensely dramatic elements',
-          'sarcastic': 'Use witty, dry humor with clever ironic twists',
-          'random': 'Be spontaneously quirky and unpredictably chaotic',
-          'weird': 'Embrace eccentric, unusual, and delightfully offbeat vibes',
-          'aesthetic': 'Focus on stylish, visually appealing, and trendy elements',
-          'nostalgic': 'Capture retro, vintage, and classic throwback feelings',
-          'background': 'Use this as thematic context and atmospheric backdrop',
-          'theme': 'Let this guide the overall conceptual direction and mood'
-        };
-
-        const enhancedInstructions = inputs.tags
-          .map(tag => semanticAdapters[tag.toLowerCase()] || `Incorporate "${tag}" as a stylistic element`)
-          .join('. ');
-
-        return `\n• Style direction: ${enhancedInstructions}.\n• CRITICAL: NEVER echo these tags verbatim: ${inputs.tags.join(', ')}. Use the spirit and meaning instead.`;
-      })()
+    ? `\n• General tags are themes/hints only - DO NOT include them verbatim. Paraphrase, allude to, or reference them creatively: ${inputs.tags.join(', ')}`
     : '';
 
   const exactWordingRequirement = inputs.exactWordingTags && inputs.exactWordingTags.length > 0
-    ? `\n• CRITICAL: Every single line MUST include these EXACT words/phrases verbatim: ${inputs.exactWordingTags.map(tag => `"${tag}"`).join(', ')}. If the phrase is long, output the phrase followed by 0–6 words max.`
+    ? `\n• CRITICAL: MUST include these EXACT words/phrases in the text: ${inputs.exactWordingTags.map(tag => `"${tag}"`).join(', ')}`
     : '';
-
-  // Sale-focused prompt wiring
-  const saleRules = hasSaleIntent ? `
-
-RETAIL OFFER RULES (CRITICAL):
-• Include explicit offer language (e.g., "55% off", "Free gift on $150+", "BOGO", "Limited time")
-• Use clear CTA variants: "Hurry ends soon" / "Today only" / "Limited time" / "Shop now"
-• NO emojis, NO hashtags, NO unexplained abbreviations (never "HH" unless "Happy Hour" is in tags)
-• Keep symbols like %, +, $, numbers for offers
-• Generate 4 distinct sale styles: standard offer, urgency-driven, playful offer, minimal clean
-• Focus on clear, professional retail copy that sells effectively
-• No generic celebration elements unless specifically requested` : '';
-
-  const qualityRules = `
-
-QUALITY RULES (CRITICAL):
-• Each option must be a complete thought (include a verb or clear descriptor)
-• NO single-word outputs (minimum 3 words, 12+ characters)
-• Never output only a name or tag verbatim without context
-• Avoid duplicates; vary structure and wording significantly
-• Each line should feel distinct and purposeful`;
 
   const corePrompt = `Generate 6 concise options under 100 chars each for:
 Category: ${inputs.category} > ${inputs.subcategory}
@@ -1657,9 +1183,8 @@ Tone: ${inputs.tone}
 Tags: ${inputs.tags?.join(', ') || 'none'}
 ${inputs.exactWordingTags && inputs.exactWordingTags.length > 0 ? `Exact Words Required: ${inputs.exactWordingTags.join(', ')}` : ''}
 ${inputs.recipient_name && inputs.recipient_name !== "-" ? `Target: ${inputs.recipient_name}` : ''}
-${hasSaleIntent ? '\nSALE INTENT DETECTED: Focus on retail offers and clear sales messaging.' : ''}
 
-${tagRequirement}${exactWordingRequirement}${specialInstructions}${saleRules}${qualityRules}
+${tagRequirement}${exactWordingRequirement}${specialInstructions}
 
 Return only: {"lines":["option1","option2","option3","option4","option5","option6"]}`;
 
@@ -1741,7 +1266,7 @@ TEXT PLACEMENT DIRECTIVES:
 
 IMPORTANT: Visual concepts must directly relate to the joke/text content above. For Pride themes, include rainbow colors, drag queens, parades, celebration elements.
 
-4 unique concepts. Each ONE SENTENCE, maximum ~20 words. No slots required.
+4 unique concepts. Each 40-60 words. No slots required.
 
 JSON only.`;
 
@@ -1764,20 +1289,14 @@ Return as a JSON object with this exact format:
 }
 
 // Builder for general text generation
-export function buildGenerateTextMessages(
-  params: {
-    tone: string;
-    category?: string;
-    subtopic?: string;
-    pick?: string;
-    tags?: string[];
-    characterLimit: number;
-  },
-  retrievedFacts?: {
-    facts: string[];
-    sources?: Array<{ title: string; url: string; site: string }>;
-  }
-): Array<{role: string; content: string}> {
+export function buildGenerateTextMessages(params: {
+  tone: string;
+  category?: string;
+  subtopic?: string;
+  pick?: string;
+  tags?: string[];
+  characterLimit: number;
+}): Array<{role: string; content: string}> {
   const { tone, category, subtopic, pick, tags = [], characterLimit } = params;
   
   let contextParts = [];
@@ -1789,38 +1308,8 @@ export function buildGenerateTextMessages(
   
   let prompt = `Generate exactly 4 short ${tone.toLowerCase()} text options for: ${context}.`;
   
-  // Add retrieved facts if available
-  if (retrievedFacts && retrievedFacts.facts.length > 0) {
-    const factsBlock = retrievedFacts.facts.slice(0, 6).map(fact => `- ${fact}`).join('\n');
-    prompt += `\n\nFACTS (use only these):\n${factsBlock}\n\nRules: Be specific and reference these facts. Name-drop with wit. No generic lines. Do not repeat tags verbatim.`;
-  }
-  
   if (tags.length > 0) {
-    // Apply semantic adapters for better AI direction
-    const semanticAdapters: Record<string, string> = {
-      'gay': 'Use expressive, dramatic, and fabulously confident language',
-      'flamboyant': 'Make it bold, theatrical, and dramatically expressive',
-      'marijuana': 'Keep it chill, relaxed, and laid-back in tone',
-      'weed': 'Use mellow, peaceful, and relaxed vibes',
-      'cannabis': 'Maintain a calm, chill, and zen-like atmosphere',
-      'drunk': 'Add uninhibited, party-ready, celebratory energy',
-      'alcohol': 'Include festive, social, and cheers-worthy spirit',
-      'savage': 'Be fierce, unapologetic, and confidently direct',
-      'dark': 'Add mysterious, edgy, and intensely dramatic elements',
-      'sarcastic': 'Use witty, dry humor with clever ironic twists',
-      'random': 'Be spontaneously quirky and unpredictably chaotic',
-      'weird': 'Embrace eccentric, unusual, and delightfully offbeat vibes',
-      'aesthetic': 'Focus on stylish, visually appealing, and trendy elements',
-      'nostalgic': 'Capture retro, vintage, and classic throwback feelings',
-      'background': 'Use this as thematic context and atmospheric backdrop',
-      'theme': 'Let this guide the overall conceptual direction and mood'
-    };
-
-    const enhancedInstructions = tags
-      .map(tag => semanticAdapters[tag.toLowerCase()] || `Incorporate "${tag}" as a stylistic element`)
-      .join('. ');
-
-    prompt += ` Style direction: ${enhancedInstructions}. General tags are hints. Do NOT include them verbatim: ${tags.join(', ')}.`;
+    prompt += ` General tags are hints. Do NOT include them verbatim: ${tags.join(', ')}.`;
   }
   
   prompt += ` Each option must be ${characterLimit} characters or fewer. Be creative and engaging.

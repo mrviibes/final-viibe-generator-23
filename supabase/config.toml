@@ -5,9 +5,3 @@ verify_jwt = false
 
 [functions.ideogram-generate]
 verify_jwt = false
-
-[functions.pop-culture-facts]
-verify_jwt = false
-
-[functions.pop-culture-search]
-verify_jwt = false

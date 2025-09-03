@@ -16,21 +16,17 @@ import { ProxySettingsDialog } from "@/components/ProxySettingsDialog";
 import { CorsRetryDialog } from "@/components/CorsRetryDialog";
 import { StepProgress } from "@/components/StepProgress";
 import { StackedSelectionCard } from "@/components/StackedSelectionCard";
-import { MovieSceneHelper } from "@/components/MovieSceneHelper";
-import { FallbackTooltip } from "@/components/FallbackTooltip";
-import { ConciseModePanel } from "@/components/ConciseModePanel";
-import { SensitiveTagNotice } from "@/components/SensitiveTagNotice";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigate } from "react-router-dom";
 import { generateCandidates, VibeResult } from "@/lib/vibeModel";
 import { buildIdeogramHandoff } from "@/lib/ideogram";
 import { generateVisualRecommendations, VisualOption } from "@/lib/visualModel";
 import { generateIdeogramImage, setIdeogramApiKey, getIdeogramApiKey, hasIdeogramApiKey, isUsingBackend as ideogramIsUsingBackend, IdeogramAPIError, getProxySettings, setProxySettings, testProxyConnection, ProxySettings } from "@/lib/ideogramApi";
-import { buildIdeogramPrompt, getAspectRatioForIdeogram, getStyleTypeForIdeogram, ConciseModeOptions } from "@/lib/ideogramPrompt";
+import { buildIdeogramPrompt, getAspectRatioForIdeogram, getStyleTypeForIdeogram } from "@/lib/ideogramPrompt";
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
 import { normalizeTypography, suggestContractions, isTextMisspelled } from "@/lib/textUtils";
-import { BACKGROUND_PRESETS, getRuntimeOverrides, TONES, VISUAL_STYLES, DEFAULT_NEGATIVE_PROMPT, rewriteSensitiveTags, SensitiveTagResult } from "../vibe-ai.config";
+import { BACKGROUND_PRESETS, getRuntimeOverrides, TONES, VISUAL_STYLES, DEFAULT_NEGATIVE_PROMPT } from "../vibe-ai.config";
 const styleOptions = [{
   id: "celebrations",
   name: "Celebrations",
@@ -44,9 +40,9 @@ const styleOptions = [{
   name: "Daily Life",
   description: "Everyday routines, hobbies, and situations"
 }, {
-  id: "anything-goes",
-  name: "Anything Goes",
-  description: "Jokes, moods, randomness, weird stuff"
+  id: "vibes-punchlines",
+  name: "Vibes & Punchlines",
+  description: "Moods, self-talk, jokes, and formats"
 }, {
   id: "pop-culture",
   name: "Pop Culture",
@@ -3359,614 +3355,458 @@ const dailyLifeOptions = [{
   id: "fire-drill",
   name: "Fire drill"
 }];
-const anythingGoesOptions = [{
+const vibesPunchlinesOptions = [{
   id: "dad-jokes",
-  name: "Dad jokes",
-  subtitle: ""
+  name: "Dad Jokes",
+  subtitle: "Cheesy predictable puns"
+}, {
+  id: "daily-vibes",
+  name: "Daily Vibes",
+  subtitle: "Day-of-week jokes"
+}, {
+  id: "quotes",
+  name: "Quotes",
+  subtitle: "General, tone later"
 }, {
   id: "one-liners",
-  name: "One-liners",
-  subtitle: ""
+  name: "One-Liners",
+  subtitle: "Quick single jokes"
+}, {
+  id: "comebacks",
+  name: "Comebacks",
+  subtitle: "Witty fast retorts"
+}, {
+  id: "career-jokes",
+  name: "Career Jokes",
+  subtitle: "Work & office humor"
+}, {
+  id: "knock-knock-jokes",
+  name: "Knock-Knock Jokes",
+  subtitle: "Classic \"Who's there\""
+}, {
+  id: "puns-wordplay",
+  name: "Puns & Wordplay",
+  subtitle: "Clever double meanings"
+}, {
+  id: "self-deprecating",
+  name: "Self-Deprecating",
+  subtitle: "Jokes on yourself"
 }, {
   id: "roasts",
   name: "Roasts",
-  subtitle: ""
+  subtitle: "Playful sharp burns"
 }, {
   id: "dark-humor",
-  name: "Dark humor",
-  subtitle: ""
+  name: "Dark Humor",
+  subtitle: "Morbid edgy jokes"
 }, {
-  id: "savage-comebacks",
-  name: "Savage comebacks",
-  subtitle: ""
+  id: "endings",
+  name: "Endings",
+  subtitle: "Funny closing lines"
 }, {
-  id: "knock-knock-jokes",
-  name: "Knock-knock jokes",
-  subtitle: ""
+  id: "life-tips",
+  name: "Life Tips",
+  subtitle: "Helpful witty advice"
 }, {
-  id: "puns-wordplay",
-  name: "Puns & wordplay",
-  subtitle: ""
+  id: "affirmations",
+  name: "Affirmations",
+  subtitle: "Positive self-reminders"
 }, {
-  id: "self-deprecating-jokes",
-  name: "Self-deprecating jokes",
-  subtitle: ""
+  id: "relationship-humor",
+  name: "Relationship Humor",
+  subtitle: "Dating, couple jokes"
 }, {
-  id: "thats-what-she-said-jokes",
-  name: "\"That's what she said\" jokes",
-  subtitle: ""
+  id: "family-jokes",
+  name: "Family Jokes",
+  subtitle: "Friends or relatives"
 }, {
-  id: "awkward-situation-humor",
-  name: "Awkward situation humor",
-  subtitle: ""
+  id: "office-humor",
+  name: "Office Humor",
+  subtitle: "Workplace banter struggles"
 }, {
-  id: "happy",
-  name: "Happy",
-  subtitle: ""
+  id: "school-life",
+  name: "School Life",
+  subtitle: "Classroom study humor"
 }, {
-  id: "sad",
-  name: "Sad",
-  subtitle: ""
+  id: "food-jokes",
+  name: "Food Jokes",
+  subtitle: "Eating, cravings"
 }, {
-  id: "angry",
-  name: "Angry",
-  subtitle: ""
+  id: "coffee-humor",
+  name: "Coffee Humor",
+  subtitle: "Morning caffeine jokes"
 }, {
-  id: "tired",
-  name: "Tired",
-  subtitle: ""
+  id: "pet-humor",
+  name: "Pet Humor",
+  subtitle: "Cats, dogs, animals"
 }, {
-  id: "overthinking",
-  name: "Overthinking",
-  subtitle: ""
+  id: "tech-humor",
+  name: "Tech Humor",
+  subtitle: "Gadgets, glitches, online"
 }, {
-  id: "lazy",
-  name: "Lazy",
-  subtitle: ""
+  id: "social-media",
+  name: "Social Media",
+  subtitle: "TikTok, Instagram, viral content"
 }, {
-  id: "stressed",
-  name: "Stressed",
-  subtitle: ""
+  id: "pop-culture",
+  name: "Pop Culture",
+  subtitle: "Celebs, TV, music"
 }, {
-  id: "excited",
-  name: "Excited",
-  subtitle: ""
+  id: "classic-quotes",
+  name: "Classic Quotes",
+  subtitle: "Famous old lines"
 }, {
-  id: "awkward",
-  name: "Awkward",
-  subtitle: ""
+  id: "monday-blues",
+  name: "Monday Blues",
+  subtitle: "Dreading week start"
 }, {
-  id: "relatable",
-  name: "Relatable",
-  subtitle: ""
+  id: "friday-feeling",
+  name: "Friday Feeling",
+  subtitle: "Weekend hype laughs"
 }, {
-  id: "school",
-  name: "School",
-  subtitle: ""
+  id: "sunday-vibes",
+  name: "Sunday Vibes",
+  subtitle: "Chill or dread"
 }, {
-  id: "homework",
-  name: "Homework",
-  subtitle: ""
+  id: "absurd-humor",
+  name: "Absurd Humor",
+  subtitle: "Nonsense surreal jokes"
 }, {
-  id: "teachers",
-  name: "Teachers",
-  subtitle: ""
+  id: "parodies",
+  name: "Parodies",
+  subtitle: "Imitations with twist"
 }, {
-  id: "exams",
-  name: "Exams",
-  subtitle: ""
+  id: "satire-irony",
+  name: "Satire & Irony",
+  subtitle: "Social commentary humor"
 }, {
-  id: "college-life",
-  name: "College life",
-  subtitle: ""
+  id: "holiday-humor",
+  name: "Holiday Humor",
+  subtitle: "Seasonal festive laughs"
 }, {
-  id: "growing-up",
-  name: "Growing up",
-  subtitle: ""
+  id: "parenting-humor",
+  name: "Parenting Humor",
+  subtitle: "Raising kids chaos"
 }, {
-  id: "nostalgia-90s-2000s",
-  name: "Nostalgia (90s, 2000s)",
-  subtitle: ""
+  id: "travel-humor",
+  name: "Travel Humor",
+  subtitle: "Vacation trip fails"
 }, {
-  id: "childhood-memories",
-  name: "Childhood memories",
-  subtitle: ""
+  id: "sports-fitness",
+  name: "Sports & Fitness",
+  subtitle: "Exercise, fan banter"
 }, {
-  id: "adulting-fails",
-  name: "Adulting fails",
-  subtitle: ""
+  id: "nostalgia-humor",
+  name: "Nostalgia Humor",
+  subtitle: "Childhood retro laughs"
 }, {
-  id: "work-struggles",
-  name: "Work struggles",
-  subtitle: ""
+  id: "internet-humor",
+  name: "Internet Humor",
+  subtitle: "Social trend jokes"
 }, {
-  id: "astronomy",
-  name: "Astronomy",
-  subtitle: ""
+  id: "insults",
+  name: "Insults",
+  subtitle: "Burns, jabs, putdowns"
 }, {
-  id: "astrology",
-  name: "Astrology",
-  subtitle: ""
+  id: "tongue-twisters",
+  name: "Tongue Twisters",
+  subtitle: "Word challenges"
 }, {
-  id: "math",
-  name: "Math",
-  subtitle: ""
+  id: "riddles",
+  name: "Riddles",
+  subtitle: "Puzzle-style jokes"
 }, {
-  id: "physics",
-  name: "Physics",
-  subtitle: ""
-}, {
-  id: "chemistry",
-  name: "Chemistry",
-  subtitle: ""
-}, {
-  id: "biology",
-  name: "Biology",
-  subtitle: ""
-}, {
-  id: "psychology",
-  name: "Psychology",
-  subtitle: ""
-}, {
-  id: "history",
-  name: "History",
-  subtitle: ""
-}, {
-  id: "geography",
-  name: "Geography",
-  subtitle: ""
-}, {
-  id: "philosophy",
-  name: "Philosophy",
-  subtitle: ""
-}, {
-  id: "memes-about-memes",
-  name: "Memes about memes",
-  subtitle: ""
-}, {
-  id: "social-media-addiction",
-  name: "Social media addiction",
-  subtitle: ""
-}, {
-  id: "internet-slang",
-  name: "Internet slang",
-  subtitle: ""
-}, {
-  id: "gaming-jokes",
-  name: "Gaming jokes",
-  subtitle: ""
-}, {
-  id: "streaming-binges",
-  name: "Streaming binges",
-  subtitle: ""
-}, {
-  id: "ai-jokes",
-  name: "AI jokes",
-  subtitle: ""
-}, {
-  id: "tech-fails",
-  name: "Tech fails",
-  subtitle: ""
-}, {
-  id: "phones",
-  name: "Phones",
-  subtitle: ""
-}, {
-  id: "computers",
-  name: "Computers",
-  subtitle: ""
-}, {
-  id: "wifi-problems",
-  name: "Wifi problems",
-  subtitle: ""
-}, {
-  id: "conspiracy-theories",
-  name: "Conspiracy theories",
-  subtitle: ""
-}, {
-  id: "aliens",
-  name: "Aliens",
-  subtitle: ""
-}, {
-  id: "ghosts",
-  name: "Ghosts",
-  subtitle: ""
-}, {
-  id: "paranormal",
-  name: "Paranormal",
-  subtitle: ""
-}, {
-  id: "dreams",
-  name: "Dreams",
-  subtitle: ""
-}, {
-  id: "nightmares",
-  name: "Nightmares",
-  subtitle: ""
-}, {
-  id: "weird-habits",
-  name: "Weird habits",
-  subtitle: ""
-}, {
-  id: "embarrassing-moments",
-  name: "Embarrassing moments",
-  subtitle: ""
-}, {
-  id: "bad-luck",
-  name: "Bad luck",
-  subtitle: ""
+  id: "proverb-twists",
+  name: "Proverb Twists",
+  subtitle: "Old sayings flipped"
 }, {
   id: "shower-thoughts",
-  name: "\"Shower thoughts\"",
-  subtitle: ""
+  name: "Shower Thoughts",
+  subtitle: "Odd clever ideas"
 }, {
-  id: "sarcasm",
-  name: "Sarcasm",
-  subtitle: ""
+  id: "complaints",
+  name: "Complaints",
+  subtitle: "Overblown small problems"
 }, {
-  id: "irony",
-  name: "Irony",
-  subtitle: ""
+  id: "generational-humor",
+  name: "Generational Humor",
+  subtitle: "Gen Z vs Millennials"
 }, {
-  id: "existential-dread",
-  name: "Existential dread",
-  subtitle: ""
+  id: "adulting-humor",
+  name: "Adulting Humor",
+  subtitle: "Grown-up struggles"
 }, {
-  id: "life-advice-gone-wrong",
-  name: "Life advice gone wrong",
-  subtitle: ""
+  id: "introvert-extrovert",
+  name: "Introvert Extrovert",
+  subtitle: "Social energy jokes"
+}, {
+  id: "self-care-humor",
+  name: "Self-Care Humor",
+  subtitle: "Lazy indulgent laughs"
+}, {
+  id: "grammar-humor",
+  name: "Grammar Humor",
+  subtitle: "Language punctuation fun"
+}, {
+  id: "pirate-jokes",
+  name: "Pirate Jokes",
+  subtitle: "Nautical \"Arrr\" puns"
+}, {
+  id: "fantasy-zombie",
+  name: "Fantasy & Zombie",
+  subtitle: "Geeky monster humor"
+}, {
+  id: "science-humor",
+  name: "Science Humor",
+  subtitle: "STEM nerdy jokes"
+}, {
+  id: "weather-humor",
+  name: "Weather Humor",
+  subtitle: "Forecast seasonal laughs"
+}, {
+  id: "karen-memes",
+  name: "Karen Memes",
+  subtitle: "Entitled stereotypes"
+}, {
+  id: "celebrity-satire",
+  name: "Celebrity Satire",
+  subtitle: "Mocking famous quirks"
+}, {
+  id: "fails",
+  name: "Fails",
+  subtitle: "Funny mishaps mistakes"
+}, {
+  id: "philosophy-twists",
+  name: "Philosophy Twists",
+  subtitle: "Deep silly flips"
+}, {
+  id: "fun-facts",
+  name: "Fun Facts",
+  subtitle: "Trivia with punchline"
+}, {
+  id: "emoji-humor",
+  name: "Emoji Humor",
+  subtitle: "Playing with symbols"
+}, {
+  id: "quote-mashups",
+  name: "Quote Mashups",
+  subtitle: "Mixed sayings"
+}, {
+  id: "innuendo-humor",
+  name: "Innuendo Humor",
+  subtitle: "Suggestive double meanings"
+}, {
+  id: "work-from-home",
+  name: "Work From Home",
+  subtitle: "Remote job fun"
+}, {
+  id: "health-wellness",
+  name: "Health & Wellness",
+  subtitle: "Fitness diet laughs"
+}, {
+  id: "late-night-thoughts",
+  name: "Late Night Thoughts",
+  subtitle: "Overtired musings"
+}, {
+  id: "instagram-ads",
+  name: "Instagram Ads",
+  subtitle: "Advertising, promotion, sponsored content"
+}, {
+  id: "facebook-marketing",
+  name: "Facebook Marketing",
+  subtitle: "Social media campaigns, business posts"
+}, {
+  id: "youtube-content",
+  name: "YouTube Content",
+  subtitle: "Video creation, channel growth"
+}, {
+  id: "tiktok-trends",
+  name: "TikTok Trends",
+  subtitle: "Viral videos, challenges, dances"
+}, {
+  id: "linkedin-professional",
+  name: "LinkedIn Professional",
+  subtitle: "Career posts, networking, business"
+}, {
+  id: "twitter-threads",
+  name: "Twitter Threads",
+  subtitle: "Tweet storms, viral takes"
+}, {
+  id: "brand-promotion",
+  name: "Brand Promotion",
+  subtitle: "Product marketing, endorsements"
+}, {
+  id: "influencer-content",
+  name: "Influencer Content",
+  subtitle: "Sponsored posts, collaborations"
+}, {
+  id: "e-commerce-sales",
+  name: "E-commerce Sales",
+  subtitle: "Online shopping, product launches"
+}, {
+  id: "digital-marketing",
+  name: "Digital Marketing",
+  subtitle: "Online campaigns, SEO, ads"
+}, {
+  id: "annoying-questions",
+  name: "Annoying Questions",
+  subtitle: "Nosy silly prods"
+}, {
+  id: "slang-lingo",
+  name: "Slang & Lingo",
+  subtitle: "Wordplay jokes"
+}, {
+  id: "mystery-puns",
+  name: "Mystery Puns",
+  subtitle: "Detective-style punchlines"
+}, {
+  id: "lightbulb-jokes",
+  name: "Lightbulb Jokes",
+  subtitle: "\"How many X\""
+}, {
+  id: "chuck-norris-jokes",
+  name: "Chuck Norris Jokes",
+  subtitle: "Absurd superhuman facts"
+}, {
+  id: "math-humor",
+  name: "Math Humor",
+  subtitle: "Number equation puns"
+}, {
+  id: "coding-jokes",
+  name: "Coding Jokes",
+  subtitle: "Programmer IT humor"
+}, {
+  id: "pet-peeves",
+  name: "Pet Peeves",
+  subtitle: "Shared annoyances"
+}, {
+  id: "apologies",
+  name: "Apologies",
+  subtitle: "Sorry not sorry"
+}, {
+  id: "awkward-comedy",
+  name: "Awkward Comedy",
+  subtitle: "Cringe relatable laughs"
+}, {
+  id: "trick-questions",
+  name: "Trick Questions",
+  subtitle: "Gotcha Q&A jokes"
 }, {
   id: "self-help-parody",
-  name: "Self-help parody",
-  subtitle: ""
-}, {
-  id: "overconfidence",
-  name: "Overconfidence",
-  subtitle: ""
-}, {
-  id: "procrastination",
-  name: "Procrastination",
-  subtitle: ""
-}, {
-  id: "motivation-fake-or-real",
-  name: "Motivation (fake or real)",
-  subtitle: ""
-}, {
-  id: "wisdom-quotes-with-a-twist",
-  name: "Wisdom quotes with a twist",
-  subtitle: ""
-}, {
-  id: "fortune-cookie-nonsense",
-  name: "Fortune-cookie nonsense",
-  subtitle: ""
-}, {
-  id: "coffee-addiction",
-  name: "Coffee addiction",
-  subtitle: ""
-}, {
-  id: "pizza",
-  name: "Pizza",
-  subtitle: ""
-}, {
-  id: "junk-food",
-  name: "Junk food",
-  subtitle: ""
-}, {
-  id: "healthy-food-shame",
-  name: "Healthy food shame",
-  subtitle: ""
-}, {
-  id: "cooking-disasters",
-  name: "Cooking disasters",
-  subtitle: ""
-}, {
-  id: "grocery-store-pain",
-  name: "Grocery store pain",
-  subtitle: ""
-}, {
-  id: "fast-food-cravings",
-  name: "Fast food cravings",
-  subtitle: ""
-}, {
-  id: "snacks",
-  name: "Snacks",
-  subtitle: ""
-}, {
-  id: "eating-out",
-  name: "Eating out",
-  subtitle: ""
-}, {
-  id: "drinks-alcohol-soda-water",
-  name: "Drinks (alcohol, soda, water)",
-  subtitle: ""
-}, {
-  id: "dating-fails",
-  name: "Dating fails",
-  subtitle: ""
-}, {
-  id: "flirting",
-  name: "Flirting",
-  subtitle: ""
-}, {
-  id: "crushes",
-  name: "Crushes",
-  subtitle: ""
-}, {
-  id: "breakups",
-  name: "Breakups",
-  subtitle: ""
-}, {
-  id: "marriage-jokes",
-  name: "Marriage jokes",
-  subtitle: ""
-}, {
-  id: "parenting-fails",
-  name: "Parenting fails",
-  subtitle: ""
-}, {
-  id: "family-drama",
-  name: "Family drama",
-  subtitle: ""
-}, {
-  id: "friend-group-chaos",
-  name: "Friend group chaos",
-  subtitle: ""
-}, {
-  id: "roommates",
-  name: "Roommates",
-  subtitle: ""
-}, {
-  id: "in-laws",
-  name: "In-laws",
-  subtitle: ""
-}, {
-  id: "bad-luck-mondays",
-  name: "Bad luck Mondays",
-  subtitle: ""
-}, {
-  id: "fridays",
-  name: "Fridays",
-  subtitle: ""
-}, {
-  id: "weekend-vibes",
-  name: "Weekend vibes",
-  subtitle: ""
-}, {
-  id: "procrastination-memes",
-  name: "Procrastination memes",
-  subtitle: ""
-}, {
-  id: "sleep-deprivation",
-  name: "Sleep deprivation",
-  subtitle: ""
-}, {
-  id: "why-am-i-like-this",
-  name: "\"Why am I like this?\"",
-  subtitle: ""
-}, {
-  id: "everyday-randomness",
-  name: "Everyday randomness",
-  subtitle: ""
-}, {
-  // Advertisements & Platforms
-  id: "general-advertisement",
-  name: "General Advertisement",
-  subtitle: ""
-}, {
-  id: "facebook-ads",
-  name: "Facebook ads",
-  subtitle: ""
-}, {
-  id: "instagram-posts",
-  name: "Instagram posts",
-  subtitle: ""
-}, {
-  id: "tiktok-skits",
-  name: "TikTok skits",
-  subtitle: ""
-}, {
-  id: "youtube-prerolls",
-  name: "YouTube pre-rolls",
-  subtitle: ""
-}, {
-  id: "billboards",
-  name: "Billboards",
-  subtitle: ""
-}, {
-  id: "print-ads",
-  name: "Old-school print ads",
-  subtitle: ""
-}, {
-  id: "clickbait-headlines",
-  name: "Clickbait headlines",
-  subtitle: ""
-}, {
-  id: "infomercials",
-  name: "Infomercials",
-  subtitle: ""
-}, {
-  // Careers & Work Life
-  id: "careers",
-  name: "Careers (any job)",
-  subtitle: ""
-}, {
-  id: "job-interviews",
-  name: "Job interviews",
-  subtitle: ""
-}, {
-  id: "office-politics",
-  name: "Office politics",
-  subtitle: ""
-}, {
-  id: "tech-bros",
-  name: "Tech bros",
-  subtitle: ""
-}, {
-  id: "doctors-nurses",
-  name: "Doctors/nurses",
-  subtitle: ""
-}, {
-  id: "lawyers",
-  name: "Lawyers",
-  subtitle: ""
-}, {
-  id: "artists-creators",
-  name: "Artists/creators",
-  subtitle: ""
-}, {
-  id: "entrepreneurs-startups",
-  name: "Entrepreneurs/startups",
-  subtitle: ""
-}, {
-  id: "trades",
-  name: "Trades (construction, plumbers, mechanics)",
-  subtitle: ""
-}, {
-  id: "retail-fastfood-misery",
-  name: "Retail/fast food misery",
-  subtitle: ""
-}, {
-  // Travel & Places
-  id: "airports",
-  name: "Airports",
-  subtitle: ""
-}, {
-  id: "road-trips",
-  name: "Road trips",
-  subtitle: ""
-}, {
-  id: "hotels",
-  name: "Hotels",
-  subtitle: ""
-}, {
-  id: "camping",
-  name: "Camping",
-  subtitle: ""
-}, {
-  id: "lost-in-translation",
-  name: "Lost in translation jokes",
-  subtitle: ""
-}, {
-  // Money & Hustle
-  id: "side-hustles",
-  name: "Side hustles",
-  subtitle: ""
-}, {
-  id: "investing-crypto",
-  name: "Investing/crypto",
-  subtitle: ""
-}, {
-  id: "broke-life",
-  name: "Broke life",
-  subtitle: ""
-}, {
-  id: "shopping-splurges",
-  name: "Shopping splurges",
-  subtitle: ""
-}, {
-  id: "payday-celebrations",
-  name: "Payday celebrations",
-  subtitle: ""
-}, {
-  // Health & Body
-  id: "fitness-struggles",
-  name: "Fitness struggles",
-  subtitle: ""
-}, {
-  id: "gym-rats",
-  name: "Gym rats",
-  subtitle: ""
-}, {
-  id: "dieting-fails",
-  name: "Dieting fails",
-  subtitle: ""
-}, {
-  id: "mental-health-moods",
-  name: "Mental health moods (light/funny)",
-  subtitle: ""
-}, {
-  id: "aging-jokes",
-  name: "Aging jokes",
-  subtitle: ""
-}, {
-  id: "sarcastic-hot-takes",
-  name: "Sarcastic hot takes",
-  subtitle: ""
-}, {
-  id: "no-context-jokes",
-  name: "\"No context\" jokes",
-  subtitle: ""
-}, {
-  id: "total-nonsense",
-  name: "Total nonsense",
-  subtitle: ""
-}];
-
-// Umbrella groups for "Anything Goes" navigation
-const anythingGoesGroups = [{
-  id: "jokes-formats",
-  name: "Jokes & Formats",
-  itemIds: ["dad-jokes", "one-liners", "roasts", "dark-humor", "savage-comebacks", "knock-knock-jokes", "puns-wordplay", "self-deprecating-jokes", "thats-what-she-said-jokes", "awkward-situation-humor"]
-}, {
-  id: "advertisements-platforms",
-  name: "Advertisements & Platforms",
-  itemIds: ["general-advertisement", "facebook-ads", "instagram-posts", "tiktok-skits", "youtube-prerolls", "billboards", "print-ads", "clickbait-headlines", "infomercials"]
-}, {
-  id: "careers-work-life",
-  name: "Careers & Work Life", 
-  itemIds: ["careers", "job-interviews", "office-politics", "tech-bros", "doctors-nurses", "lawyers", "artists-creators", "entrepreneurs-startups", "trades", "retail-fastfood-misery"]
-}, {
-  id: "travel-places",
-  name: "Travel & Places",
-  itemIds: ["airports", "road-trips", "hotels", "camping", "lost-in-translation"]
-}, {
-  id: "money-hustle",
-  name: "Money & Hustle",
-  itemIds: ["side-hustles", "investing-crypto", "broke-life", "shopping-splurges", "payday-celebrations"]
-}, {
-  id: "health-body",
-  name: "Health & Body",
-  itemIds: ["fitness-struggles", "gym-rats", "dieting-fails", "mental-health-moods", "aging-jokes"]
-}, {
-  id: "moods-feels",
-  name: "Moods & Feels",
-  itemIds: ["happy", "sad", "angry", "tired", "overthinking", "lazy", "stressed", "excited", "awkward", "relatable"]
-}, {
-  id: "school-education",
-  name: "School & Education", 
-  itemIds: ["school", "homework", "teachers", "exams", "college-life", "growing-up"]
-}, {
-  id: "nostalgia-memories",
-  name: "Nostalgia & Memories",
-  itemIds: ["nostalgia-90s-2000s", "childhood-memories", "adulting-fails", "work-struggles"]
-}, {
-  id: "science-academic",
-  name: "Science & Academic",
-  itemIds: ["astronomy", "astrology", "math", "physics", "chemistry", "biology", "psychology", "history", "geography", "philosophy"]
-}, {
-  id: "internet-tech",
-  name: "Internet & Tech",
-  itemIds: ["memes-about-memes", "social-media-addiction", "internet-slang", "gaming-jokes", "streaming-binges", "ai-jokes", "tech-fails", "phones", "computers", "wifi-problems"]
-}, {
-  id: "weird-random",
-  name: "Weird & Random",
-  itemIds: ["conspiracy-theories", "aliens", "ghosts", "paranormal", "dreams", "nightmares", "weird-habits", "embarrassing-moments", "bad-luck", "shower-thoughts"]
-}, {
-  id: "attitudes-vibes",
-  name: "Attitudes & Vibes",
-  itemIds: ["sarcasm", "irony", "existential-dread", "life-advice-gone-wrong", "self-help-parody", "overconfidence", "procrastination", "motivation-fake-or-real", "wisdom-quotes-with-a-twist", "fortune-cookie-nonsense"]
-}, {
-  id: "food-drinks",
-  name: "Food & Drinks",
-  itemIds: ["coffee-addiction", "pizza", "junk-food", "healthy-food-shame", "cooking-disasters", "grocery-store-pain", "fast-food-cravings", "snacks", "eating-out", "drinks-alcohol-soda-water"]
-}, {
-  id: "relationships-social",
-  name: "Relationships & Social",
-  itemIds: ["dating-fails", "flirting", "crushes", "breakups", "marriage-jokes", "parenting-fails", "family-drama", "friend-group-chaos", "roommates", "in-laws"]
-}, {
-  id: "time-miscellaneous",
-  name: "Time & Miscellaneous",
-  itemIds: ["bad-luck-mondays", "fridays", "weekend-vibes", "procrastination-memes", "sleep-deprivation", "why-am-i-like-this", "everyday-randomness", "sarcastic-hot-takes", "no-context-jokes", "total-nonsense"]
+  name: "Self-Help Parody",
+  subtitle: "Motivational spoofs"
+}, {
+  id: "edgy-one-liners",
+  name: "Edgy One-Liners",
+  subtitle: "Risky quick jokes"
+}, {
+  id: "burnout-humor",
+  name: "Burnout Humor",
+  subtitle: "Exhaustion jokes"
+}, {
+  id: "ai-robot-jokes",
+  name: "AI Robot Jokes",
+  subtitle: "Future tech laughs"
+}, {
+  id: "gamer-memes",
+  name: "Gamer Memes",
+  subtitle: "Gaming culture fun"
+}, {
+  id: "would-you-rather",
+  name: "Would You Rather",
+  subtitle: "Absurd choices"
+}, {
+  id: "cat-memes",
+  name: "Cat Memes",
+  subtitle: "Feline antics"
+}, {
+  id: "dog-memes",
+  name: "Dog Memes",
+  subtitle: "Canine silliness"
+}, {
+  id: "dating-humor",
+  name: "Dating Humor",
+  subtitle: "Single romance laughs"
+}, {
+  id: "money-jokes",
+  name: "Money Jokes",
+  subtitle: "Broke rich jokes"
+}, {
+  id: "toilet-humor",
+  name: "Toilet Humor",
+  subtitle: "Bathroom laughs"
+}, {
+  id: "astrology-memes",
+  name: "Astrology Memes",
+  subtitle: "Zodiac stereotypes"
+}, {
+  id: "doctor-humor",
+  name: "Doctor Humor",
+  subtitle: "Medical profession laughs"
+}, {
+  id: "stoner-humor",
+  name: "Stoner Humor",
+  subtitle: "Cannabis culture fun"
+}, {
+  id: "bar-jokes",
+  name: "Bar Jokes",
+  subtitle: "Walks into..."
+}, {
+  id: "yo-mama-jokes",
+  name: "Yo Mama Jokes",
+  subtitle: "Insult classics"
+}, {
+  id: "clever-comebacks",
+  name: "Clever Comebacks",
+  subtitle: "Smart quick retorts"
+}, {
+  id: "anti-jokes",
+  name: "Anti-Jokes",
+  subtitle: "No punchline jokes"
+}, {
+  id: "pick-up-lines",
+  name: "Pick-Up Lines",
+  subtitle: "Flirty cheesy openers"
+}, {
+  id: "celebrations",
+  name: "Celebrations",
+  subtitle: "Joyful milestones"
+}, {
+  id: "funny-rants",
+  name: "Funny Rants",
+  subtitle: "Angry but funny"
+}, {
+  id: "lawyer-jokes",
+  name: "Lawyer Jokes",
+  subtitle: "Legal profession laughs"
+}, {
+  id: "little-johnny",
+  name: "Little Johnny",
+  subtitle: "Kid cheeky lines"
+}, {
+  id: "pranks",
+  name: "Pranks",
+  subtitle: "Trick setups"
+}, {
+  id: "heartbreak",
+  name: "Heartbreak",
+  subtitle: "Breakup lost love"
+}, {
+  id: "party-humor",
+  name: "Party Humor",
+  subtitle: "Night out fun"
+}, {
+  id: "seasonal-events",
+  name: "Seasonal Events",
+  subtitle: "Big yearly happenings"
+}, {
+  id: "advertising",
+  name: "Advertising",
+  subtitle: "Marketing campaigns and ads"
+}, {
+  id: "courier-jokes",
+  name: "Courier Jokes",
+  subtitle: "Delivery service humor"
 }];
 const popCultureOptions = [{
   id: "celebrities",
@@ -4178,15 +4018,14 @@ const Index = () => {
   const [customHeight, setCustomHeight] = useState<string>("");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState<string>("");
-  const [sensitiveTagNotices, setSensitiveTagNotices] = useState<Record<string, boolean>>({});
-  const [lastSanitizedTags, setLastSanitizedTags] = useState<SensitiveTagResult[]>([]);
+  const [exactWordingTags, setExactWordingTags] = useState<string[]>([]);
+  const [exactWordingTagInput, setExactWordingTagInput] = useState<string>("");
   const [textGenerationStartTime, setTextGenerationStartTime] = useState<number>(0);
   const [visualGenerationStartTime, setVisualGenerationStartTime] = useState<number>(0);
   const [generatedOptions, setGeneratedOptions] = useState<string[]>([]);
   const [selectedGeneratedOption, setSelectedGeneratedOption] = useState<string | null>(null);
   const [selectedGeneratedIndex, setSelectedGeneratedIndex] = useState<number | null>(null);
   const [generationAudit, setGenerationAudit] = useState<any>(null);
-  const [useAlludeMode, setUseAlludeMode] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [subOptionSearchTerm, setSubOptionSearchTerm] = useState<string>("");
   const [isSearchFocused, setIsSearchFocused] = useState<boolean>(false);
@@ -4208,11 +4047,6 @@ const Index = () => {
   const [isCustomTextConfirmed, setIsCustomTextConfirmed] = useState<boolean>(false);
   // Use fixed negative prompt - no longer editable
   const negativePrompt = DEFAULT_NEGATIVE_PROMPT;
-  const [conciseModeOptions, setConciseModeOptions] = useState<ConciseModeOptions>({
-    enabled: false,
-    textZone: 'NATURAL',
-    strongerSubjectLock: false
-  });
   const [showIdeogramKeyDialog, setShowIdeogramKeyDialog] = useState<boolean>(false);
   const [showProxySettingsDialog, setShowProxySettingsDialog] = useState<boolean>(false);
   const [showCorsRetryDialog, setShowCorsRetryDialog] = useState<boolean>(false);
@@ -4230,13 +4064,6 @@ const Index = () => {
     const stored = localStorage.getItem('remember_last_choices');
     return stored === 'true';
   });
-
-  // Backward compatibility: migrate old "vibes-punchlines" to "anything-goes"
-  useEffect(() => {
-    if (selectedStyle === 'vibes-punchlines') {
-      setSelectedStyle('anything-goes');
-    }
-  }, [selectedStyle]);
 
   // Load saved choices on component mount
   useEffect(() => {
@@ -4323,14 +4150,6 @@ const Index = () => {
   const [targetSlot, setTargetSlot] = useState<string>('');
   const [exactSceneMode, setExactSceneMode] = useState<boolean>(false);
 
-  // Movie Scene Helper state
-  const [showMovieSceneHelper, setShowMovieSceneHelper] = useState<boolean>(false);
-  const [movieSceneData, setMovieSceneData] = useState<{
-    exactQuote: string;
-    sceneDescription: string;
-    useExactMode: boolean;
-  } | null>(null);
-
   // Text speed locked to fast (removed state)
 
   // Auto-generate 1 image when Step 4 loads AND visual recommendations are ready
@@ -4400,41 +4219,6 @@ const Index = () => {
       });
     }
     setIsTestingProxy(false);
-  };
-
-  // Quick generation with different concise modes
-  const handleQuickGenerate = async (mode: 'ultra-short' | 'short' | 'short-locked') => {
-    if (!stepTwoText.trim()) {
-      toast({
-        title: "No Text Available",
-        description: "Please add some text before generating quick prompts",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Configure concise mode options based on the selected mode
-    const modeOptions: ConciseModeOptions = {
-      enabled: true,
-      textZone: 'NATURAL',
-      strongerSubjectLock: mode === 'short-locked'
-    };
-
-    // Temporarily set the concise mode options and regenerate
-    const originalOptions = conciseModeOptions;
-    setConciseModeOptions(modeOptions);
-    
-    try {
-      await handleGenerateImage(1);
-      toast({
-        title: "Quick Generation",
-        description: `Generated with ${mode.replace('-', ' ')} mode`,
-      });
-    } catch (error) {
-      // Restore original options on error
-      setConciseModeOptions(originalOptions);
-      throw error;
-    }
   };
 
   // Helper function to build selections for StackedSelectionCard
@@ -4572,7 +4356,7 @@ const Index = () => {
       case "celebrations":
       case "sports":
       case "daily-life":
-      case "anything-goes":
+      case "vibes-punchlines":
         return !!selectedSubOption;
       default:
         return false;
@@ -4656,30 +4440,7 @@ const Index = () => {
   const handleAddTag = (tag: string) => {
     const trimmedTag = tag.trim();
     if (trimmedTag && !tags.includes(trimmedTag)) {
-      const overrides = getRuntimeOverrides();
-      const tagHandling = overrides.sensitiveTagHandling ?? 'warn-only';
-      
-      if (tagHandling === 'off') {
-        // No sanitization - use exact tag
-        setTags([...tags, trimmedTag]);
-      } else {
-        // Check for sensitive content
-        const sanitizedResult = rewriteSensitiveTags([trimmedTag]);
-        if (sanitizedResult[0].wasSanitized) {
-          if (tagHandling === 'auto-rewrite') {
-            // Replace with sanitized version
-            setTags([...tags, sanitizedResult[0].replacement]);
-            setSensitiveTagNotices(prev => ({ ...prev, [trimmedTag]: true }));
-          } else if (tagHandling === 'warn-only') {
-            // Keep original but show warning
-            setTags([...tags, trimmedTag]);
-            setSensitiveTagNotices(prev => ({ ...prev, [trimmedTag]: true }));
-          }
-        } else {
-          // No issues - use original tag
-          setTags([...tags, trimmedTag]);
-        }
-      }
+      setTags([...tags, trimmedTag]);
     }
     setTagInput("");
   };
@@ -4694,37 +4455,21 @@ const Index = () => {
   };
 
   // Handle exact wording tags
-
-  // Sensitive tag handlers
-  const handleSensitiveTagReplace = (originalTag: string, newTag: string) => {
-    setTags(prev => prev.map(tag => tag === originalTag ? newTag : tag));
-    setSensitiveTagNotices(prev => ({ ...prev, [originalTag]: false }));
-  };
-
-  const handleSensitiveTagDismiss = (tag: string) => {
-    setSensitiveTagNotices(prev => ({ ...prev, [tag]: false }));
-  };
-
-  const handlePrideModeRegenerate = () => {
-    // Add pride-positive tags and regenerate
-    const prideStyle = 'fabulous';
-    if (!tags.includes(prideStyle)) {
-      setTags(prev => [...prev, prideStyle]);
+  const handleAddExactWordingTag = (tag: string) => {
+    const trimmedTag = tag.trim();
+    if (trimmedTag && !exactWordingTags.includes(trimmedTag)) {
+      setExactWordingTags([...exactWordingTags, trimmedTag]);
     }
-    handleGenerateText();
+    setExactWordingTagInput("");
   };
-
-  const handleSkipSensitiveTagsRegenerate = () => {
-    // Remove flagged tags and regenerate
-    const sensitiveTagNames = Object.keys(sensitiveTagNotices).filter(tag => sensitiveTagNotices[tag]);
-    setTags(prev => prev.filter(tag => !sensitiveTagNames.includes(tag)));
-    handleGenerateText();
+  const handleExactWordingTagInputKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      handleAddExactWordingTag(exactWordingTagInput);
+    }
   };
-
-  const handleAlludeModeRegenerate = () => {
-    // Enable allude mode for the next generation
-    setUseAlludeMode(true);
-    handleGenerateText();
+  const removeExactWordingTag = (tagToRemove: string) => {
+    setExactWordingTags(exactWordingTags.filter(tag => tag !== tagToRemove));
   };
 
   // Handle adding subject tags
@@ -4760,6 +4505,10 @@ const Index = () => {
       setTags([...tags, tagInput.trim()]);
       setTagInput("");
     }
+    if (exactWordingTagInput.trim()) {
+      setExactWordingTags([...exactWordingTags, exactWordingTagInput.trim()]);
+      setExactWordingTagInput("");
+    }
     if (subjectTagInput.trim()) {
       setSubjectTags([...subjectTags, subjectTagInput.trim()]);
       setSubjectTagInput("");
@@ -4770,7 +4519,7 @@ const Index = () => {
       // Build inputs using the same mapping logic as text generation
       let category = '';
       let subcategory = '';
-      let finalTags = [...tags, ...subjectTags];
+      let finalTags = [...tags, ...exactWordingTags, ...subjectTags];
       console.log('🎨 Visual generation started with tags:', {
         tags,
         subjectTags,
@@ -4788,8 +4537,8 @@ const Index = () => {
         case 'daily-life':
           category = 'daily life';
           break;
-        case 'anything-goes':
-          category = 'anything goes';
+        case 'vibes-punchlines':
+          category = 'vibes and punchlines';
           break;
         case 'pop-culture':
           category = 'pop culture';
@@ -4884,67 +4633,22 @@ const Index = () => {
       // Map UI selections to vibe model inputs
       let category = '';
       let subcategory = '';
-      // Auto-commit pending tag inputs before generating - use current state
-      const currentTags = tagInput.trim() ? [...tags, tagInput.trim()] : tags;
-      
-      // Clear inputs after committing
-      if (tagInput.trim()) setTagInput("");
-      
-      // Add smart fallback tags when user leaves tag box empty
-      let fallbackTags = [...currentTags];
-      if (fallbackTags.length === 0) {
-        // Generate default tags based on subcategory and selected pick
-        if (selectedStyle === 'celebrations' && selectedSubOption) {
-          // Extract clean tag from celebration subcategory
-          const cleanTag = selectedSubOption
-            .replace(/-us$/, '') // Remove "-us" suffix
-            .replace(/-united-states$/, '') // Remove "-united-states" suffix  
-            .replace(/-day$/, '') // Remove "-day" suffix
-            .replace(/-eve$/, '') // Remove "-eve" suffix
-            .replace(/-party$/, '') // Remove "-party" suffix
-            .replace(/\([^)]*\)/g, '') // Remove parentheses content
-            .replace(/-/g, ' ') // Replace hyphens with spaces
-            .trim();
-          if (cleanTag) fallbackTags.push(cleanTag);
-        } else if (selectedStyle === 'pop-culture' && selectedPick) {
-          // Use the selected celebrity/movie/show/song as default tag
-          fallbackTags.push(selectedPick);
-        } else if (selectedSubOption) {
-          // For other categories, use normalized subcategory name
-          const cleanTag = selectedSubOption
-            .replace(/-/g, ' ') // Replace hyphens with spaces
-            .replace(/\([^)]*\)/g, '') // Remove parentheses content
-            .trim();
-          if (cleanTag) fallbackTags.push(cleanTag);
-        }
+      // Auto-commit pending tag inputs before generating
+      if (tagInput.trim()) {
+        setTags([...tags, tagInput.trim()]);
+        setTagInput("");
       }
-      
-      // Preprocess tags for sensitive content before generation
-      const overrides = getRuntimeOverrides();
-      const tagHandling = overrides.sensitiveTagHandling ?? 'warn-only';
-      
-      const allTags = fallbackTags;
-      let finalTags = allTags;
-      let sanitizedTags: any[] = [];
-      
-      if (tagHandling !== 'off') {
-        const sanitizedTagResults = rewriteSensitiveTags(allTags);
-        if (tagHandling === 'auto-rewrite') {
-          finalTags = sanitizedTagResults.map(result => result.replacement);
-        } else {
-          finalTags = allTags; // Keep original tags even if problematic
-        }
-        sanitizedTags = sanitizedTagResults.filter(result => result.wasSanitized);
+      if (exactWordingTagInput.trim()) {
+        setExactWordingTags([...exactWordingTags, exactWordingTagInput.trim()]);
+        setExactWordingTagInput("");
       }
-      
-      // Store sanitized tags for audit display
-      setLastSanitizedTags(sanitizedTags);
-      
-      console.log('🏷️ Text generation started with tags:', currentTags);
-      console.log('🏷️ Sanitized tags:', sanitizedTags);
+      let finalTags = [...tags, ...exactWordingTags];
+      console.log('🏷️ Text generation started with tags:', tags, 'exact wording:', exactWordingTags);
       console.log('🏷️ Current tags state:', {
-        tags: currentTags,
-        tagsLength: currentTags.length
+        tags,
+        exactWordingTags,
+        tagsLength: tags.length,
+        exactWordingLength: exactWordingTags.length
       });
       console.log('🏷️ Final tags for processing:', finalTags);
 
@@ -4959,8 +4663,8 @@ const Index = () => {
         case 'daily-life':
           category = 'daily life';
           break;
-        case 'anything-goes':
-          category = 'anything goes';
+        case 'vibes-punchlines':
+          category = 'vibes and punchlines';
           break;
         case 'pop-culture':
           category = 'pop culture';
@@ -4995,33 +4699,32 @@ const Index = () => {
 
       // Filter out visual-only tags for text generation
       // Only use the original text tags, not subject tags or visual-only tags
-      let finalTagsForGeneration = [...currentTags]; // Use committed tags
+      let finalTagsForGeneration = [...tags]; // Only use text tags, not subjectTags
 
       console.log('📋 Final parameters for text generation:', {
         category,
         subcategory,
         tone: tone.toLowerCase(),
         tags: finalTagsForGeneration,
+        exactWordingTags: exactWordingTags,
         originalTags: tags,
-        tagCount: finalTagsForGeneration.length
+        tagCount: finalTagsForGeneration.length,
+        exactWordingCount: exactWordingTags.length
       });
 
       // Ensure we have at least the basic tags
-      if (finalTagsForGeneration.length === 0 && currentTags.length > 0) {
-        console.warn('⚠️ finalTagsForGeneration is empty but current tags exist, using current tags');
-        finalTagsForGeneration = [...currentTags];
+      if (finalTagsForGeneration.length === 0 && tags.length > 0) {
+        console.warn('⚠️ finalTagsForGeneration is empty but original tags exist, using original tags');
+        finalTagsForGeneration = [...tags];
       }
       const vibeResult: VibeResult = await generateCandidates({
         category: category as any,
         subcategory,
         tone: tone as any,
         tags: finalTagsForGeneration,
-        recipient_name: selectedPick || "-",
-        retryMode: useAlludeMode ? 'allude-dont-quote' : undefined
+        exactWordingTags: exactWordingTags,
+        recipient_name: selectedPick || "-"
       }, 4);
-      
-      // Reset allude mode after use
-      setUseAlludeMode(false);
 
       // Check for partial tag coverage and show notification
       if (vibeResult.audit.reason?.includes('tag coverage') || vibeResult.audit.reason?.includes('partial tag coverage')) {
@@ -5055,20 +4758,15 @@ const Index = () => {
         });
       }
 
-      // Warn if fallbacks were used with detailed reason
+      // Warn if fallbacks were used
       if (vibeResult.audit.usedFallback) {
         console.warn('⚠️ Text generation used fallback variants. API may be unavailable or having issues.');
-        sonnerToast.warning('Used fallback (API issue)', {
-          description: 'Results may be less relevant to your keywords.',
-          duration: 8000,
-        });
+        sonnerToast.warning('Text generation used fallback. Results may be less relevant to your tags.');
       } else if (vibeResult.audit.candidateCount < 4) {
         console.log(`✅ Generated ${vibeResult.audit.candidateCount} unique options from AI model`);
       }
     } catch (error) {
       console.error('❌ Error generating text:', error);
-      
-      
       sonnerToast.error('Failed to generate text options. Please try again.');
     } finally {
       setIsGenerating(false);
@@ -5100,7 +4798,7 @@ const Index = () => {
     setSelectedImageIndex(0);
     try {
       // Build the handoff data using actual form values
-      const finalText = movieSceneData?.exactQuote || selectedGeneratedOption || stepTwoText || "";
+      const finalText = selectedGeneratedOption || stepTwoText || "";
       const categoryName = selectedStyle ? styleOptions.find(s => s.id === selectedStyle)?.name || "" : "";
       const subcategory = (() => {
         if (selectedStyle === 'celebrations' && selectedSubOption) {
@@ -5140,8 +4838,6 @@ const Index = () => {
         final_line: finalText,
         tags_csv: [textTagsStr, visualTagsStr].filter(tag => tag !== "None").join(', '),
         chosen_visual: chosenVisual,
-        custom_design_notes: movieSceneData?.sceneDescription,
-        exact_scene_mode: movieSceneData?.useExactMode || exactSceneMode,
         category: categoryName,
         subcategory_secondary: subcategorySecondary,
         aspect_ratio: aspectRatio,
@@ -5156,7 +4852,7 @@ const Index = () => {
 
       // ALWAYS use deterministic EXACT TEXT prompt builder
       console.log('ideogram: using EXACT TEXT builder');
-      const prompt = buildIdeogramPrompt(ideogramPayload, false, conciseModeOptions);
+      const prompt = buildIdeogramPrompt(ideogramPayload);
       const aspectForIdeogram = getAspectRatioForIdeogram(aspectRatio);
       const styleForIdeogram = getStyleTypeForIdeogram(visualStyle);
       // Get model from runtime overrides
@@ -5267,60 +4963,29 @@ const Index = () => {
     }
   };
 
-  // Independent pop culture search handler with stale response protection
-  const popSearchRequestId = useRef(0);
+  // Independent pop culture search handler
   const handlePopSearch = async (searchTerm: string) => {
     if (!searchTerm.trim() || !selectedSubOption) return;
-    
-    // Check if this subcategory is supported
-    const categoryLower = selectedSubOption.toLowerCase();
-    const isSupportedCategory = 
-      categoryLower.includes('celebrities') || categoryLower.includes('celebrity') || 
-      categoryLower.includes('actor') || categoryLower.includes('actress') ||
-      categoryLower.includes('movie') || categoryLower.includes('film') ||
-      categoryLower.includes('tv') || categoryLower.includes('show') || categoryLower.includes('series') ||
-      categoryLower.includes('music') || categoryLower.includes('song') || categoryLower.includes('artist') || categoryLower.includes('band') ||
-      categoryLower.includes('book') || categoryLower.includes('literature');
-    
-    if (!isSupportedCategory) {
-      console.log('Skipping pop culture search for unsupported category:', selectedSubOption);
-      return;
-    }
-    
     if (!openAIService.hasApiKey()) {
       if (!openAIService.isUsingBackend()) {
         setShowApiKeyDialog(true);
         return;
       }
     }
-    
-    // Generate unique request ID to handle stale responses
-    const currentRequestId = ++popSearchRequestId.current;
-    
     setIsPopSearching(true);
     setPopSearchError("");
     setPopSearchResults([]);
     try {
       const results = await openAIService.searchPopCulture(selectedSubOption, searchTerm);
-      
-      // Only update results if this is still the latest request
-      if (currentRequestId === popSearchRequestId.current) {
-        setPopSearchResults(results);
-      }
+      setPopSearchResults(results);
     } catch (error) {
-      // Only show error if this is still the latest request
-      if (currentRequestId === popSearchRequestId.current) {
-        console.error('Pop culture search error:', error);
-        setPopSearchError(error instanceof Error ? error.message : 'Search failed');
-        if (error instanceof Error && error.message.includes('API key')) {
-          setShowApiKeyDialog(true);
-        }
+      console.error('Pop culture search error:', error);
+      setPopSearchError(error instanceof Error ? error.message : 'Search failed');
+      if (error instanceof Error && error.message.includes('API key')) {
+        setShowApiKeyDialog(true);
       }
     } finally {
-      // Only clear loading state if this is still the latest request
-      if (currentRequestId === popSearchRequestId.current) {
-        setIsPopSearching(false);
-      }
+      setIsPopSearching(false);
     }
   };
   const handlePopSearchInputChange = (value: string) => {
@@ -5467,12 +5132,12 @@ const Index = () => {
                 }
               });
 
-              // Search anything goes
-              anythingGoesOptions.forEach(option => {
+              // Search vibes & punchlines
+              vibesPunchlinesOptions.forEach(option => {
                 if (option.name.toLowerCase().includes(searchTermLower) || option.subtitle.toLowerCase().includes(searchTermLower)) {
                   subcategoryResults.push({
-                    category: 'anything-goes',
-                    categoryName: 'Anything Goes',
+                    category: 'vibes-punchlines',
+                    categoryName: 'Vibes & Punchlines',
                     subcategory: option,
                     type: 'subcategory'
                   });
@@ -5568,8 +5233,8 @@ const Index = () => {
                   return 'Selected sport';
                 } else if (selectedStyle === 'daily-life') {
                   return 'Selected daily life activity';
-                } else if (selectedStyle === 'anything-goes') {
-                  return 'Selected anything goes tag';
+                } else if (selectedStyle === 'vibes-punchlines') {
+                  return 'Selected vibe';
                 } else if (selectedStyle === 'pop-culture') {
                   const popOption = popCultureOptions.find(p => p.id === selectedSubOption);
                   return popOption?.subtitle || 'Selected pop culture';
@@ -5781,9 +5446,9 @@ const Index = () => {
                       </ScrollArea>
                     </Card>}
                 </div>
-              </div> : selectedStyle === "anything-goes" && !selectedSubOption ? <div className="selected-card mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              </div> : selectedStyle === "vibes-punchlines" && !selectedSubOption ? <div className="selected-card mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="text-center mb-6">
-                  <p className="text-xl text-muted-foreground">Choose an Anything Goes tag</p>
+                  <p className="text-xl text-muted-foreground">Choose a specific vibe or punchline style</p>
                 </div>
                 
                 <div className="space-y-4">
@@ -5793,47 +5458,15 @@ const Index = () => {
                     <Input value={subOptionSearchTerm} onChange={e => setSubOptionSearchTerm(e.target.value)} onFocus={() => setIsSearchFocused(true)} onBlur={() => {
                   // Delay hiding the list to allow clicks to complete
                   setTimeout(() => setIsSearchFocused(false), 150);
-                }} placeholder="Search Anything Goes..." className="pl-10 text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
+                }} placeholder="Search vibes & punchlines..." className="pl-10 text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
                   </div>
 
-                  {/* Umbrella Groups (only show when not searching) */}
-                  {!isSearchFocused && subOptionSearchTerm.length === 0 && (
-                    <div className="space-y-3">
-                      {anythingGoesGroups.map(group => (
-                        <Card key={group.id} className="border-border">
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">{group.name}</CardTitle>
-                          </CardHeader>
-                          <CardContent className="pt-0">
-                            <div className="grid grid-cols-2 gap-2">
-                              {group.itemIds.map(itemId => {
-                                const option = anythingGoesOptions.find(opt => opt.id === itemId);
-                                if (!option) return null;
-                                return (
-                                  <div 
-                                    key={itemId} 
-                                    onClick={() => {
-                                      setSelectedSubOption(option.name);
-                                    }}
-                                    className="p-2 rounded border border-border hover:bg-accent/50 cursor-pointer transition-colors text-center"
-                                  >
-                                    <p className="text-xs font-medium text-card-foreground">{option.name}</p>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Anything Goes List */}
+                  {/* Vibes & Punchlines List */}
                   {(isSearchFocused || subOptionSearchTerm.length > 0) && <Card className="max-h-96 overflow-hidden">
                       <ScrollArea className="h-96">
                         <div className="p-4 space-y-2">
                           {(() => {
-                      const filteredVibes = anythingGoesOptions.filter(vibe => (vibe.name + " " + vibe.subtitle).toLowerCase().includes(subOptionSearchTerm.toLowerCase()));
+                      const filteredVibes = vibesPunchlinesOptions.filter(vibe => (vibe.name + " " + vibe.subtitle).toLowerCase().includes(subOptionSearchTerm.toLowerCase()));
                       return filteredVibes.length > 0 ? filteredVibes.map(vibe => <div key={vibe.id} onClick={e => {
                         console.log('Vibe clicked:', vibe.name);
                         e.preventDefault();
@@ -5859,12 +5492,12 @@ const Index = () => {
                                 <div className="w-4 h-4 rounded-full border border-muted-foreground flex items-center justify-center">
                                   <span className="text-xs font-bold text-muted-foreground">+</span>
                                 </div>
-                                 <p className="text-sm font-medium text-card-foreground">
-                                   Add "{subOptionSearchTerm.trim()}" as custom tag
-                                 </p>
-                               </div> : <div className="text-center py-8">
-                                 <p className="text-muted-foreground">Start typing to search Anything Goes</p>
-                               </div>;
+                                <p className="text-sm font-medium text-card-foreground">
+                                  Add "{subOptionSearchTerm.trim()}" as custom vibe
+                                </p>
+                              </div> : <div className="text-center py-8">
+                                <p className="text-muted-foreground">Start typing to search vibes & punchlines</p>
+                              </div>;
                     })()}
                         </div>
                       </ScrollArea>
@@ -5959,7 +5592,7 @@ const Index = () => {
                       {!isPopSearching && popSearchResults.length > 0 && <>
                           <div className="text-center mb-4">
                             <p className="text-sm text-muted-foreground">
-                              Found {popSearchResults.length} results
+                              Found {popSearchResults.length} results from OpenAI's extensive database
                             </p>
                           </div>
                           <Card className="max-h-96 overflow-hidden">
@@ -6006,35 +5639,16 @@ const Index = () => {
                       <p className="text-sm text-destructive">{popSearchError}</p>
                     </div>}
 
-                   {/* Custom Entry Option */}
-                   {popSearchTerm.trim() && popSearchResults.length === 0 && !isPopSearching && !popSearchError && <div className="text-center">
-                       <Button onClick={() => {
-                   setSelectedPick(popSearchTerm.trim());
-                   setPopSearchTerm("");
-                 }} variant="outline" size="lg" className="px-6 py-3">
-                         Use "{popSearchTerm.trim()}" as custom {selectedSubOption.toLowerCase()}
-                       </Button>
-                     </div>}
-
-                   {/* Movie Scene Helper */}
-                   {selectedSubOption === "movies" && (
-                     <div className="mt-6 pt-6 border-t border-border">
-                       <div className="text-center mb-4">
-                         <Button
-                           onClick={() => setShowMovieSceneHelper(!showMovieSceneHelper)}
-                           variant="secondary"
-                           size="lg"
-                           className="px-6 py-3"
-                         >
-                           🎬 Movie Scene Helper
-                         </Button>
-                         <p className="text-xs text-muted-foreground mt-2">
-                           Perfect for recreating iconic movie scenes with exact quotes
-                         </p>
-                       </div>
-                     </div>
-                   )}
-                 </div>
+                  {/* Custom Entry Option */}
+                  {popSearchTerm.trim() && popSearchResults.length === 0 && !isPopSearching && !popSearchError && <div className="text-center">
+                      <Button onClick={() => {
+                  setSelectedPick(popSearchTerm.trim());
+                  setPopSearchTerm("");
+                }} variant="outline" size="lg" className="px-6 py-3">
+                        Use "{popSearchTerm.trim()}" as custom {selectedSubOption.toLowerCase()}
+                      </Button>
+                    </div>}
+                </div>
               </div> : selectedStyle === "random" && !selectedSubOption ? <div className="selected-card mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="text-center mb-6">
                   <p className="text-xl text-muted-foreground">Ready to create your text</p>
@@ -6054,23 +5668,10 @@ const Index = () => {
           </div>}
           </>}
 
-        {/* Movie Scene Helper */}
-        <MovieSceneHelper
-          isVisible={showMovieSceneHelper}
-          onSceneData={(data) => {
-            setMovieSceneData(data);
-            setStepTwoText(data.exactQuote);
-            setIsCustomTextConfirmed(true);
-            setExactSceneMode(data.useExactMode);
-            setShowMovieSceneHelper(false);
-            setCurrentStep(3); // Move to visual style selection
-          }}
-        />
-
         {currentStep === 2 && <>
             <div className="text-center mb-12">
               <div className="flex items-center justify-between max-w-6xl mx-auto mb-6">
-                <h2 className="text-2xl md:text-3xl font-semibold text-foreground text-center">Choose Your Text Style</h2>
+                <h2 className="text-2xl md:text-3xl font-semibold text-foreground">Choose Your Text Style</h2>
                 {/* Remember choices toggle hidden for now */}
                 {false && <div className="flex items-center gap-3 text-sm">
                   <label htmlFor="remember-choices" className="text-muted-foreground cursor-pointer">
@@ -6251,61 +5852,38 @@ const Index = () => {
                     </div>
 
                     <div className="max-w-lg mx-auto space-y-6">
-                       {/* General Tags Input */}
-                       <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
-                           <div className="text-center flex items-center justify-center gap-2">
-                             <label className="text-sm font-medium text-foreground">Guidance Tags</label>
-                             <Tooltip>
-                               <TooltipTrigger>
-                                 <Info className="h-4 w-4 text-muted-foreground" />
-                               </TooltipTrigger>
-                               <TooltipContent className="max-w-xs">
-                                 <p className="text-xs">Industry, offer, audience, keywords — guide the AI in the right direction for your content</p>
-                               </TooltipContent>
-                             </Tooltip>
-                           </div>
-                           <Input value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={handleTagInputKeyDown} placeholder="theme, sale, millennials, birthday, sarcastic..." className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
-                         
-                         {/* Display General Tags */}
-                         {tags.length > 0 && (
-                           <div className="space-y-2">
-                             <div className="flex flex-wrap gap-2 justify-center">
-                               {tags.map((tag, index) => (
-                                 <Badge key={index} variant="secondary" className="px-3 py-1 text-sm flex items-center gap-1">
-                                   {tag}
-                                   <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => removeTag(tag)} />
-                                 </Badge>
-                               ))}
-                             </div>
-                             
-                             {/* Sensitive tag notices */}
-                             {tags.map((tag) => 
-                               sensitiveTagNotices[tag] && (
-                                 <SensitiveTagNotice
-                                   key={`notice-${tag}`}
-                                   tag={tag}
-                                   onReplace={(newTag) => handleSensitiveTagReplace(tag, newTag)}
-                                   onDismiss={() => handleSensitiveTagDismiss(tag)}
-                                />
-                              )
-                            )}
-                          </div>
-                        )}
+                      {/* General Tags Input */}
+                      <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
+                        <div className="text-center">
+                          <label className="text-sm font-medium text-foreground">General Tags (give AI direction for text)</label>
+                          <p className="text-xs text-muted-foreground mt-1">Theme, vibe, direction (movie quotes, birthday, funny)</p>
+                        </div>
+                        <Input value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={handleTagInputKeyDown} placeholder="Enter general tags (press Enter or comma to add)" className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
+                        
+                        {/* Display General Tags */}
+                        {tags.length > 0 && <div className="flex flex-wrap gap-2 justify-center">
+                            {tags.map((tag, index) => <Badge key={index} variant="secondary" className="px-3 py-1 text-sm flex items-center gap-1">
+                                {tag}
+                                <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => removeTag(tag)} />
+                              </Badge>)}
+                          </div>}
                       </div>
 
-                       {/* Exact Text Tags Input */}
-                       <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-200">
-                         <div className="text-center flex items-center justify-center gap-2">
-                           <label className="text-sm font-medium text-foreground">Must Include Words</label>
-                           <Tooltip>
-                             <TooltipTrigger>
-                               <Info className="h-4 w-4 text-muted-foreground" />
-                             </TooltipTrigger>
-                             <TooltipContent className="max-w-xs">
-                               <p className="text-xs">These exact words/phrases will appear in all 4 options. Great for promo codes, brand names, or required terms.</p>
-                             </TooltipContent>
-                           </Tooltip>
-                         </div>
+                      {/* Exact Text Tags Input */}
+                      <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-200">
+                        <div className="text-center">
+                          <label className="text-sm font-medium text-foreground">Exact Text Tags (they will literally be in the text)</label>
+                          <p className="text-xs text-muted-foreground mt-1">⚠️ Don't include "EXACT TEXT:" prefix - it's added automatically</p>
+                        </div>
+                        <Input value={exactWordingTagInput} onChange={e => setExactWordingTagInput(e.target.value)} onKeyDown={handleExactWordingTagInputKeyDown} placeholder="Enter exact text tags (press Enter or comma to add)" className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
+                        
+                        {/* Display Exact Wording Tags */}
+                        {exactWordingTags.length > 0 && <div className="flex flex-wrap gap-2 justify-center">
+                            {exactWordingTags.map((tag, index) => <Badge key={index} variant="outline" className="px-3 py-1 text-sm flex items-center gap-1 border-primary/50 text-primary">
+                                "{tag}"
+                                <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => removeExactWordingTag(tag)} />
+                              </Badge>)}
+                          </div>}
                       </div>
 
                       {/* Generate Button */}
@@ -6317,17 +5895,12 @@ const Index = () => {
                               {!selectedCompletionOption && <li>• Text completion option</li>}
                             </ul>
                           </div>}
-                        <div className="flex flex-col items-center gap-2">
-                          <Badge variant="secondary" className="text-xs font-medium px-2 py-1">
-                            Model: GPT-4.1
-                          </Badge>
-                          <Button variant="brand" className="px-8 py-3 text-base font-medium rounded-lg" onClick={handleGenerateText} disabled={isGenerating || !canGenerateText()}>
-                            {isGenerating ? <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Generating...
-                              </> : "Generate Text Now"}
-                          </Button>
-                        </div>
+                        <Button variant="brand" className="px-8 py-3 text-base font-medium rounded-lg" onClick={handleGenerateText} disabled={isGenerating || !canGenerateText()}>
+                          {isGenerating ? <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Generating...
+                            </> : "Generate Text Now"}
+                        </Button>
                       </div>
                     </div>
                   </div>}
@@ -6346,34 +5919,10 @@ const Index = () => {
                           {isGenerating ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : "Regenerate"}
                         </Button>
                       </div>
-                        {generatedOptions.length > 0 && generationAudit && <div className="flex items-center justify-center gap-1">
-                          <p className="text-xs text-muted-foreground">
-                            Using {generationAudit.model} • Generated in {((Date.now() - textGenerationStartTime) / 1000).toFixed(1)}s
-                            {generationAudit.usedFallback ? " • Used fallback" : ` • Received ${generationAudit.candidateCount} options`}
-                          </p>
-                           {generationAudit.usedFallback && (
-                             <FallbackTooltip 
-                               reason={(() => {
-                                 const reason = generationAudit.reason?.toLowerCase() || '';
-                                 if (reason.includes('api error') || reason.includes('network')) return 'api-error';
-                                 if (reason.includes('timeout') || reason.includes('timed out')) return 'timeout'; 
-                                 if (reason.includes('banned word') || reason.includes('blocked') || reason.includes('content filter')) return 'content-filter';
-                                 if (reason.includes('insufficient') || reason.includes('candidates')) return 'insufficient-candidates';
-                                 return 'content-filter';
-                               })()}
-                               onRegenerate={handleGenerateText}
-                               onAlludeMode={handleAlludeModeRegenerate}
-                               onPrideMode={handlePrideModeRegenerate}
-                               onSkipTags={handleSkipSensitiveTagsRegenerate}
-                               isGenerating={isGenerating}
-                               sanitizedTags={lastSanitizedTags.map(tag => ({
-                                 original: tag.original,
-                                 replacement: tag.replacement,
-                                 reason: tag.reason || 'Content filtered'
-                               }))}
-                             />
-                           )}
-                        </div>}
+                       {generatedOptions.length > 0 && generationAudit && <p className="text-xs text-muted-foreground">
+                           Using {generationAudit.model} • Generated in {((Date.now() - textGenerationStartTime) / 1000).toFixed(1)}s
+                           {generationAudit.usedFallback ? " • Used fallback" : ` • Received ${generationAudit.candidateCount} options`}
+                        </p>}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-6">
@@ -7120,7 +6669,7 @@ const Index = () => {
                   <div className="bg-muted/30 rounded-lg p-6">
                     {(() => {
                 // Build the same handoff structure we use for generation
-                const finalText = movieSceneData?.exactQuote || selectedGeneratedOption || stepTwoText || "";
+                const finalText = selectedGeneratedOption || stepTwoText || "";
                 const visualStyle = selectedVisualStyle || "";
                 const subcategory = (() => {
                   if (selectedStyle === 'celebrations' && selectedSubOption) {
@@ -7154,21 +6703,13 @@ const Index = () => {
                   rec_subject: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].subject : selectedSubjectOption === "design-myself" ? subjectDescription : undefined,
                   rec_background: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined
                 });
-                const promptText = buildIdeogramPrompt(tempHandoff, false, conciseModeOptions);
-                return <p className="text-sm text-foreground font-mono leading-relaxed whitespace-pre-wrap">
+                const promptText = buildIdeogramPrompt(tempHandoff);
+                return <p className="text-sm text-foreground font-mono leading-relaxed">
                           {promptText || "No prompt available"}
                         </p>;
               })()}
                   </div>
                 </div>
-
-                {/* Concise Mode Panel */}
-                <ConciseModePanel 
-                  conciseModeOptions={conciseModeOptions}
-                  onOptionsChange={setConciseModeOptions}
-                  onQuickGenerate={handleQuickGenerate}
-                  className="mb-4"
-                />
 
                 {/* Negative Prompt Display */}
                 {negativePrompt.trim() && <div className="space-y-4">
@@ -7245,7 +6786,7 @@ const Index = () => {
               // Start manual image generation on Step 4
               setIsGeneratingImage(true);
               try {
-                const finalText = movieSceneData?.exactQuote || selectedGeneratedOption || stepTwoText || "";
+                const finalText = selectedGeneratedOption || stepTwoText || "";
                 const visualStyle = selectedVisualStyle || "";
                 const subcategory = (() => {
                   if (selectedStyle === 'celebrations' && selectedSubOption) {
@@ -7270,19 +6811,6 @@ const Index = () => {
 
                 // Get secondary subcategory for pop culture
                 const subcategorySecondary = selectedStyle === 'pop-culture' && selectedPick ? selectedPick : undefined;
-                
-                // Auto-inject dispensary background for cannabis-related content
-                const cannabisKeywords = ['cannabis', 'marijuana', 'weed', '420', 'dispensary', 'joint', 'cbd', 'thc'];
-                const hasCannabisContent = [...allTags, finalText, subcategory].some(item =>
-                  cannabisKeywords.some(keyword => item?.toLowerCase().includes(keyword))
-                );
-                
-                let recBackground = selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined;
-                if (hasCannabisContent && !recBackground) {
-                  recBackground = "Trendy dispensary interior with stylish shelves, modern decor, clear area above subject for big sale text";
-                  console.log('🌿 Auto-injected dispensary background for cannabis content');
-                }
-
                 const ideogramPayload = buildIdeogramHandoff({
                   // Core parameters
                   visual_style: visualStyle,
@@ -7302,13 +6830,13 @@ const Index = () => {
                   negative_prompt: negativePrompt,
                   // Visual AI Recommendations
                   rec_subject: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].subject : selectedSubjectOption === "design-myself" ? subjectDescription : undefined,
-                  rec_background: recBackground
+                  rec_background: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined
                 });
 
                 // Generate the Ideogram prompt
-                const promptText = buildIdeogramPrompt(ideogramPayload, false, conciseModeOptions);
+                const promptText = buildIdeogramPrompt(ideogramPayload);
                 const aspectRatioKey = getAspectRatioForIdeogram(selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || "");
-                let styleType = getStyleTypeForIdeogram(visualStyle, promptText);
+                let styleType = getStyleTypeForIdeogram(visualStyle);
                 let model: 'V_1' | 'V_1_TURBO' | 'V_2' | 'V_2_TURBO' | 'V_2A' | 'V_2A_TURBO' | 'V_3' = 'V_2_TURBO';
 
                 // Get model from AI settings instead of auto-selecting based on style
@@ -7377,7 +6905,7 @@ const Index = () => {
               }
             } else if (currentStep === 4 && isStep4Complete()) {
               // Generate vibe with Ideogram handoff
-              const finalText = movieSceneData?.exactQuote || selectedGeneratedOption || stepTwoText || "";
+              const finalText = selectedGeneratedOption || stepTwoText || "";
               const visualStyle = selectedVisualStyle || "";
               const subcategory = (() => {
                 if (selectedStyle === 'celebrations' && selectedSubOption) {

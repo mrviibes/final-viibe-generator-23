@@ -1,6 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
 import { buildPopCultureSearchPrompt, buildGenerateTextMessages, getEffectiveConfig, MODEL_DISPLAY_NAMES, getSmartFallbackChain } from "../vibe-ai.config";
-import { getPopCultureFacts, type PopCultureFact } from './popCultureRAG';
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -35,8 +34,6 @@ export class OpenAIService {
   private apiKey: string | null = null;
   private useBackendAPI: boolean = true; // Use Supabase backend by default
   private textSpeed: 'fast' | 'creative' = 'fast'; // Locked to fast
-  private lastError: string | null = null;
-  private connectionStatus: 'unknown' | 'working' | 'quota-exceeded' | 'auth-failed' | 'network-error' = 'unknown';
 
   constructor() {
     // Still support localStorage for fallback, but prefer backend
@@ -416,32 +413,32 @@ export class OpenAIService {
   }
 
   async searchPopCulture(category: string, searchTerm: string): Promise<OpenAISearchResult[]> {
-    // Early return if no search term
-    if (!searchTerm || searchTerm.trim().length === 0) {
-      return [];
-    }
+    const prompt = buildPopCultureSearchPrompt(category, searchTerm);
 
     try {
-      console.log('Searching pop culture for:', searchTerm, 'in category:', category);
-      
-      // Call our new pop-culture-search Edge Function
-      const { data, error } = await supabase.functions.invoke('pop-culture-search', {
-        body: {
-          category,
-          searchTerm: searchTerm.trim()
-        }
+      const result = await this.chatJSON([
+        { role: 'user', content: prompt }
+      ], {
+        max_completion_tokens: 500,
+        model: 'gpt-4.1-2025-04-14' // More reliable model
       });
 
-      if (error) {
-        console.error('Pop culture search failed:', error);
-        throw new Error(error.message);
+      // Post-process to ensure we have exactly 5 valid items
+      const suggestions = result?.suggestions || [];
+      const validSuggestions = suggestions.filter((item: any) => 
+        item && typeof item.title === 'string' && typeof item.description === 'string' &&
+        item.title.trim() && item.description.trim()
+      );
+
+      // If we don't have enough valid suggestions, pad with generic ones
+      while (validSuggestions.length < 5) {
+        validSuggestions.push({
+          title: `${category} suggestion ${validSuggestions.length + 1}`,
+          description: `Popular ${category.toLowerCase()} related to ${searchTerm}`
+        });
       }
 
-      // Return the results from our Edge Function
-      const results = data?.results || [];
-      console.log(`Found ${results.length} search results`);
-      
-      return results.slice(0, 5);
+      return validSuggestions.slice(0, 5);
     } catch (error) {
       console.error('Pop culture search failed:', error);
       
@@ -467,29 +464,7 @@ export class OpenAIService {
 
   async generateShortTexts(params: GenerateTextParams): Promise<string[]> {
     const { tone, category, characterLimit } = params;
-    
-    let retrievedFacts: PopCultureFact[] = [];
-    
-    // For Pop Culture category or when tags are present, try to get facts
-    if (category === 'Pop Culture' || (params.tags && params.tags.length > 0)) {
-      try {
-        const factsResult = await getPopCultureFacts(
-          category || 'Pop Culture',
-          params.subtopic || '',
-          params.tags || [],
-          params.pick || ''
-        );
-        retrievedFacts = factsResult.facts;
-        console.log(`Retrieved ${retrievedFacts.length} pop culture facts`);
-      } catch (error) {
-        console.warn('Failed to retrieve pop culture facts:', error);
-      }
-    }
-
-    const messages = buildGenerateTextMessages(params, retrievedFacts.length > 0 ? {
-      facts: retrievedFacts.map(f => f.text),
-      sources: retrievedFacts.flatMap(f => f.sources).slice(0, 3)
-    } : undefined);
+    const messages = buildGenerateTextMessages(params);
 
     try {
       // Use effective config to get the model from AI settings
@@ -505,70 +480,15 @@ export class OpenAIService {
 
       const options = result?.options || [];
       
-      // Clean and apply quality gate
-      const cleanedOptions = options.map((option: string) => 
-        this.cleanVisibleOption(option.replace(/^["']|["']$/g, '').trim())
-      );
+      // Enforce character limit and ensure exactly 4 options
+      const processedOptions = options.map((option: string) => {
+        const cleaned = option.replace(/^["']|["']$/g, '').trim();
+        return cleaned.length > characterLimit ? cleaned.slice(0, characterLimit) : cleaned;
+      }).slice(0, 4);
 
-      // Filter out low-quality options
-      const highQualityOptions: string[] = [];
-      const rejectedOptions: string[] = [];
-      
-      for (const option of cleanedOptions) {
-        const { isLowQuality, reason } = this.isLowQualityOption(option, params.tags || []);
-        if (isLowQuality) {
-          console.log(`🚫 Rejected option: "${option}" - ${reason}`);
-          rejectedOptions.push(option);
-        } else {
-          highQualityOptions.push(option);
-        }
-      }
-
-      // Remove duplicates
-      const uniqueOptions = Array.from(new Set(highQualityOptions.map(opt => opt.toLowerCase())))
-        .map(lower => highQualityOptions.find(opt => opt.toLowerCase() === lower)!);
-
-      console.log(`✅ Quality gate: ${uniqueOptions.length}/${cleanedOptions.length} options passed`);
-
-      // Top-up if we need more options
-      let finalOptions = uniqueOptions.slice(0, 4);
-      if (finalOptions.length < 4 && finalOptions.length > 0) {
-        console.log(`🔄 Top-up needed: ${4 - finalOptions.length} more options`);
-        
-        try {
-          const topUpResult = await this.chatJSON([
-            { role: 'user', content: `Generate ${4 - finalOptions.length} replacement options obeying the original instructions plus the Quality Rules. 
-            Avoid these rejected options: ${rejectedOptions.map(opt => `"${opt}"`).join(', ')}
-            Return JSON: {"options":["option1","option2",...]}` }
-          ], {
-            max_completion_tokens: 200,
-            model: targetModel
-          });
-          
-          if (topUpResult.options && Array.isArray(topUpResult.options)) {
-            const topUpCleaned = topUpResult.options
-              .map((option: string) => this.cleanVisibleOption(option.replace(/^["']|["']$/g, '').trim()))
-              .filter((option: string) => !this.isLowQualityOption(option, params.tags || []).isLowQuality)
-              .filter((option: string) => !finalOptions.some(existing => existing.toLowerCase() === option.toLowerCase()));
-            
-            finalOptions = [...finalOptions, ...topUpCleaned].slice(0, 4);
-            console.log(`✅ Top-up added ${topUpCleaned.length} options`);
-          }
-        } catch (error) {
-          console.log(`⚠️ Top-up failed:`, error);
-        }
-      }
-
-      // Enforce character limit
-      const processedOptions = finalOptions.map((option: string) => 
-        option.length > characterLimit ? option.slice(0, characterLimit) : option
-      );
-
-      // Fill with tone-specific fallbacks if still needed
+      // If we don't have 4 options, pad with generic ones
       while (processedOptions.length < 4) {
-        const fallbackIndex = processedOptions.length + 1;
-        const toneFallback = this.getToneFallback(tone, fallbackIndex);
-        processedOptions.push(toneFallback);
+        processedOptions.push(`${tone} text option ${processedOptions.length + 1}`);
       }
 
       return processedOptions;
@@ -588,51 +508,6 @@ export class OpenAIService {
         option.length > characterLimit ? option.slice(0, characterLimit) : option
       );
     }
-  }
-
-  // Check if an option is low quality and should be filtered out
-  private isLowQualityOption(text: string, tags: string[] = []): { isLowQuality: boolean; reason?: string } {
-    const trimmed = text.trim();
-    
-    // Check word count and length
-    const wordCount = trimmed.split(/\s+/).length;
-    if (wordCount < 3 || trimmed.length < 12) {
-      return { isLowQuality: true, reason: `Too short: ${wordCount} words, ${trimmed.length} chars` };
-    }
-    
-    // Check if it's just a name or tag verbatim
-    const tagSet = new Set(tags.map(tag => tag.toLowerCase().trim()));
-    if (tagSet.has(trimmed.toLowerCase()) || /^[A-Z][a-z]+$/.test(trimmed)) {
-      return { isLowQuality: true, reason: "Name/tag-only output" };
-    }
-    
-    return { isLowQuality: false };
-  }
-
-  // Clean visible options by removing emojis/hashtags and collapsing punctuation
-  private cleanVisibleOption(text: string): string {
-    return text
-      // Remove emojis and hashtags
-      .replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '')
-      .replace(/#\w+/g, '')
-      // Preserve %, +, $, en/em dashes but collapse multiple spaces/punctuation
-      .replace(/\s+/g, ' ')
-      .replace(/([.!?])\1+/g, '$1')
-      .trim();
-  }
-
-  // Generate tone-specific fallback options
-  private getToneFallback(tone: string, index: number): string {
-    const fallbacks: Record<string, string[]> = {
-      'playful': ['Let\'s have some fun!', 'Ready to play?', 'Time for excitement!', 'Join the fun!'],
-      'savage': ['No games here', 'Straight talk only', 'Real talk time', 'Keep it honest'],
-      'casual': ['Just keeping it real', 'Simple and easy', 'No fuss here', 'Straightforward vibes'],
-      'professional': ['Excellence in every detail', 'Quality you can trust', 'Professional service', 'Your success matters'],
-      'urgent': ['Act now!', 'Don\'t wait!', 'Time is running out', 'Immediate action needed']
-    };
-    
-    const toneOptions = fallbacks[tone.toLowerCase()] || ['Great choice ahead', 'Quality option here', 'Excellent selection', 'Perfect fit'];
-    return toneOptions[(index - 1) % toneOptions.length];
   }
 }
 

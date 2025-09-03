@@ -8,10 +8,9 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-import { ArrowLeft, RotateCcw, Settings, AlertTriangle, Info, ImageIcon, Key, CheckCircle, XCircle, AlertCircle as AlertCircleIcon } from "lucide-react";
+import { ArrowLeft, RotateCcw, Settings, AlertTriangle, Info, ImageIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { openAIService } from "@/lib/openai";
 import { 
   getRuntimeOverrides, 
   setRuntimeOverrides, 
@@ -24,19 +23,14 @@ import {
   isTemperatureSupported,
   type AIRuntimeOverrides,
   type VisualStyle,
-  type Tone,
-  type ContentFilterStrictness,
-  type SensitiveTagHandling
+  type Tone
 } from "@/vibe-ai.config";
-import { clearPopCultureCache } from "@/lib/popCultureRAG";
 
 export default function AiSettings() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [overrides, setOverrides] = useState<AIRuntimeOverrides>({});
   const [hasChanges, setHasChanges] = useState(false);
-  const [openaiConnectionStatus, setOpenaiConnectionStatus] = useState<'unknown' | 'working' | 'quota-exceeded' | 'auth-failed' | 'network-error'>('unknown');
-  const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
 
   useEffect(() => {
     const current = getRuntimeOverrides();
@@ -45,9 +39,6 @@ export default function AiSettings() {
     delete cleanedOverrides.model;
     delete cleanedOverrides.temperature;
     setOverrides(cleanedOverrides);
-    
-    // Update OpenAI connection status
-    setOpenaiConnectionStatus('unknown');
   }, []);
 
   const updateOverride = (key: keyof AIRuntimeOverrides, value: any) => {
@@ -79,58 +70,6 @@ export default function AiSettings() {
     const current = getRuntimeOverrides();
     setOverrides(current);
     setHasChanges(false);
-  };
-
-  const getConnectionStatusIcon = () => {
-    switch (openaiConnectionStatus) {
-      case 'working':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'quota-exceeded':
-      case 'auth-failed':
-        return <XCircle className="h-4 w-4 text-red-500" />;
-      case 'network-error':
-        return <AlertCircleIcon className="h-4 w-4 text-yellow-500" />;
-      default:
-        return <AlertCircleIcon className="h-4 w-4 text-muted-foreground" />;
-    }
-  };
-
-  const getConnectionStatusText = () => {
-    if (openAIService.isUsingBackend()) {
-      return 'Using Supabase backend';
-    }
-    
-    switch (openaiConnectionStatus) {
-      case 'working':
-        return 'Connected';
-      case 'quota-exceeded':
-        return 'Quota exceeded - add billing to OpenAI account';
-      case 'auth-failed':
-        return 'Invalid API key';
-      case 'network-error':
-        return 'Connection error';
-      default:
-        return openAIService.hasApiKey() ? 'API key set' : 'No API key';
-    }
-  };
-
-  const handleClearApiKey = () => {
-    openAIService.clearApiKey();
-    
-    setOpenaiConnectionStatus('unknown');
-    toast({
-      title: "API Key Cleared",
-      description: "Now using Supabase backend for OpenAI requests."
-    });
-  };
-
-  const handleApiKeySet = (apiKey: string) => {
-    openAIService.setApiKey(apiKey);
-    setOpenaiConnectionStatus('unknown');
-    toast({
-      title: "API Key Set",
-      description: "OpenAI API key has been configured. Test it by generating content."
-    });
   };
 
   return (
@@ -221,217 +160,6 @@ export default function AiSettings() {
                 />
               </div>
 
-              <Separator />
-
-              <div className="space-y-2">
-                <Label>Content Filter Strictness</Label>
-                <Select
-                  value={overrides.contentFilterStrictness || 'relaxed'}
-                  onValueChange={(value) => updateOverride('contentFilterStrictness', value as ContentFilterStrictness)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="strict">
-                      <div className="space-y-1">
-                        <div className="font-medium">Strict</div>
-                        <div className="text-sm text-muted-foreground">Maximum filtering (current behavior)</div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="relaxed">
-                      <div className="space-y-1">
-                        <div className="font-medium">Relaxed (Recommended)</div>
-                        <div className="text-sm text-muted-foreground">Balanced approach, fewer false positives</div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="off">
-                      <div className="space-y-1">
-                        <div className="font-medium">Off</div>
-                        <div className="text-sm text-muted-foreground">Minimal filtering, rely on model safety</div>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-sm text-muted-foreground">
-                  Controls how strictly content is filtered. "Relaxed" reduces fallback usage while maintaining safety.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Sensitive Tag Handling</Label>
-                <Select
-                  value={overrides.sensitiveTagHandling || 'warn-only'}
-                  onValueChange={(value) => updateOverride('sensitiveTagHandling', value as SensitiveTagHandling)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="auto-rewrite">
-                      <div className="space-y-1">
-                        <div className="font-medium">Auto-rewrite</div>
-                        <div className="text-sm text-muted-foreground">Automatically replace sensitive tags</div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="warn-only">
-                      <div className="space-y-1">
-                        <div className="font-medium">Warn Only (Recommended)</div>
-                        <div className="text-sm text-muted-foreground">Keep original tags but show warnings</div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="off">
-                      <div className="space-y-1">
-                        <div className="font-medium">Off</div>
-                        <div className="text-sm text-muted-foreground">No tag processing</div>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-sm text-muted-foreground">
-                  How to handle potentially sensitive tags. "Warn only" preserves your intent while providing feedback.
-                </p>
-              </div>
-
-            </CardContent>
-          </Card>
-
-          {/* Pop Culture Settings */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Pop Culture Intelligence</CardTitle>
-              <CardDescription>
-                Configure web fact retrieval for pop culture content generation.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label>Use Web Facts for Pop Culture</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Retrieve real facts from Wikipedia and other sources for pop culture topics
-                  </p>
-                </div>
-                <Switch
-                  checked={overrides.popCultureWebFacts !== false}
-                  onCheckedChange={(checked) => updateOverride('popCultureWebFacts', checked)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Recency Filter</Label>
-                <Select
-                  value={overrides.popCultureRecency || 'all'}
-                  onValueChange={(value) => updateOverride('popCultureRecency', value)}
-                  disabled={overrides.popCultureWebFacts === false}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="month">This Month</SelectItem>
-                    <SelectItem value="year">This Year</SelectItem>
-                    <SelectItem value="all">All Time</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-sm text-muted-foreground">
-                  Filter facts based on recency for more current references
-                </p>
-              </div>
-
-              {overrides.popCultureWebFacts !== false && (
-                <div className="flex items-start gap-2 p-3 rounded-md bg-muted">
-                  <Info className="h-4 w-4 mt-0.5" />
-                  <div className="text-sm">
-                    <p className="font-medium">Cache Information</p>
-                    <p className="text-muted-foreground">
-                      Web facts are cached for 24 hours to improve speed. Use the reset button below to clear cache and fetch fresh data.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              <Button
-                variant="outline"
-                onClick={() => {
-                  clearPopCultureCache();
-                  toast({
-                    title: "Cache Cleared",
-                    description: "Pop culture cache has been cleared. Fresh facts will be fetched on next use."
-                  });
-                }}
-                disabled={overrides.popCultureWebFacts === false}
-              >
-                Clear Pop Culture Cache
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* OpenAI Connection */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Key className="h-5 w-5" />
-                OpenAI Connection
-              </CardTitle>
-              <CardDescription>
-                Manage your OpenAI API connection for text generation.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-3 border rounded-lg">
-                <div className="flex items-center gap-2">
-                  {getConnectionStatusIcon()}
-                  <div>
-                    <div className="font-medium">Status</div>
-                    <div className="text-sm text-muted-foreground">
-                      {getConnectionStatusText()}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  {!openAIService.isUsingBackend() && (
-                    <Button variant="outline" size="sm" onClick={handleClearApiKey}>
-                      Clear Key
-                    </Button>
-                  )}
-                  <Button variant="outline" size="sm" onClick={() => setShowApiKeyDialog(true)}>
-                    {openAIService.hasApiKey() && !openAIService.isUsingBackend() ? 'Update Key' : 'Set API Key'}
-                  </Button>
-                </div>
-              </div>
-
-              {openaiConnectionStatus === 'quota-exceeded' && (
-                <div className="p-3 border border-red-200 bg-red-50 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <XCircle className="h-4 w-4 text-red-500 mt-0.5" />
-                    <div className="text-sm">
-                      <div className="font-medium text-red-800">Quota Exceeded</div>
-                      <div className="text-red-700 mt-1">
-                        Your OpenAI account has insufficient credits. Add billing to your OpenAI account or use the Supabase backend.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {openaiConnectionStatus === 'auth-failed' && (
-                <div className="p-3 border border-red-200 bg-red-50 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <XCircle className="h-4 w-4 text-red-500 mt-0.5" />
-                    <div className="text-sm">
-                      <div className="font-medium text-red-800">Authentication Failed</div>
-                      <div className="text-red-700 mt-1">
-                        Your API key is invalid. Please check and update your OpenAI API key.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="text-sm text-muted-foreground">
-                By default, this app uses the Supabase backend for OpenAI requests. You can optionally set your own API key to use OpenAI directly.
-              </div>
             </CardContent>
           </Card>
 
@@ -554,20 +282,6 @@ export default function AiSettings() {
                   Poster style creates larger, more prominent text like the examples you prefer.
                 </p>
               </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="magic-prompt"
-                    checked={overrides.enableMagicPrompt !== false}
-                    onCheckedChange={(checked) => updateOverride('enableMagicPrompt', checked)}
-                  />
-                  <Label htmlFor="magic-prompt">Magic Prompt (Ideogram)</Label>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Enhances image prompts with additional details for better visual results.
-                </p>
-              </div>
             </CardContent>
           </Card>
 
@@ -595,51 +309,6 @@ export default function AiSettings() {
           </Card>
         </div>
       </div>
-
-      {/* API Key Dialog */}
-      {showApiKeyDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-background p-6 rounded-lg max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">Set OpenAI API Key</h3>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="apikey">API Key</Label>
-                <Input
-                  id="apikey"
-                  type="password"
-                  placeholder="sk-..."
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      const apiKey = (e.target as HTMLInputElement).value.trim();
-                      if (apiKey) {
-                        handleApiKeySet(apiKey);
-                        setShowApiKeyDialog(false);
-                        (e.target as HTMLInputElement).value = '';
-                      }
-                    }
-                  }}
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setShowApiKeyDialog(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={() => {
-                  const input = document.getElementById('apikey') as HTMLInputElement;
-                  const apiKey = input?.value?.trim();
-                  if (apiKey) {
-                    handleApiKeySet(apiKey);
-                    setShowApiKeyDialog(false);
-                    input.value = '';
-                  }
-                }}>
-                  Save
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
