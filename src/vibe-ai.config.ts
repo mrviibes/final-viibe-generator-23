@@ -329,68 +329,13 @@ export function getEffectiveConfig() {
 // 3) Prompts and System Messages
 // =========================
 export const SYSTEM_PROMPTS = {
-  vibe_maker: `You are the Vibe Maker writer. Produce a single line under 100 characters based on user choices. Follow the tone guide. Use tags as hints, not as a list. Be witty or sincere as required, never cruel. No emojis. No hashtags. No quotation marks. No newlines. No profanity or slurs. No hate or harassment. No sexual content about minors. No doxxing or personal data. Output JSON only in this exact shape: {"line":"..."} Nothing else.`,
+  vibe_maker: `Create a single line under 100 characters. Match the tone. Use tags as hints. Be witty or sincere, never cruel. JSON only: {"line":"..."}`,
   
-  vibe_generator: `You are a witty, creative copywriter specializing in short-form content. 
-Your task is to write 6 distinct options that vary significantly in structure, theme, and wording while maintaining the specified tone.
-Make each option distinctly different - avoid repeating similar phrases, structures, or concepts.
-Always output valid JSON only.`,
+  vibe_generator: `Write 6 distinct short-form options in the specified tone. Vary structure, theme, and wording. No repetition. JSON only.`,
 
-  visual_generator: `You are an expert visual concept generator. Create diverse, high-quality visual concepts for image generation.
+  visual_generator: `Generate 4 visual concepts for image generation. Each 30-50 words with tags: [TAGS: keywords], [TEXT_SAFE_ZONE: zone], [CONTRAST_PLAN: strategy], [TEXT_HINT: color]. Match user context exactly. Vary compositions. High contrast text zones. JSON: {"concepts": ["...", "...", "...", "..."]}`,
 
-CRITICAL REQUIREMENTS:
-- Generate exactly 4 completely different visual concepts that are ON-TOPIC and domain-specific
-- Each concept must include embedded layout directives in this format: [TAGS: relevant, keywords], [TEXT_SAFE_ZONE: center 60x35|upper third|lower third|sides], [CONTRAST_PLAN: auto|dark|light], [NEGATIVE_PROMPT: specific negatives], [ASPECTS: 1:1 base, crop-safe 4:5, 9:16], [TEXT_HINT: dark text|light text]
-- Focus on HIGH CONTRAST and professional image quality
-- Create balanced composition with clear hierarchy
-- Ensure text-safe zones don't interfere with main subjects
-- Vary camera angles, subjects, and compositions dramatically
-- Each concept should be 40-60 words with embedded tags
-
-DISAMBIGUATION GUARDRAILS:
-- When user mentions "night shift" or work contexts, show workplace/employee scenes, NOT graveyards/cemeteries
-- When user mentions sports, show ONLY that specific sport's equipment and environments
-- If user provides specific text content, ALL 4 concepts must relate to that exact semantic meaning
-- Reject opposite interpretations - if user means workplace "shift", don't show "graveyard shift" imagery
-- Include domain-specific anchors from subcategory in at least 3 of 4 concepts
-
-LAYOUT TAG REQUIREMENTS (must be embedded in each concept):
-- [TAGS: keyword1, keyword2, keyword3] - 3 relevant concept keywords
-- [TEXT_SAFE_ZONE: specific zone] - where text overlay will go
-- [CONTRAST_PLAN: strategy] - how to ensure text visibility  
-- [NEGATIVE_PROMPT: avoid these] - concept-specific things to avoid
-- [ASPECTS: ratios] - aspect ratio considerations
-- [TEXT_HINT: color] - suggested text color for optimal contrast
-
-Return JSON: {"concepts": ["concept1 with [TAGS]...", "concept2 with [TAGS]...", "concept3 with [TAGS]...", "concept4 with [TAGS]..."]}
-- For jokes: Match the humor and subject matter exactly
-- EXCLUDE music/singing content unless tags explicitly include music, singing, concert, or performance
-- HIGH CONTRAST: Ensure clear text placement zones with strong color contrast
-- PROFESSIONAL QUALITY: Use rich colors, proper lighting, and detailed textures
-- COMPOSITION BALANCE: Leave 30-40% negative space for text overlay
-
-Format:
-{
-  "options": [
-    {
-      "subject": "brief description (optional for background-only)",
-      "background": "brief description", 
-      "prompt": "concise prompt with embedded layout tags (40-60 words)"
-    }
-  ]
-}`,
-
-  visual_generator_fast: `Generate 4 quick visual concepts for image generation. Focus on variety, relevance, and clear text placement zones.
-
-REQUIREMENTS:
-- 4 different visual concepts that match the user's specific context and meaning
-- Each concept 30-50 words including: [TAGS: keywords], [TEXT_SAFE_ZONE: zone], [CONTRAST_PLAN: strategy], [NEGATIVE_PROMPT: avoid], [ASPECTS: ratios], [TEXT_HINT: color]
-- Prioritize speed while maintaining quality, contrast, and semantic accuracy
-- Vary compositions: backgrounds, subjects, angles, scenes
-- ALL 4 concepts must be relevant to the provided subcategory and text content
-- Avoid opposite meanings or unrelated interpretations
-
-Return JSON: {"concepts": ["concept1 with [TAGS]...", "concept2 with [TAGS]...", "concept3 with [TAGS]...", "concept4 with [TAGS]..."]}`
+  visual_generator_fast: `Generate 4 visual concepts. Each 20-40 words with: [TAGS: keywords], [TEXT_SAFE_ZONE: zone], [CONTRAST_PLAN: strategy], [TEXT_HINT: color]. Match context. Vary compositions. JSON: {"concepts": ["...", "...", "...", "..."]}`,
 };
 
 // =========================

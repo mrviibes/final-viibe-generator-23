@@ -14,6 +14,7 @@ export interface VisualInputs {
   dimensions?: string; // square, 4:5, 9:16, etc.
   targetSlot?: string; // background-only, subject+background, object, singing
   backgroundPreset?: string; // minimal, urban, nature, etc.
+  typographyStyle?: string; // Typography layout style
 }
 
 export interface VisualOption {
@@ -489,7 +490,7 @@ function getSlotBasedFallbacks(inputs: VisualInputs): VisualOption[] {
       textAwareFallbacks.push({
         subject: "Documentary poster motif with Oscar silhouette and subtle rainbow accents",
         background: "Realistic studio or festival wall with soft vignette and empty central space",
-        prompt: `Documentary-style poster concept featuring an Oscar silhouette and subtle rainbow accents, realistic modern composition with clean central negative space for large text [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: ${contextualBans.join(', ')}] [TEXT_HINT: dark text]`,
+        prompt: `Documentary-style poster concept featuring an Oscar silhouette and subtle rainbow accents, realistic modern composition with clean central negative space for large text [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: ${inputs.typographyStyle === 'subtle-caption' ? 'corner small 5%' : 'center 60x35'}] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: ${contextualBans.join(', ')}] [TEXT_HINT: dark text]`,
         textAligned: true
       });
     }
@@ -500,14 +501,14 @@ function getSlotBasedFallbacks(inputs: VisualInputs): VisualOption[] {
       textAwareFallbacks.push({
         subject: "Male couple holding hands with subtle rainbow pride accents",
         background: "Urban setting or park with soft natural lighting and clear text space",
-        prompt: `Two men holding hands or embracing, subtle rainbow pride flag accents in background, warm natural lighting, urban or park setting with clear negative space for text [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: ${contextualBans.join(', ')}] [TEXT_HINT: dark text]`,
+        prompt: `Two men holding hands or embracing, subtle rainbow pride flag accents in background, warm natural lighting, urban or park setting with clear negative space for text [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: ${inputs.typographyStyle === 'subtle-caption' ? 'corner small 5%' : 'center 60x35'}] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: ${contextualBans.join(', ')}] [TEXT_HINT: dark text]`,
         textAligned: true
       });
       
       textAwareFallbacks.push({
         subject: "Wardrobe and mirror scene with cross-dressing elements and rainbow accents",
         background: "Clean dressing room with soft lighting, leaving open area for text",
-        prompt: `Realistic dressing room scene with tasteful wardrobe cues (heels, blazer-over-dress on hanger, lipstick on vanity), subtle rainbow color accents, uncluttered background with clear negative space for text [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [TEXT_HINT: dark text]`,
+        prompt: `Realistic dressing room scene with tasteful wardrobe cues (heels, blazer-over-dress on hanger, lipstick on vanity), subtle rainbow color accents, uncluttered background with clear negative space for text [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: ${inputs.typographyStyle === 'subtle-caption' ? 'corner small 5%' : 'center 60x35'}] [CONTRAST_PLAN: auto] [TEXT_HINT: dark text]`,
         textAligned: true
       });
     }
@@ -517,7 +518,7 @@ function getSlotBasedFallbacks(inputs: VisualInputs): VisualOption[] {
       textAwareFallbacks.push({
         subject: "Elegant wardrobe with mixed clothing styles and mirror reflection",
         background: "Sophisticated dressing room with warm lighting",
-        prompt: `Elegant wardrobe with mix of masculine and feminine clothing, mirror with soft reflection, sophisticated dressing room atmosphere, warm lighting with clear text placement area [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [TEXT_HINT: dark text]`,
+        prompt: `Elegant wardrobe with mix of masculine and feminine clothing, mirror with soft reflection, sophisticated dressing room atmosphere, warm lighting with clear text placement area [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: ${inputs.typographyStyle === 'subtle-caption' ? 'corner small 5%' : 'center 60x35'}] [CONTRAST_PLAN: auto] [TEXT_HINT: dark text]`,
         textAligned: true
       });
     }
