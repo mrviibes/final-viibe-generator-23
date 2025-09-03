@@ -33,24 +33,68 @@ serve(async (req) => {
       });
     }
 
-    // Search Wikipedia
+    // Search Wikipedia using the correct API endpoint
     try {
-      const wikiSearchUrl = `https://en.wikipedia.org/api/rest_v1/page/search/${encodeURIComponent(searchTerm)}?limit=5`;
+      const wikiSearchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(searchTerm)}&format=json&origin=*&srlimit=5`;
       const wikiResponse = await fetch(wikiSearchUrl);
       
       if (wikiResponse.ok) {
         const wikiData = await wikiResponse.json();
-        if (wikiData.pages) {
-          for (const page of wikiData.pages.slice(0, 3)) {
+        if (wikiData.query && wikiData.query.search) {
+          for (const page of wikiData.query.search.slice(0, 3)) {
             results.push({
               title: page.title,
-              description: page.description || page.excerpt || `Wikipedia article about ${page.title}`
+              description: page.snippet ? page.snippet.replace(/<[^>]*>/g, '') : `Wikipedia article about ${page.title}`
             });
           }
         }
       }
     } catch (error) {
       console.log('Wikipedia search failed:', error.message);
+    }
+
+    // For celebrities, search actors and musicians specifically
+    if (category?.toLowerCase().includes('celebrities') || category?.toLowerCase().includes('celebrity') || category?.toLowerCase().includes('actor') || category?.toLowerCase().includes('actress')) {
+      // Search TVMaze for actors
+      try {
+        const tvMazeUrl = `https://api.tvmaze.com/search/people?q=${encodeURIComponent(searchTerm)}`;
+        const tvResponse = await fetch(tvMazeUrl);
+        
+        if (tvResponse.ok) {
+          const tvData = await tvResponse.json();
+          for (const item of tvData.slice(0, 2)) {
+            if (item.person) {
+              const person = item.person;
+              results.push({
+                title: person.name,
+                description: `Actor/Actress${person.birthday ? ` • Born ${person.birthday}` : ''}${person.country ? ` • ${person.country.name}` : ''}`
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.log('TVMaze people search failed:', error.message);
+      }
+
+      // Search iTunes for musicians
+      try {
+        const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=musicArtist&limit=2`;
+        const itunesResponse = await fetch(itunesUrl);
+        
+        if (itunesResponse.ok) {
+          const itunesData = await itunesResponse.json();
+          if (itunesData.results) {
+            for (const artist of itunesData.results) {
+              results.push({
+                title: artist.artistName,
+                description: `Musical Artist • ${artist.primaryGenreName || 'Music'}`
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.log('iTunes artist search failed:', error.message);
+      }
     }
 
     // For movies, search iTunes API
