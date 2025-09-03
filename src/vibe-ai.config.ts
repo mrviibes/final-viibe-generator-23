@@ -869,7 +869,7 @@ export function getBackgroundPreset(presetId: string): BackgroundPreset | null {
 export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: boolean = false): string {
   const parts: string[] = [];
   const overrides = getRuntimeOverrides();
-  const typographyStyle = overrides.typographyStyle || 'poster'; // Default to poster style
+  const typographyStyle = overrides.typographyStyle || 'negative-space'; // Default to negative-space for cleaner results
   
   // Add unique session variation to prevent duplicate outputs across users
   const sessionVariation = Math.floor(Math.random() * 9999) + 1000;
@@ -881,26 +881,35 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     const cleanText = handoff.key_line.replace(/[""]/g, '"').replace(/['']/g, "'").replace(/[—–]/g, '-').trim();
     parts.push(`"${cleanText}" as exact text only`);
     
-    // Compact scene description
+    // Enforce birthday-themed backgrounds for celebrations/birthday
+    let background = handoff.rec_background;
+    const isBirthday = handoff.category?.toLowerCase() === 'celebrations' && 
+                      handoff.subcategory_primary?.toLowerCase().includes('birthday');
+    
+    if (isBirthday && handoff.chosen_visual && handoff.chosen_visual.includes('Explosive savage realistic environment')) {
+      // Override non-birthday backgrounds with appropriate birthday elements
+      background = "birthday party scene with balloons, cake, confetti, celebration decorations";
+    } else if (!background && handoff.chosen_visual) {
+      const visualParts = handoff.chosen_visual.split(' - ');
+      background = visualParts.length >= 2 ? visualParts[1].trim() : `${handoff.category} themed background`;
+    }
+    
+    if (!background) {
+      background = isBirthday ? "birthday celebration with balloons, cake, party decorations" : 
+                   `${handoff.category || 'contextually appropriate'} themed background`;
+    }
+    if (cleanBackground) {
+      background = "clean, minimal background with high contrast for text";
+    }
+    
+    // Compact scene description without labels
     let subject = handoff.rec_subject;
     if (!subject && handoff.chosen_visual) {
       const visualParts = handoff.chosen_visual.split(' - ');
       subject = visualParts.length >= 2 ? visualParts[0].trim() : handoff.chosen_visual;
     }
     
-    let background = handoff.rec_background;
-    if (!background && handoff.chosen_visual) {
-      const visualParts = handoff.chosen_visual.split(' - ');
-      background = visualParts.length >= 2 ? visualParts[1].trim() : `${handoff.category} themed background`;
-    }
-    if (!background) {
-      background = `${handoff.category || 'contextually appropriate'} themed background`;
-    }
-    if (cleanBackground) {
-      background = "clean, minimal background with high contrast for text";
-    }
-    
-    parts.push(`${subject || handoff.category} scene with ${background}.`);
+    parts.push(`Clean ${handoff.visual_style || 'realistic'} ${subject || handoff.category} environment scene with ${background}.`);
   } else {
     // Non-EXACT TEXT: use original labeling format
     // OCCASION/CATEGORY
@@ -946,11 +955,10 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   
   // COMPOSITION & STYLE WITH ENHANCED DIRECTIVES
   if (handoff.key_line && handoff.key_line.trim()) {
-    // Compact style and tone
-    const styleDesc = `${handoff.visual_style || 'realistic'} style, ${handoff.tone || 'dynamic'} tone`;
-    parts.push(`${styleDesc}, ${handoff.aspect_ratio || 'square'} format.`);
+    // More compact style description with realistic tone
+    parts.push(`${handoff.visual_style || 'realistic'} style, ${handoff.tone || 'savage'} tone, ${handoff.aspect_ratio || 'Square'} format.`);
     
-    // Typography constraints
+    // Typography constraints with plain English
     const typographyConstraints = getTypographyStyleConstraints(typographyStyle);
     parts.push(typographyConstraints);
   } else {
@@ -1075,22 +1083,21 @@ export function getTypographyStyleConstraints(typography: string): string {
   
   switch (typography) {
     case 'negative-space':
-      return `[NATURAL_SPACE] [TEXT_AREA: 30-40%] [NO_SUBJECT_OVERLAP] [SEED:${randomSeed}]`;
+      return `Text in natural empty areas, 10-20% of image size, avoid covering main subject. SEED:${randomSeed}`;
     case 'meme-style':
-      return `[TOP_BOTTOM_BANDS] [HEIGHT: 15-20%] [IMPACT_FONT] [WHITE_OUTLINE] [SEED:${randomSeed}]`;
+      return `Classic meme format with text bands at top and bottom, white outline, bold impact font. SEED:${randomSeed}`;
     case 'lower-third':
-      return `[BOTTOM_BANNER: 20%] [HIGH_CONTRAST] [NEWS_STYLE] [SEED:${randomSeed}]`;
+      return `Text banner at bottom 20% only, high contrast background, news-style overlay. SEED:${randomSeed}`;
     case 'side-bar':
-      return `[SIDE_PANEL: 25-30%] [VERTICAL_TEXT] [CLEAR_SEPARATION] [SEED:${randomSeed}]`;
+      return `Side panel text taking 25-30% width, vertical orientation, clear separation from main image. SEED:${randomSeed}`;
     case 'badge-sticker':
-      return `[SMALL_BADGE] [CORNER_EDGE] [NO_SUBJECT_COVER] [SIZE: small] [SEED:${randomSeed}]`;
+      return `Small corner badge or sticker style, doesn't cover main subject, minimal size. SEED:${randomSeed}`;
     case 'subtle-caption':
-      // CRITICAL FIX: Very strict size and placement constraints
-      return `[CORNER_ONLY] [MAX_SIZE: 8%] [TINY_FONT] [ONE_TEXT_INSTANCE] [NO_FOOTER] [NO_SIGNATURE] [NO_SECONDARY_CAPTION] [MINIMAL] [NO_OVERLAP] [SEED:${randomSeed}]`;
+      return `Tiny corner caption only, maximum 8% of image area, very unobtrusive, one text instance only. SEED:${randomSeed}`;
     case 'poster':
-      return `[ONE_TEXT_INSTANCE] [NO_CREDITS] [NO_TAGLINE] [NO_FOOTER] [SEED:${randomSeed}]`;
+      return `Balanced poster text overlay, one text instance only, no credits or taglines. SEED:${randomSeed}`;
     default:
-      return `[BALANCED_LAYOUT] [CLEAR_TEXT_SPACE] [SEED:${randomSeed}]`;
+      return `Balanced text layout with clear readable space. SEED:${randomSeed}`;
   }
 }
 

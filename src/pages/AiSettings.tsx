@@ -275,7 +275,7 @@ export default function AiSettings() {
               <div className="space-y-2">
                 <Label>Typography Style</Label>
                 <Select
-                  value={overrides.typographyStyle || 'poster'}
+                  value={overrides.typographyStyle || 'negative-space'}
                   onValueChange={(value) => updateOverride('typographyStyle', value as 'poster' | 'negative-space' | 'subtle-caption')}
                 >
                   <SelectTrigger>

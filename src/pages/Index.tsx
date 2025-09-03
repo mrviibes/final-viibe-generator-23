@@ -6752,7 +6752,7 @@ const Index = () => {
                     <div>
                       <span className="font-medium">Typography Style:</span> {(() => {
                         const runtimeOverrides = getRuntimeOverrides();
-                        return runtimeOverrides.typographyStyle || "poster";
+                        return runtimeOverrides.typographyStyle || "negative-space";
                       })()}
                     </div>
                     <div>
