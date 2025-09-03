@@ -100,6 +100,112 @@ async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: st
   }
 }
 
+// Utility to tokenize subcategory for keyword extraction
+function tokenizeSubcategory(subcategory: string): string[] {
+  if (!subcategory || subcategory === '-') return [];
+  
+  const stopwords = new Set(['the', 'of', 'and', 'or', 'for', 'to', 'in', 'on', 'at', 'by', 'with']);
+  
+  return subcategory
+    .toLowerCase()
+    .split(/[\s\-\/]+/)
+    .filter(token => token.length >= 3 && !stopwords.has(token))
+    .map(token => {
+      // Simple plural to singular conversion
+      if (token.endsWith('s') && token.length > 4) {
+        return token.slice(0, -1);
+      }
+      return token;
+    });
+}
+
+// Build keyword set for subcategory matching
+function buildKeywordSet(subcategory: string): Set<string> {
+  const tokens = tokenizeSubcategory(subcategory);
+  const keywords = new Set<string>();
+  
+  for (const token of tokens) {
+    keywords.add(token);
+    // Add common variants
+    keywords.add(token + 's'); // plural
+    keywords.add(token + 'ing'); // gerund
+    keywords.add(token + 'ed'); // past tense
+  }
+  
+  return keywords;
+}
+
+// Calculate subcategory relevance score
+function subcategoryRelevanceScore(line: string, subcategory: string): number {
+  if (!subcategory || subcategory === '-') return 0;
+  
+  const keywords = buildKeywordSet(subcategory);
+  const lineWords = line.toLowerCase().split(/\W+/);
+  
+  let matches = 0;
+  let exactMatches = 0;
+  
+  for (const word of lineWords) {
+    if (keywords.has(word)) {
+      matches++;
+      // Check if it's an exact token match (not variant)
+      if (tokenizeSubcategory(subcategory).includes(word)) {
+        exactMatches++;
+      }
+    }
+  }
+  
+  // Score: exact matches get higher weight, cap to avoid overfitting
+  return Math.min(exactMatches * 15 + matches * 5, 40);
+}
+
+// Build anchored fallbacks for subcategory
+function buildAnchoredFallbacks(tone: string, subcategory: string, tags?: string[]): string[] {
+  if (!subcategory || subcategory === '-') return [];
+  
+  const tokens = tokenizeSubcategory(subcategory);
+  if (tokens.length === 0) return [];
+  
+  const primaryToken = tokens[0];
+  
+  const toneTemplates: Record<string, string[]> = {
+    humorous: [
+      `My ${primaryToken} game is surprisingly strong today.`,
+      `Turns out ${primaryToken} expertise comes naturally to me.`
+    ],
+    savage: [
+      `Your ${primaryToken} skills need serious improvement.`,
+      `That ${primaryToken} attempt was painfully amateur.`
+    ],
+    sentimental: [
+      `${primaryToken} moments remind me of what matters most.`,
+      `Nothing beats the feeling of perfect ${primaryToken} connection.`
+    ],
+    nostalgic: [
+      `Remember when ${primaryToken} used to be so much simpler?`,
+      `Those classic ${primaryToken} days were truly golden.`
+    ],
+    romantic: [
+      `You make even ${primaryToken} feel romantic and special.`,
+      `Our ${primaryToken} moments together are absolutely magical.`
+    ],
+    inspirational: [
+      `Every ${primaryToken} challenge builds stronger character.`,
+      `Success in ${primaryToken} starts with believing in yourself.`
+    ],
+    playful: [
+      `${primaryToken} adventures make the best unexpected memories.`,
+      `Who knew ${primaryToken} could be this much fun?`
+    ],
+    serious: [
+      `Professional ${primaryToken} excellence requires consistent dedication.`,
+      `Strategic ${primaryToken} planning delivers measurable results.`
+    ]
+  };
+  
+  return toneTemplates[tone.toLowerCase()] || toneTemplates.humorous;
+}
+
 // Helper function to calculate sentence quality score for ranking
 function sentenceQualityScore(line: string, tone: string): number {
   let score = 0;

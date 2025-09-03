@@ -735,12 +735,12 @@ export function postProcessLine(
 function getFallbackVariants(tone: string, category: string, subcategory: string): string[] {
   const baseFallback = TONE_FALLBACKS[tone.toLowerCase()] || TONE_FALLBACKS.humorous;
   
-  // Create 4 distinct variations based on tone and context
+  // Create 4 distinct variations based on tone and context (removing vibes/energy endings)
   const variations = [
     baseFallback,
     `${baseFallback} today`,
-    `${baseFallback} vibes`,
-    `${baseFallback} energy`
+    `${baseFallback} right now`,
+    `${baseFallback} perfectly`
   ];
   
   return variations;
