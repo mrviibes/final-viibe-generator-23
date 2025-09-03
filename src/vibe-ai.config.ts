@@ -205,7 +205,7 @@ export interface IdeogramHandoff {
 // =========================
 
 // Fixed negative prompt applied to all image generations
-export const DEFAULT_NEGATIVE_PROMPT = "misspellings, distorted letters, extra characters, typos, random symbols, unreadable fonts, cartoon style, flat colors, empty background, isolated subject, small text, hidden text";
+export const DEFAULT_NEGATIVE_PROMPT = "misspellings, distorted letters, extra characters, typos, random symbols, unreadable fonts, cartoon style, flat colors, empty background, isolated subject, small text, hidden text, blurry text, warped text, backwards text, upside down text, gibberish text, corrupted letters, overlapping text, crowded composition, low contrast text";
 // Model fallback chains for retry strategy
 export const MODEL_FALLBACK_CHAINS = {
   text: [
@@ -348,6 +348,9 @@ RULES:
 - For Pride themes: Include rainbow, drag queens, parades, celebrations, fabulous elements
 - For jokes: Match the humor and subject matter exactly
 - EXCLUDE music/singing content unless tags explicitly include music, singing, concert, or performance
+- HIGH CONTRAST: Ensure clear text placement zones with strong color contrast
+- PROFESSIONAL QUALITY: Use rich colors, proper lighting, and detailed textures
+- COMPOSITION BALANCE: Leave 30-40% negative space for text overlay
 
 Format:
 {
@@ -355,13 +358,13 @@ Format:
     {
       "subject": "brief description (optional for background-only)",
       "background": "brief description", 
-      "prompt": "concise prompt (40-60 words)"
+      "prompt": "concise prompt with embedded layout tags (40-60 words)"
     }
   ]
 }`,
 
-  visual_generator_fast: `4 visual concepts, JSON only, 30 words max each:
-{"options":[{"subject":"brief","background":"brief","prompt":"30 words max"}]}`
+  visual_generator_fast: `4 visual concepts, JSON only, 30 words max each with layout tags:
+{"options":[{"subject":"brief","background":"brief","prompt":"30 words max with [TAGS] and [TEXT_SAFE_ZONE] directives"}]}`
 };
 
 // =========================
@@ -932,24 +935,35 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     parts.push("Include multiple people clearly visible in the scene.");
   }
   
-  // COMPOSITION & STYLE
+  // COMPOSITION & STYLE WITH ENHANCED DIRECTIVES
   if (handoff.visual_style) {
-    parts.push(`Style: ${handoff.visual_style}.`);
+    parts.push(`Style: ${handoff.visual_style}, professional quality with rich colors and detailed textures.`);
   }
   if (handoff.tone) {
-    parts.push(`Tone: ${handoff.tone}.`);
+    parts.push(`Tone: ${handoff.tone} with emotional depth and visual impact.`);
   }
   if (handoff.aspect_ratio) {
-    parts.push(`Format: ${handoff.aspect_ratio}.`);
+    parts.push(`Format: ${handoff.aspect_ratio} with balanced composition.`);
   }
+  
+  // ENHANCED QUALITY DIRECTIVES
+  parts.push("HIGH QUALITY: Professional photography lighting, rich saturated colors, sharp focus, detailed textures, cinematic composition.");
+  parts.push("CONTRAST OPTIMIZATION: Ensure strong color contrast between subject and background for optimal text readability.");
   
   // TYPOGRAPHY STYLE PLACEMENT (if present)
   if (handoff.key_line && handoff.key_line.trim()) {
     if (typographyStyle === 'negative_space') {
-      parts.push("Place text in natural negative space areas like sky, walls, or empty backgrounds. Use TOP, BOTTOM, LEFT, or RIGHT zones rather than always centering. Ensure high contrast and avoid overlapping with faces or main subjects.");
+      parts.push("Place text in natural negative space areas like sky, walls, or empty backgrounds. Use TOP, BOTTOM, LEFT, or RIGHT zones rather than always centering. Ensure high contrast and avoid overlapping with faces or main subjects. Reserve 30-40% of image area for text with clean separation.");
     } else if (typographyStyle === 'subtle_caption') {
-      parts.push("Render text as small caption: 8-12% of image width, positioned in corners/edges or clear negative space. Strong contrast required. Never cover faces or key subjects. Use corner placement, edge margins, or unobtrusive clear zones.");
+      parts.push("Render text as small caption: 8-12% of image width, positioned in corners/edges or clear negative space. Strong contrast required. Never cover faces or key subjects. Use corner placement, edge margins, or unobtrusive clear zones with perfect readability.");
+    } else {
+      parts.push("Design for poster-style text overlay with clear readable zones. Maintain strong visual hierarchy and text-background separation.");
     }
+  }
+  
+  // GLOBAL NEGATIVE PROMPT ENFORCEMENT
+  if (handoff.negative_prompt) {
+    parts.push(`Avoid: ${handoff.negative_prompt}.`);
   }
   
   return parts.join(' ');
@@ -1311,7 +1325,8 @@ ${finalLine ? `- AT LEAST TWO concepts must directly reflect the exact content/s
 - For LGBTQ/pride themes, include explicit visual cues: rainbow flags, male couples, pride parades, drag elements, wardrobe/mirror scenes
 - For "came out" or similar phrases, show supportive relationship scenes or pride celebration contexts
 - For cross-dressing themes, include wardrobe elements, mirrors, makeup, or tasteful costume details
-- Visual concepts MUST NOT be subtle - make the connection obvious and direct` : ''}
+- Visual concepts MUST NOT be subtle - make the connection obvious and direct
+- Each concept MUST include embedded layout directives: [TAGS: relevant, keywords], [TEXT_SAFE_ZONE: center 60x35|upper third|lower third|sides], [CONTRAST_PLAN: auto|dark|light], [NEGATIVE_PROMPT: specific negatives], [ASPECTS: 1:1 base, crop-safe 4:5, 9:16], [TEXT_HINT: dark text|light text]` : ''}
 
 REQUIRED OBJECTS/SUBJECTS (must be visible in each concept):
 - ${subcategory === 'Ice Hockey' ? 'hockey stick and puck' : 'relevant category objects'}
@@ -1331,10 +1346,19 @@ TEXT PLACEMENT DIRECTIVES:
 - Avoid placing text over faces, main subjects, or busy areas
 - Consider TOP, BOTTOM, LEFT, RIGHT zones - not just center
 - Leave clear areas for text that won't compete with visuals
+- MANDATORY: Include bracketed layout tags in each prompt: [TEXT_SAFE_ZONE: specific zone], [CONTRAST_PLAN: contrast strategy], [NEGATIVE_PROMPT: avoid these elements]
+
+LAYOUT TAG REQUIREMENTS (EMBED IN EACH PROMPT):
+- [TAGS: ${tags.slice(0, 3).join(', ')}] (relevant concept keywords)
+- [TEXT_SAFE_ZONE: center 60x35] or "upper third", "lower third", "sides" (text placement zone)
+- [CONTRAST_PLAN: auto] or "dark", "light" (text contrast strategy)
+- [NEGATIVE_PROMPT: ${DEFAULT_NEGATIVE_PROMPT.split(', ').slice(0, 4).join(', ')}] (per-concept negatives)
+- [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] (aspect ratio handling)
+- [TEXT_HINT: dark text] or "light text" (suggested text color)
 
 IMPORTANT: Visual concepts must directly relate to the joke/text content above. For Pride themes, include rainbow colors, drag queens, parades, celebration elements.
 
-4 unique concepts. Each 40-60 words. No slots required.
+4 unique concepts. Each 40-60 words WITH embedded layout tags. No slots required.
 
 JSON only.`;
 
