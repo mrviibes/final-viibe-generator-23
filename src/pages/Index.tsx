@@ -4469,7 +4469,7 @@ const Index = () => {
 
   // Check if text generation requirements are met
   const canGenerateText = () => {
-    if (!selectedTextStyle || !selectedTextLayout || !selectedCompletionOption) {
+    if (!selectedTextStyle || !selectedCompletionOption) {
       return false;
     }
     return true;
@@ -5707,7 +5707,7 @@ const Index = () => {
         {currentStep === 2 && <>
             <div className="text-center mb-12">
               <div className="flex items-center justify-between max-w-6xl mx-auto mb-6">
-                <h2 className="text-2xl md:text-3xl font-semibold text-foreground">Choose Your Text Style</h2>
+                <h2 className="text-2xl md:text-3xl font-semibold text-foreground">Create Your Text Content</h2>
                 {/* Remember choices toggle hidden for now */}
                 {false && <div className="flex items-center gap-3 text-sm">
                   <label htmlFor="remember-choices" className="text-muted-foreground cursor-pointer">
@@ -5885,39 +5885,9 @@ const Index = () => {
             })()} />
                       </div>}
 
-                {/* Text Layout Selection */}
-                {selectedTextStyle && !selectedTextLayout ? <>
-                    <div className="text-center mb-6">
-                      <p className="text-xl text-muted-foreground">Choose your text layout style</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 justify-items-center max-w-6xl mx-auto">
-                      {textLayoutOptions.map(layout => 
-                        <Card key={layout.id} className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-1 hover:bg-accent/50 w-full" onClick={() => {
-                          setSelectedTextLayout(layout.id);
-                          // Set typography style in runtime overrides
-                          setRuntimeOverrides({ typographyStyle: layout.id as any });
-                        }}>
-                          <CardHeader className="pb-3">
-                            <CardTitle className="text-lg font-semibold text-card-foreground">
-                              {layout.name}
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <CardDescription className="text-sm text-muted-foreground mb-2">
-                              {layout.description}
-                            </CardDescription>
-                            <div className="text-xs text-muted-foreground/80">
-                              <strong>Best for:</strong> {layout.bestFor}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </div>
-                  </> : null}
 
                 {/* Completion Options */}
-                {selectedTextLayout && !selectedCompletionOption ? <>
+                {selectedTextStyle && !selectedCompletionOption ? <>
                     <div className="text-center mb-6">
                       <p className="text-xl text-muted-foreground">Choose your option for completing your text</p>
                     </div>
@@ -5966,9 +5936,8 @@ const Index = () => {
                         {!canGenerateText() && (
                           <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
                             <p className="font-medium mb-1">To generate text, please select:</p>
-                            <ul className="text-xs space-y-1">
+                             <ul className="text-xs space-y-1">
                               {!selectedTextStyle && <li>• Text style (tone)</li>}
-                              {!selectedTextLayout && <li>• Text layout style</li>}
                               {!selectedCompletionOption && <li>• Text completion option</li>}
                             </ul>
                           </div>
@@ -6070,6 +6039,42 @@ const Index = () => {
                 {selectedCompletionOption === "write-myself" && isCustomTextConfirmed && <>
                   </>}
 
+                {/* Text Layout Selection - Now moved to the bottom after text is ready */}
+                {(() => {
+                  const hasFinalText = selectedGeneratedOption || (selectedCompletionOption === "write-myself" && isCustomTextConfirmed) || selectedCompletionOption === "no-text";
+                  return hasFinalText && !selectedTextLayout ? (
+                    <>
+                      <div className="text-center mb-6 mt-8">
+                        <p className="text-xl text-muted-foreground">Now choose your text layout style</p>
+                        <p className="text-sm text-muted-foreground/70 mt-2">This determines how your text will be positioned and styled in the image</p>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 justify-items-center max-w-6xl mx-auto">
+                        {textLayoutOptions.map(layout => 
+                          <Card key={layout.id} className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-1 hover:bg-accent/50 w-full" onClick={() => {
+                            setSelectedTextLayout(layout.id);
+                            // Set typography style in runtime overrides
+                            setRuntimeOverrides({ typographyStyle: layout.id as any });
+                          }}>
+                            <CardHeader className="pb-3">
+                              <CardTitle className="text-lg font-semibold text-card-foreground">
+                                {layout.name}
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <CardDescription className="text-sm text-muted-foreground mb-2">
+                                {layout.description}
+                              </CardDescription>
+                              <div className="text-xs text-muted-foreground/80">
+                                <strong>Best for:</strong> {layout.bestFor}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )}
+                      </div>
+                    </>
+                  ) : null;
+                })()}
 
                 {/* TODO: Add additional sub-options here after text style is selected */}
               </div>)}
