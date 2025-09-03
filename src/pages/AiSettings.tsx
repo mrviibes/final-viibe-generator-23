@@ -116,90 +116,23 @@ export default function AiSettings() {
 
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="grid gap-6">
-          {/* Overview */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                Configuration Overview
-              </CardTitle>
-              <CardDescription>
-                Customize AI behavior and defaults. Changes are applied immediately to new generations.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4">
-                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <div>
-                    <p className="font-medium">Current Version</p>
-                    <p className="text-sm text-muted-foreground">AI Config {AI_CONFIG.version}</p>
-                  </div>
-                  <Badge variant="secondary">{AI_CONFIG.version}</Badge>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <div>
-                    <p className="font-medium">Active Model</p>
-                    <p className="text-sm text-muted-foreground">{MODEL_DISPLAY_NAMES[effectiveConfig.generation.model] || effectiveConfig.generation.model}</p>
-                  </div>
-                  <Badge variant={overrides.model ? "default" : "secondary"}>
-                    {overrides.model ? "Override" : "Default"}
-                  </Badge>
-                </div>
-                {/* Last Used Models (Read-only) */}
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-muted-foreground">Last Used Models</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="flex items-center justify-between p-2 bg-muted/50 rounded">
-                      <span className="text-xs font-medium">Text:</span>
-                      <Badge variant="outline" className="text-xs">
-                        {MODEL_DISPLAY_NAMES[localStorage.getItem('last_text_model') || effectiveConfig.generation.model] || 'Not set'}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between p-2 bg-muted/50 rounded">
-                      <span className="text-xs font-medium">Visuals:</span>
-                      <Badge variant="outline" className="text-xs">
-                        {MODEL_DISPLAY_NAMES[localStorage.getItem('last_visual_model') || effectiveConfig.visual_generation.model] || 'Not set'}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Model Settings */}
           <Card>
             <CardHeader>
               <CardTitle>Model Configuration</CardTitle>
               <CardDescription>
-                Control which AI model and parameters are used for text generation.
+                Using GPT-4.1 for consistent, reliable text generation.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="model">AI Model</Label>
-                <Select
-                  value={overrides.model || AI_CONFIG.generation.model}
-                  onValueChange={(value) => updateOverride('model', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select model" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {AVAILABLE_MODELS.map(model => (
-                      <SelectItem key={model.value} value={model.value}>
-                        <div>
-                          <div className="font-medium">{model.label}</div>
-                          {model.isRecommended && (
-                            <div className="text-xs text-muted-foreground">Recommended</div>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                <div>
+                  <p className="font-medium">AI Model</p>
+                  <p className="text-sm text-muted-foreground">GPT-4.1 (2025-04-14)</p>
+                </div>
+                <Badge variant="secondary">Fixed</Badge>
               </div>
-
             </CardContent>
           </Card>
 
@@ -253,18 +186,6 @@ export default function AiSettings() {
                 />
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label>Strict Model Mode</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Only use selected model (disable fallback/quality retry)
-                  </p>
-                </div>
-                <Switch
-                  checked={overrides.strictModelEnabled ?? false}
-                  onCheckedChange={(checked) => updateOverride('strictModelEnabled', checked)}
-                />
-              </div>
 
               <div className="flex items-center justify-between">
                 <div className="space-y-1">

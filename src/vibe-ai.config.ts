@@ -273,7 +273,7 @@ export const AI_CONFIG = {
     max_candidates: 6,
     temperature: 0.7,
     max_tokens: 120, // Reduced for faster generation
-    model: 'gpt-4o-mini' // Fast mini model by default
+    model: 'gpt-4.1-2025-04-14' // GPT-4.1 only
   },
   visual_generation: {
     max_tokens: 450, // Reduced for faster concepts
@@ -298,6 +298,10 @@ export function getSmartFallbackChain(userModel: string, type: 'text' | 'visual'
 // Get effective configuration with runtime overrides applied
 export function getEffectiveConfig() {
   const overrides = getRuntimeOverrides();
+  
+  // Force GPT-4.1 for any saved override to ensure consistency
+  const forcedModel = 'gpt-4.1-2025-04-14';
+  
   return {
     ...AI_CONFIG,
     spellcheck: {
@@ -310,12 +314,12 @@ export function getEffectiveConfig() {
     },
     generation: {
       ...AI_CONFIG.generation,
-      model: overrides.model ?? AI_CONFIG.generation.model,
+      model: forcedModel, // Always use GPT-4.1
       temperature: overrides.temperature ?? AI_CONFIG.generation.temperature
     },
     visual_generation: {
       ...AI_CONFIG.visual_generation,
-      model: overrides.model ?? AI_CONFIG.visual_generation.model,
+      model: forcedModel, // Always use GPT-4.1
       max_tokens: overrides.fastVisualsEnabled ? AI_CONFIG.visual_generation.fast_max_tokens : AI_CONFIG.visual_generation.max_tokens
     }
   };
