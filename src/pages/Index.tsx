@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Search, Loader2, AlertCircle, ArrowLeft, ArrowRight, X, Download, Settings } from "lucide-react";
+import { Search, Loader2, AlertCircle, ArrowLeft, ArrowRight, X, Download, Settings, ChevronDown, Copy } from "lucide-react";
 import { openAIService, OpenAISearchResult } from "@/lib/openai";
 import { ApiKeyDialog } from "@/components/ApiKeyDialog";
 import { IdeogramKeyDialog } from "@/components/IdeogramKeyDialog";
@@ -26,6 +26,8 @@ import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
 import { normalizeTypography, suggestContractions, isTextMisspelled } from "@/lib/textUtils";
 import { BACKGROUND_PRESETS, getRuntimeOverrides, setRuntimeOverrides, TONES, VISUAL_STYLES, DEFAULT_NEGATIVE_PROMPT } from "../vibe-ai.config";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+
 const styleOptions = [{
   id: "celebrations",
   name: "Celebrations",
@@ -4873,7 +4875,9 @@ const Index = () => {
       // Get model from runtime overrides
       const runtimeOverrides = getRuntimeOverrides();
       const chosenModel = runtimeOverrides.ideogramModel || 'V_2A_TURBO';
-      const magicPromptEnabled = runtimeOverrides.magicPromptEnabled ?? true;
+      // Force magic prompt OFF for exact text prompts
+      const isExactTextPrompt = prompt.includes('EXACT TEXT:') || prompt.includes('[PERFECT_SPELLING]');
+      const magicPromptEnabled = isExactTextPrompt ? false : (runtimeOverrides.magicPromptEnabled ?? true);
       console.log('=== Ideogram Generation Debug ===');
       
       console.log('Direct prompt provided:', !!directPrompt.trim());
@@ -6741,83 +6745,147 @@ const Index = () => {
                 </div>
               </div>
 
-                {/* Applied Settings Summary */}
+                {/* Applied Settings Summary - Compact */}
                 <div className="mb-6 p-4 bg-muted/50 rounded-lg border">
                   <h4 className="text-sm font-medium text-foreground mb-2">Applied Settings</h4>
                   <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
                     <div>
                       <span className="font-medium">Typography Style:</span> {(() => {
                         const runtimeOverrides = getRuntimeOverrides();
-                        return runtimeOverrides.typographyStyle || "Natural";
+                        return runtimeOverrides.typographyStyle || "poster";
                       })()}
                     </div>
                     <div>
-                      <span className="font-medium">Negative Prompt:</span> {negativePrompt.trim() ? 
-                        `${negativePrompt.substring(0, 30)}${negativePrompt.length > 30 ? '...' : ''}` : 
-                        'None'
-                      }
+                      <span className="font-medium">Model:</span> {(() => {
+                        const runtimeOverrides = getRuntimeOverrides();
+                        return runtimeOverrides.ideogramModel || 'V_2A_TURBO';
+                      })()}
                     </div>
                   </div>
-                </div>
-
-
-                {/* Generated Prompt */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium text-foreground">Generated Prompt</h3>
-                  <div className="bg-muted/30 rounded-lg p-6">
+                  <div className="mt-3">
+                    <Badge variant="outline" className="text-xs">
+                      Strict text-quality filters enabled
+                    </Badge>
                     {(() => {
-                // Build the same handoff structure we use for generation
-                const finalText = selectedGeneratedOption || stepTwoText || "";
-                const visualStyle = selectedVisualStyle || "";
-                const subcategory = (() => {
-                  if (selectedStyle === 'celebrations' && selectedSubOption) {
-                    const celebOption = celebrationOptions.find(c => c.id === selectedSubOption);
-                    return celebOption?.name || selectedSubOption;
-                  } else if (selectedStyle === 'pop-culture' && selectedSubOption) {
-                    const popOption = popCultureOptions.find(p => p.id === selectedSubOption);
-                    return popOption?.name || selectedSubOption;
-                  }
-                  return selectedSubOption || 'general';
-                })();
-                const selectedTextStyleObj = textStyleOptions.find(ts => ts.id === selectedTextStyle);
-                const tone = selectedTextStyleObj?.name || 'Humorous';
-                const categoryName = selectedStyle ? styleOptions.find(s => s.id === selectedStyle)?.name || "" : "";
-                const aspectRatio = selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || "";
-                const subcategorySecondary = selectedStyle === 'pop-culture' && selectedPick ? selectedPick : undefined;
-                const tempHandoff = buildIdeogramHandoff({
-                  visual_style: visualStyle,
-                  subcategory: subcategory,
-                  tone: tone.toLowerCase(),
-                  final_line: finalText,
-                  tags_csv: [...tags, ...subjectTags].join(', '),
-                  category: categoryName,
-                  subcategory_secondary: subcategorySecondary,
-                  aspect_ratio: aspectRatio,
-                  text_tags_csv: tags.join(', '),
-                  visual_tags_csv: subjectTags.join(', '),
-                  ai_text_assist_used: selectedCompletionOption === "ai-assist",
-                  ai_visual_assist_used: selectedSubjectOption === "ai-assist",
-                  negative_prompt: negativePrompt,
-                  rec_subject: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].subject : selectedSubjectOption === "design-myself" ? subjectDescription : undefined,
-                  rec_background: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined
-                });
-                const promptText = buildIdeogramPrompt(tempHandoff);
-                return <p className="text-sm text-foreground font-mono leading-relaxed">
-                          {promptText || "No prompt available"}
-                        </p>;
-              })()}
+                      const finalText = selectedGeneratedOption || stepTwoText || "";
+                      const isExactText = finalText && (finalText.includes('EXACT TEXT:') || finalText.includes('[PERFECT_SPELLING]'));
+                      return isExactText ? (
+                        <Badge variant="outline" className="text-xs ml-2">
+                          Magic prompt disabled (exact text)
+                        </Badge>
+                      ) : null;
+                    })()}
                   </div>
                 </div>
 
-                {/* Negative Prompt Display */}
+
+                {/* Generated Prompt - Compact */}
+                <div className="space-y-4">
+                  <Collapsible defaultOpen={(() => {
+                    const runtimeOverrides = getRuntimeOverrides();
+                    return runtimeOverrides.showAdvancedPromptDetails ?? false;
+                  })()}>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" className="flex items-center gap-2 h-auto p-0">
+                        <ChevronDown className="h-4 w-4" />
+                        <span className="text-lg font-medium text-foreground">View technical prompt</span>
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-3">
+                      <div className="bg-muted/30 rounded-lg p-6 relative">
+                        {(() => {
+                          // Build the same handoff structure we use for generation
+                          const finalText = selectedGeneratedOption || stepTwoText || "";
+                          const visualStyle = selectedVisualStyle || "";
+                          const subcategory = (() => {
+                            if (selectedStyle === 'celebrations' && selectedSubOption) {
+                              const celebOption = celebrationOptions.find(c => c.id === selectedSubOption);
+                              return celebOption?.name || selectedSubOption;
+                            } else if (selectedStyle === 'pop-culture' && selectedSubOption) {
+                              const popOption = popCultureOptions.find(p => p.id === selectedSubOption);
+                              return popOption?.name || selectedSubOption;
+                            }
+                            return selectedSubOption || 'general';
+                          })();
+                          const selectedTextStyleObj = textStyleOptions.find(ts => ts.id === selectedTextStyle);
+                          const tone = selectedTextStyleObj?.name || 'Humorous';
+                          const categoryName = selectedStyle ? styleOptions.find(s => s.id === selectedStyle)?.name || "" : "";
+                          const aspectRatio = selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || "";
+                          const subcategorySecondary = selectedStyle === 'pop-culture' && selectedPick ? selectedPick : undefined;
+                          const tempHandoff = buildIdeogramHandoff({
+                            visual_style: visualStyle,
+                            subcategory: subcategory,
+                            tone: tone.toLowerCase(),
+                            final_line: finalText,
+                            tags_csv: [...tags, ...subjectTags].join(', '),
+                            category: categoryName,
+                            subcategory_secondary: subcategorySecondary,
+                            aspect_ratio: aspectRatio,
+                            text_tags_csv: tags.join(', '),
+                            visual_tags_csv: subjectTags.join(', '),
+                            ai_text_assist_used: selectedCompletionOption === "ai-assist",
+                            ai_visual_assist_used: selectedSubjectOption === "ai-assist",
+                            negative_prompt: negativePrompt,
+                            rec_subject: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].subject : selectedSubjectOption === "design-myself" ? subjectDescription : undefined,
+                            rec_background: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined
+                          });
+                          const promptText = buildIdeogramPrompt(tempHandoff);
+                          return (
+                            <>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="absolute top-2 right-2"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(promptText || "");
+                                  toast({ title: "Prompt copied to clipboard" });
+                                }}
+                              >
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                              <p className="text-sm text-foreground font-mono leading-relaxed pr-12">
+                                {promptText || "No prompt available"}
+                              </p>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                </div>
+
+                {/* Negative Prompt Display - Compact */}
                 {negativePrompt.trim() && (
                   <div className="space-y-4">
-                    <h3 className="text-lg font-medium text-foreground">Applied Negative Prompt</h3>
-                    <div className="bg-muted/30 rounded-lg p-6">
-                      <p className="text-sm text-foreground font-mono leading-relaxed">
-                        {negativePrompt}
-                      </p>
-                    </div>
+                    <Collapsible defaultOpen={(() => {
+                      const runtimeOverrides = getRuntimeOverrides();
+                      return runtimeOverrides.showAdvancedPromptDetails ?? false;
+                    })()}>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" className="flex items-center gap-2 h-auto p-0">
+                          <ChevronDown className="h-4 w-4" />
+                          <span className="text-lg font-medium text-foreground">View negative prompt details</span>
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="space-y-3">
+                        <div className="bg-muted/30 rounded-lg p-6 relative">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="absolute top-2 right-2"
+                            onClick={() => {
+                              navigator.clipboard.writeText(negativePrompt);
+                              toast({ title: "Negative prompt copied to clipboard" });
+                            }}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                          <p className="text-sm text-foreground font-mono leading-relaxed pr-12">
+                            {negativePrompt}
+                          </p>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
                   </div>
                 )}
             </div>
@@ -6957,7 +7025,9 @@ const Index = () => {
                   const backgroundPrompt = promptText.replace(/EXACT_TEXT \(VERBATIM\): ".*?"/g, '').replace(/Render this text EXACTLY.*?\./g, '').replace(/Use only standard ASCII.*?\./g, '').replace(/If you cannot render.*?\./g, '').replace(/Style and display this text.*?\./g, '').replace(/Ensure the text is.*?\./g, '').replace(/NEGATIVE PROMPTS:.*?\./g, '').replace(/\s+/g, ' ').trim() + ' No text, no typography, no words, no letters, no characters, no glyphs, no symbols, no UI elements overlaid on the image. Clean minimal background only.';
                   
                   const runtimeOverrides2 = getRuntimeOverrides();
-                  const magicPromptEnabled2 = runtimeOverrides2.magicPromptEnabled ?? true;
+                  // Force magic prompt OFF for exact text prompts
+                  const isExactTextPrompt2 = backgroundPrompt.includes('EXACT TEXT:') || backgroundPrompt.includes('[PERFECT_SPELLING]');
+                  const magicPromptEnabled2 = isExactTextPrompt2 ? false : (runtimeOverrides2.magicPromptEnabled ?? true);
                   
                   const backgroundResult = await generateIdeogramImage({
                     prompt: backgroundPrompt,
@@ -6976,7 +7046,9 @@ const Index = () => {
 
                 // Generate 1 image with appropriate model
                 const runtimeOverrides3 = getRuntimeOverrides();
-                const magicPromptEnabled3 = runtimeOverrides3.magicPromptEnabled ?? true;
+                // Force magic prompt OFF for exact text prompts
+                const isExactTextPrompt3 = promptText.includes('EXACT TEXT:') || promptText.includes('[PERFECT_SPELLING]');
+                const magicPromptEnabled3 = isExactTextPrompt3 ? false : (runtimeOverrides3.magicPromptEnabled ?? true);
                 
                 console.log(`Magic Prompt: ${magicPromptEnabled3 ? 'ON' : 'OFF'} (Turbo only)`);
                 console.log(`Using model: ${model}`);

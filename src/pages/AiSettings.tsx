@@ -199,6 +199,21 @@ export default function AiSettings() {
                   onCheckedChange={(checked) => updateOverride('magicPromptEnabled', checked)}
                 />
               </div>
+
+              <Separator />
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label>Show Advanced Prompt Details</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Show full technical prompts and negative prompt details by default
+                  </p>
+                </div>
+                <Switch
+                  checked={overrides.showAdvancedPromptDetails ?? false}
+                  onCheckedChange={(checked) => updateOverride('showAdvancedPromptDetails', checked)}
+                />
+              </div>
             </CardContent>
           </Card>
 

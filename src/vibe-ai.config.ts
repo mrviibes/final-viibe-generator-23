@@ -25,6 +25,7 @@ export interface AIRuntimeOverrides {
   typographyStyle?: 'negative-space' | 'meme-style' | 'lower-third' | 'side-bar' | 'badge-sticker' | 'subtle-caption';
   strictModelEnabled?: boolean;
   fastVisualsEnabled?: boolean;
+  showAdvancedPromptDetails?: boolean;
 }
 
 // Get runtime overrides from localStorage
