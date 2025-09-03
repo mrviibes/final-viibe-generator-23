@@ -101,13 +101,13 @@ async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: st
 
 // Helper function to generate tone-specific phrase candidates
 function phraseCandidates(tone: string, tags?: string[]): string[] {
-  const firstTag = tags && tags.length > 0 ? tags[0] : '';
-  const tagSuffix = firstTag ? ` ${firstTag}` : '';
+  // Include up to first two tags to help with validation
+  const tagSuffix = tags && tags.length > 0 ? ` ${tags.slice(0, 2).join(' ')}` : '';
   
   const toneMap: Record<string, string[]> = {
     humorous: ['Hilarious vibes only', 'Comedy gold incoming', 'Laugh track ready', 'Funny bone activated'],
     sarcastic: ['Oh, absolutely perfect', 'Well, this is fantastic', 'Clearly the best choice', 'Obviously brilliant'],
-    savage: ['No mercy shown', 'Brutally honest moment', 'Savage mode activated', 'Zero chill detected'],
+    savage: ['No mercy shown', 'Brutally honest moment', 'Pure intensity', 'Maximum effort'],
     witty: ['Clever comeback ready', 'Sharp wit engaged', 'Smartly crafted', 'Intelligence on display'],
     playful: ['Fun times ahead', 'Playful energy activated', 'Good vibes flowing', 'Cheerful moment incoming'],
     romantic: ['Love in the air', 'Heart eyes activated', 'Romance mode on', 'Sweetness overload'],
@@ -250,17 +250,35 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
     }
     
     // Ensure we have exactly 4 options - use validated tone-specific phrases
-    while (finalCandidates.length < 4) {
+    let paddingAttempts = 0;
+    const maxPaddingAttempts = 20; // Prevent infinite loops
+    
+    while (finalCandidates.length < 4 && paddingAttempts < maxPaddingAttempts) {
       console.log('Padding with local fallback due to filtered candidates');
       const phraseCandidatesList = phraseCandidates(inputs.tone, inputs.tags);
-      let nextCandidate = phraseCandidatesList[finalCandidates.length % phraseCandidatesList.length];
+      let nextCandidate = phraseCandidatesList[paddingAttempts % phraseCandidatesList.length];
+      paddingAttempts++;
       
       // Validate through same filter as API candidates
       const processedCandidate = postProcessLine(nextCandidate, inputs.tone, inputs.tags || []);
       if (!processedCandidate.blocked && !finalCandidates.includes(processedCandidate.line)) {
         finalCandidates.push(processedCandidate.line);
+        console.log('✅ Padding: Added validated candidate:', processedCandidate.line);
       } else {
-        finalCandidates.push(`${nextCandidate} energy`);
+        console.log('❌ Padding: Rejected candidate:', nextCandidate, 'blocked:', processedCandidate.blocked);
+        // Don't add anything if validation fails - keep trying with next candidate
+      }
+    }
+    
+    // If still not enough after all attempts, use basic fallbacks
+    while (finalCandidates.length < 4) {
+      const fallbackVariants = getFallbackVariants(inputs.tone, inputs.category, inputs.subcategory);
+      const nextFallback = fallbackVariants[finalCandidates.length % fallbackVariants.length];
+      if (!finalCandidates.includes(nextFallback)) {
+        finalCandidates.push(nextFallback);
+        console.log('⚡ Emergency fallback added:', nextFallback);
+      } else {
+        break; // Prevent infinite loop if all fallbacks are already used
       }
     }
     
