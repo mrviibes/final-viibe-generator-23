@@ -204,8 +204,8 @@ export interface IdeogramHandoff {
 // 2) Feature Flags and Constants  
 // =========================
 
-// Fixed negative prompt applied to all image generations
-export const DEFAULT_NEGATIVE_PROMPT = "misspellings, distorted letters, extra characters, typos, random symbols, unreadable fonts, cartoon style, flat colors, empty background, isolated subject, small text, hidden text, blurry text, warped text, backwards text, upside down text, gibberish text, corrupted letters, overlapping text, crowded composition, low contrast text";
+// Enhanced negative prompt with stronger text quality controls
+export const DEFAULT_NEGATIVE_PROMPT = "misspellings, spelling errors, typos, distorted letters, corrupted text, extra characters, random symbols, unreadable fonts, blurry text, warped text, backwards text, upside down text, gibberish text, overlapping text, crowded composition, low contrast text, pixelated text, cut off text, partial text, incomplete words, text artifacts, malformed letters, wrong fonts, invisible text, faded text";
 // Model fallback chains for retry strategy
 export const MODEL_FALLBACK_CHAINS = {
   text: [
@@ -325,6 +325,16 @@ export function getEffectiveConfig() {
   };
 }
 
+// Utility to inject dynamic variation into prompts to prevent duplicate outputs
+export function injectPromptVariation(basePrompt: string): string {
+  const variationId = Math.floor(Math.random() * 10000);
+  const timestamp = Date.now() % 1000;
+  const uniqueSeed = `[VAR:${variationId}_${timestamp}]`;
+  
+  // Add variation seed and ensure unique outputs
+  return basePrompt.replace('JSON:', `CRITICAL: Generate completely unique content, no repetition across sessions. ${uniqueSeed} JSON:`);
+}
+
 // =========================
 // 3) Prompts and System Messages
 // =========================
@@ -333,9 +343,9 @@ export const SYSTEM_PROMPTS = {
   
   vibe_generator: `Write 6 distinct short-form options in the specified tone. Vary structure, theme, and wording. No repetition. JSON only.`,
 
-  visual_generator: `Generate 4 visual concepts for image generation. Each 30-50 words with tags: [TAGS: keywords], [TEXT_SAFE_ZONE: zone], [CONTRAST_PLAN: strategy], [TEXT_HINT: color]. Match user context exactly. Vary compositions. High contrast text zones. JSON: {"concepts": ["...", "...", "...", "..."]}`,
+  visual_generator: `Generate 4 unique visual concepts for image generation. Each 30-50 words with tags: [TAGS: keywords], [TEXT_SAFE_ZONE: zone], [CONTRAST_PLAN: strategy], [TEXT_HINT: color]. Match user context exactly. Vary compositions dramatically. High contrast text zones. Ensure completely different layouts and compositions. JSON: {"concepts": ["...", "...", "...", "..."]}`,
 
-  visual_generator_fast: `Generate 4 visual concepts. Each 20-40 words with: [TAGS: keywords], [TEXT_SAFE_ZONE: zone], [CONTRAST_PLAN: strategy], [TEXT_HINT: color]. Match context. Vary compositions. JSON: {"concepts": ["...", "...", "...", "..."]}`,
+  visual_generator_fast: `Generate 4 distinct visual concepts. Each 20-40 words with: [TAGS: keywords], [TEXT_SAFE_ZONE: zone], [CONTRAST_PLAN: strategy], [TEXT_HINT: color]. Match context. Vary compositions significantly. No duplicate layouts. JSON: {"concepts": ["...", "...", "...", "..."]}`,
 };
 
 // =========================
@@ -860,10 +870,15 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   const overrides = getRuntimeOverrides();
   const typographyStyle = overrides.typographyStyle || 'poster'; // Default to poster style
   
-  // EXACT TEXT RENDERING (if present)
+  // Add unique session variation to prevent duplicate outputs across users
+  const sessionVariation = Math.floor(Math.random() * 9999) + 1000;
+  const timeVariation = Date.now() % 1000;
+  const uniqueId = `${sessionVariation}_${timeVariation}`;
+  
+  // EXACT TEXT RENDERING (if present) with enhanced quality controls
   if (handoff.key_line && handoff.key_line.trim()) {
     const cleanText = handoff.key_line.replace(/[""]/g, '"').replace(/['']/g, "'").replace(/[—–]/g, '-').trim();
-    parts.push(`EXACT TEXT: "${cleanText}"`);
+    parts.push(`EXACT TEXT: "${cleanText}" [PERFECT_SPELLING] [CRISP_FONT] [ID:${uniqueId}]`);
   }
   
   // OCCASION/CATEGORY
@@ -917,17 +932,29 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     parts.push(`Format: ${handoff.aspect_ratio} with balanced composition.`);
   }
   
-  // ENHANCED QUALITY DIRECTIVES (compact)
-  parts.push("HIGH QUALITY, professional composition");
+  // ENHANCED QUALITY DIRECTIVES with composition variety
+  const varietyKeywords = [
+    'dynamic angles', 'creative perspective', 'bold composition',
+    'innovative layout', 'fresh viewpoint', 'original framing'
+  ];
+  const varietyBoost = varietyKeywords[Math.floor(Math.random() * varietyKeywords.length)];
+  
+  parts.push(`HIGH QUALITY, professional composition, ${varietyBoost}`);
   parts.push("CONTRAST: strong color contrast for text readability");
   
-  // TYPOGRAPHY STYLE PLACEMENT (compact version) 
+  // ENHANCED TYPOGRAPHY STYLE PLACEMENT with text quality controls
   if (handoff.key_line && handoff.key_line.trim()) {
     const typographyZone = getTypographyStyleZone(typographyStyle);
     const typographyConstraints = getTypographyStyleConstraints(typographyStyle);
     
+    // Add text rendering quality controls
+    const textQuality = "TEXT QUALITY: perfect spelling, clear fonts, no distortion";
+    const readabilityBoost = "READABILITY: high contrast background, crisp edges, proper spacing";
+    
     parts.push(typographyZone);
     parts.push(typographyConstraints);
+    parts.push(textQuality);
+    parts.push(readabilityBoost);
   }
   
   // GLOBAL NEGATIVE PROMPT ENFORCEMENT
@@ -962,42 +989,70 @@ export function getStyleTypeForIdeogram(visualStyle: string): 'AUTO' | 'GENERAL'
   return styleMap[visualStyle?.toLowerCase()] || 'AUTO';
 }
 
-// Typography helper functions for compact prompt building
+// Typography helper functions for compact prompt building with enhanced variety
 export function getTypographyStyleZone(typography: string): string {
+  // Add random variation to prevent duplicate outputs
+  const randomSeed = Math.floor(Math.random() * 3) + 1;
+  
   switch (typography) {
     case 'negative-space':
-      return 'TEXT ZONE: natural empty areas, TOP/BOTTOM/LEFT/RIGHT placement';
+      const nsOptions = [
+        'TEXT ZONE: natural empty areas, top/bottom/sides placement',
+        'TEXT ZONE: use background negative space, avoid subject overlap',
+        'TEXT ZONE: find natural text areas in composition'
+      ];
+      return nsOptions[randomSeed - 1];
     case 'meme-style':
-      return 'TEXT ZONE: TOP and BOTTOM bands, classic meme style';
+      return 'TEXT ZONE: TOP and BOTTOM bands, classic impact font style';
     case 'lower-third':
-      return 'TEXT ZONE: bottom 20% banner area';
+      const ltOptions = [
+        'TEXT ZONE: bottom 20% banner area only',
+        'TEXT ZONE: lower third band, news-style placement',
+        'TEXT ZONE: bottom overlay bar'
+      ];
+      return ltOptions[randomSeed - 1];
     case 'side-bar':
-      return 'TEXT ZONE: left 25-30% vertical panel';
+      const sbOptions = [
+        'TEXT ZONE: left 25% vertical panel',
+        'TEXT ZONE: right side panel, clear separation',
+        'TEXT ZONE: side column layout'
+      ];
+      return sbOptions[randomSeed - 1];
     case 'badge-sticker':
-      return 'TEXT ZONE: badge/sticker placement, avoid covering subjects';
+      return 'TEXT ZONE: small badge/sticker, corner or edge placement';
     case 'subtle-caption':
-      return 'TEXT ZONE: small corner placement, unobtrusive';
+      // FIXED: Much more specific constraints for subtle caption
+      const scOptions = [
+        'TEXT ZONE: tiny bottom-right corner, maximum 8% image area',
+        'TEXT ZONE: small top-left corner, very unobtrusive, max 6% area',
+        'TEXT ZONE: minimal bottom-left watermark style, under 10% area'
+      ];
+      return scOptions[randomSeed - 1];
     default:
       return 'TEXT ZONE: poster-style overlay with clear separation';
   }
 }
 
 export function getTypographyStyleConstraints(typography: string): string {
+  // Add random seed for variety
+  const randomSeed = Math.floor(Math.random() * 1000);
+  
   switch (typography) {
     case 'negative-space':
-      return '[ZONE: natural empty area] [TEXT_AREA: 30-40%] [NO_OVERLAP]';
+      return `[NATURAL_SPACE] [TEXT_AREA: 30-40%] [NO_SUBJECT_OVERLAP] [SEED:${randomSeed}]`;
     case 'meme-style':
-      return '[TOP/BOTTOM] [HEIGHT: 15-20%] [IMPACT STYLE] [OUTLINE]';
+      return `[TOP_BOTTOM_BANDS] [HEIGHT: 15-20%] [IMPACT_FONT] [WHITE_OUTLINE] [SEED:${randomSeed}]`;
     case 'lower-third':
-      return '[BANNER: bottom 20%] [HIGH CONTRAST]';
+      return `[BOTTOM_BANNER: 20%] [HIGH_CONTRAST] [NEWS_STYLE] [SEED:${randomSeed}]`;
     case 'side-bar':
-      return '[LEFT PANEL: 25-30%] [CLEAR SEPARATION]';
+      return `[SIDE_PANEL: 25-30%] [VERTICAL_TEXT] [CLEAR_SEPARATION] [SEED:${randomSeed}]`;
     case 'badge-sticker':
-      return '[BADGE] [DO NOT COVER SUBJECT] [SIZE: small-medium]';
+      return `[SMALL_BADGE] [CORNER_EDGE] [NO_SUBJECT_COVER] [SIZE: small] [SEED:${randomSeed}]`;
     case 'subtle-caption':
-      return '[CORNER] [MAX_TEXT_AREA: 5%] [SIZE: small] [NO_OVERLAP]';
+      // CRITICAL FIX: Very strict size and placement constraints
+      return `[CORNER_ONLY] [MAX_SIZE: 8%] [TINY_FONT] [WATERMARK_STYLE] [MINIMAL] [NO_OVERLAP] [SEED:${randomSeed}]`;
     default:
-      return '[BALANCED LAYOUT] [CLEAR TEXT SPACE]';
+      return `[BALANCED_LAYOUT] [CLEAR_TEXT_SPACE] [SEED:${randomSeed}]`;
   }
 }
 
