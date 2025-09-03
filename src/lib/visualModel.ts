@@ -47,6 +47,12 @@ function autoEnrichInputs(inputs: VisualInputs): VisualInputs {
     enriched.tags = [...inputs.tags, ...extractedNouns].slice(0, 8); // Max 8 tags
   }
   
+  // Auto-add subcategory-derived tags
+  if (inputs.subcategory && inputs.subcategory !== '-') {
+    const subcategoryKeywords = Array.from(buildVisualKeywordSet(inputs.subcategory)).slice(0, 4);
+    enriched.tags = [...inputs.tags, ...subcategoryKeywords].slice(0, 8);
+  }
+  
   // Auto-seed category-specific tags if not provided
   if (inputs.tags.length < 3) {
     const categoryTags = getCategorySpecificTags(inputs.category, inputs.subcategory);

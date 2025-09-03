@@ -1225,6 +1225,41 @@ Return only: {"lines":["option1","option2","option3","option4","option5","option
   ];
 }
 
+// Utility to extract domain keywords from subcategory
+function extractSubcategoryKeywords(subcategory: string): string[] {
+  if (!subcategory || subcategory === '-') return [];
+  
+  const tokens = subcategory.toLowerCase()
+    .split(/[\s\-\/]+/)
+    .filter(token => token.length >= 3);
+  
+  // Add synonym enrichment for common occasions
+  const synonymMap: Record<string, string[]> = {
+    'christmas': ['tree', 'ornaments', 'lights', 'snow', 'wreath', 'carolers', 'santa'],
+    'halloween': ['pumpkin', 'costume', 'ghost', 'witch', 'candy', 'spooky'],
+    'easter': ['bunny', 'eggs', 'basket', 'flowers', 'spring'],
+    'valentine': ['hearts', 'roses', 'romance', 'couples', 'love'],
+    'thanksgiving': ['turkey', 'feast', 'autumn', 'harvest', 'family'],
+    'new': ['party', 'celebration', 'countdown', 'fireworks'],
+    'year': ['party', 'celebration', 'countdown', 'fireworks'],
+    'hanukkah': ['menorah', 'candles', 'dreidel', 'lights'],
+    'diwali': ['lights', 'lamps', 'celebration', 'colors'],
+    'birthday': ['cake', 'candles', 'balloons', 'party'],
+    'wedding': ['rings', 'flowers', 'celebration', 'ceremony'],
+    'graduation': ['cap', 'gown', 'diploma', 'ceremony'],
+    'pride': ['rainbow', 'parade', 'flags', 'celebration']
+  };
+  
+  const enrichedTokens = [...tokens];
+  for (const token of tokens) {
+    if (synonymMap[token]) {
+      enrichedTokens.push(...synonymMap[token]);
+    }
+  }
+  
+  return [...new Set(enrichedTokens)].slice(0, 8); // Max 8 keywords
+}
+
 // Builder for visual generator chat messages  
 export function buildVisualGeneratorMessages(inputs: any): Array<{role: string; content: string}> {
   const { category, subcategory, tone, tags, visualStyle, finalLine } = inputs;
@@ -1248,8 +1283,11 @@ export function buildVisualGeneratorMessages(inputs: any): Array<{role: string; 
     additionalRequirements += '\n- SPELLING ACCURACY: Ensure all visible text elements are spelled correctly';
   }
 
-  // Check if music/singing content is actually relevant
-  const musicKeywords = ['music', 'song', 'sing', 'concert', 'band', 'album', 'lyrics'];
+  // Extract subcategory keywords for anchoring
+  const subcategoryKeywords = extractSubcategoryKeywords(subcategory);
+  
+  // Check if music/singing content is actually relevant  
+  const musicKeywords = ['music', 'song', 'sing', 'concert', 'band', 'album', 'lyrics', 'carol', 'choir'];
   const hasMusicRelevance = tags.some(tag => 
     musicKeywords.some(keyword => tag.toLowerCase().includes(keyword))
   ) || (finalLine && musicKeywords.some(keyword => finalLine.toLowerCase().includes(keyword)));
@@ -1258,6 +1296,12 @@ export function buildVisualGeneratorMessages(inputs: any): Array<{role: string; 
   const userPrompt = `${category}>${subcategory}, ${tone}, ${visualStyle || '3d-animated'}
 Tags: ${tags.slice(0, 4).join(', ')}
 ${finalLine ? `JOKE/TEXT: "${finalLine}" - VISUAL CONCEPTS MUST MATCH THIS CONTENT AND TONE` : ''}
+
+SUBCATEGORY ANCHORING (CRITICAL):
+${subcategoryKeywords.length > 0 ? `- Domain keywords to incorporate: ${subcategoryKeywords.join(', ')}
+- AT LEAST 3 of 4 concepts must include clear visual cues from these domain keywords
+- Vary wording; don't copy the subcategory verbatim every time
+- Make domain connections natural and witty/sincere per tone, not generic or slogan-y` : ''}
 
 TEXT ALIGNMENT REQUIREMENTS (CRITICAL):
 ${finalLine ? `- AT LEAST TWO concepts must directly reflect the exact content/semantics of: "${finalLine}"
