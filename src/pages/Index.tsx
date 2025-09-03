@@ -6101,33 +6101,21 @@ const Index = () => {
                      {/* Visual AI recommendations - always show if available */}
                      {selectedSubjectOption === "ai-assist" && visualOptions.length > 0 && selectedVisualIndex === null && <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                          <div className="text-center mb-6">
-                              <div className="flex items-center justify-center gap-3 mb-2">
-                                <h3 className="text-xl font-semibold text-foreground">Visual AI recommendations</h3>
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <div className="inline-flex items-center gap-1 text-xs text-muted-foreground cursor-help">
-                                        🎯 <span className="underline decoration-dotted">What does this mean?</span>
-                                      </div>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p className="text-sm max-w-xs">Bullseye (🎯) indicates options that closely match your typed message content</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                                <Button variant="outline" size="sm" onClick={handleGenerateSubject} disabled={isGeneratingSubject} className="text-xs">
-                                  {isGeneratingSubject ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : "Regenerate"}
-                                </Button>
-                              </div>
-                             {visualOptions.length > 0 && visualModel && (
-                               <p className="text-xs text-muted-foreground mb-2">
-                                 Using {visualModel.includes('gpt-5-mini') ? 'gpt-5-mini' : visualModel} • Generated in {((Date.now() - visualGenerationStartTime) / 1000).toFixed(1)}s
-                                 {visualModel === 'fallback' && " • Used fallback"}
-                               </p>
-                             )}
-                            {visualModel === 'fallback' && <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 text-xs p-2 rounded-lg mb-3 max-w-md mx-auto">
-                                {getErrorMessage(visualRecommendations?.errorCode)}
-                              </div>}
+                               <div className="flex items-center justify-center gap-3 mb-2">
+                                 <h3 className="text-xl font-semibold text-foreground">Visual AI recommendations</h3>
+                                 <Button variant="outline" size="sm" onClick={handleGenerateSubject} disabled={isGeneratingSubject} className="text-xs">
+                                   {isGeneratingSubject ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : "Regenerate"}
+                                 </Button>
+                               </div>
+                              {visualOptions.length > 0 && visualModel && (
+                                <p className="text-xs text-muted-foreground mb-2">
+                                  Using {visualRecommendations?.modelDisplayName || visualModel} • Generated in {((Date.now() - visualGenerationStartTime) / 1000).toFixed(1)}s
+                                  {visualRecommendations?.errorCode && " • Used fallback"}
+                                </p>
+                              )}
+                             {visualRecommendations?.errorCode && <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 text-xs p-2 rounded-lg mb-3 max-w-md mx-auto">
+                                 {getErrorMessage(visualRecommendations?.errorCode)}
+                               </div>}
                            <p className="text-sm text-muted-foreground">Choose one of these AI-generated concepts</p>
                          </div>
                         
@@ -6155,13 +6143,13 @@ const Index = () => {
                                          )}
                                        </div>
                                      </CardTitle>
-                                   {visualModel === 'fallback' && (
-                                     <Badge variant="secondary" className="text-xs">
-                                       {visualRecommendations?.errorCode === 'timeout' ? 'Timeout' : 
-                                        visualRecommendations?.errorCode === 'unauthorized' ? 'Auth Error' :
-                                        visualRecommendations?.errorCode === 'network' ? 'Network Error' : 'Fallback'}
-                                     </Badge>
-                                   )}
+                                    {visualRecommendations?.errorCode && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        {visualRecommendations?.errorCode === 'timeout' ? 'Timeout' : 
+                                         visualRecommendations?.errorCode === 'unauthorized' ? 'Auth Error' :
+                                         visualRecommendations?.errorCode === 'network' ? 'Network Error' : 'Fallback'}
+                                      </Badge>
+                                    )}
                                  </div>
                                </CardHeader>
                                <CardContent className="pt-0">

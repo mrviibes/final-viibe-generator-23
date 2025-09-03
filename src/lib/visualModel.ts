@@ -833,7 +833,8 @@ export async function generateVisualRecommendations(
     
     return {
       options: fallbackOptions,
-      model: 'fallback-gpt-4o-mini',
+      model: targetModel,
+      modelDisplayName: MODEL_DISPLAY_NAMES[targetModel] || 'GPT-4.1',
       errorCode,
       fallbackReason
     };
