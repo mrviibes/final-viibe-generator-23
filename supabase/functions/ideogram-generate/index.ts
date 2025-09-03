@@ -53,7 +53,13 @@ serve(async (req) => {
     let endpointUsed = '';
 
     const count = request.count || 1;
-    console.log(`Ideogram API call - Model: ${modelToUse}, Count: ${count}, Prompt: EXACT TEXT: "${request.prompt.substring(0, 80)}..."`);
+    
+    // Detect exact text requests and apply enhanced processing
+    const isExactTextRequest = /EXACT TEXT:/i.test(request.prompt);
+    const normalizedPrompt = normalizePromptForIdeogram(request.prompt);
+    const finalPrompt = isExactTextRequest ? normalizedPrompt : request.prompt;
+    
+    console.log(`Ideogram API call - Model: ${modelToUse}, Count: ${count}, ExactText: ${isExactTextRequest}, Prompt: "${finalPrompt.substring(0, 80)}..."`);
 
     if (count === 1) {
       // Single image generation with V3 endpoint support
@@ -68,7 +74,7 @@ serve(async (req) => {
         endpointUsed = 'v3-primary';
         
         const formData = new FormData();
-        formData.append('prompt', request.prompt);
+        formData.append('prompt', enhancePromptForV3ExactText(finalPrompt, isExactTextRequest));
         formData.append('resolution', mapAspectRatioToResolution(request.aspect_ratio));
         
         if (request.seed !== undefined) {
@@ -109,7 +115,7 @@ serve(async (req) => {
         endpointUsed = 'legacy';
         
         payload = {
-          prompt: request.prompt,
+          prompt: finalPrompt,
           aspect_ratio: request.aspect_ratio,
           model: modelToUse,
           magic_prompt_option: request.magic_prompt_option,
@@ -197,7 +203,7 @@ serve(async (req) => {
         modelToUse = 'V_2A_TURBO';
         
         const fallbackPayload: any = {
-          prompt: request.prompt,
+          prompt: finalPrompt,
           aspect_ratio: request.aspect_ratio,
           model: modelToUse,
           magic_prompt_option: request.magic_prompt_option,
@@ -266,7 +272,7 @@ serve(async (req) => {
         }
         
         const payload: any = {
-          prompt: request.prompt,
+          prompt: finalPrompt,
           aspect_ratio: request.aspect_ratio,
           model: effectiveModel,
           magic_prompt_option: request.magic_prompt_option,
@@ -365,4 +371,60 @@ function mapAspectRatioToResolution(aspectRatio: string): string {
   };
   
   return resolutionMap[aspectRatio] || '1024x1024';
+}
+
+// Text normalization function for better Ideogram rendering
+function normalizePromptForIdeogram(prompt: string): string {
+  return prompt
+    // Convert curly quotes to straight quotes
+    .replace(/[""]/g, '"')
+    .replace(/['']/g, "'")
+    // Convert em/en dashes to regular hyphens
+    .replace(/[—–]/g, '-')
+    // Normalize ellipsis
+    .replace(/…/g, '...')
+    // Fix common spacing issues around punctuation
+    .replace(/\s+([,.!?;:])/g, '$1')
+    .replace(/([.!?])\s*([A-Z])/g, '$1 $2')
+    // Apply common contraction fixes
+    .replace(/\byoud\b/gi, "you'd")
+    .replace(/\byoure\b/gi, "you're")
+    .replace(/\byoull\b/gi, "you'll")
+    .replace(/\byouve\b/gi, "you've")
+    .replace(/\btheyre\b/gi, "they're")
+    .replace(/\btheyll\b/gi, "they'll")
+    .replace(/\btheyve\b/gi, "they've")
+    .replace(/\bwere\b/gi, "we're")
+    .replace(/\bwell\b/gi, "we'll")
+    .replace(/\bweve\b/gi, "we've")
+    .replace(/\bits\b/gi, "it's")
+    .replace(/\bim\b/gi, "I'm")
+    .replace(/\bive\b/gi, "I've")
+    .replace(/\bill\b/gi, "I'll")
+    .replace(/\bid\b/gi, "I'd")
+    .replace(/\bwont\b/gi, "won't")
+    .replace(/\bcant\b/gi, "can't")
+    .replace(/\bdont\b/gi, "don't")
+    .replace(/\bdidnt\b/gi, "didn't")
+    .replace(/\bwasnt\b/gi, "wasn't")
+    .replace(/\bwerent\b/gi, "weren't")
+    .replace(/\bisnt\b/gi, "isn't")
+    .replace(/\barent\b/gi, "aren't")
+    .replace(/\bhasnt\b/gi, "hasn't")
+    .replace(/\bhavent\b/gi, "haven't")
+    .replace(/\bhadnt\b/gi, "hadn't")
+    .replace(/\bshouldnt\b/gi, "shouldn't")
+    .replace(/\bwouldnt\b/gi, "wouldn't")
+    .replace(/\bcouldnt\b/gi, "couldn't")
+    .trim();
+}
+
+// Enhanced V3 prompt for exact text requests
+function enhancePromptForV3ExactText(prompt: string, isExactText: boolean): string {
+  if (!isExactText) return prompt;
+  
+  // For exact text requests, emphasize typography and clarity
+  const basePrompt = prompt.replace(/EXACT TEXT:\s*/i, '');
+  
+  return `${basePrompt}. Typography-focused render with clean, readable text placement. High contrast text against background. Professional text rendering quality.`;
 }

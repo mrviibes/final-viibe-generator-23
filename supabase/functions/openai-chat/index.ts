@@ -36,7 +36,7 @@ serve(async (req) => {
       temperature = 0.8,
       max_tokens = 2500,
       max_completion_tokens,
-      model = 'gpt-4.1-2025-04-14',
+      model = 'gpt-5-mini-2025-08-07',
       response_format
     } = options;
 
@@ -109,53 +109,6 @@ serve(async (req) => {
     const data = await response.json();
     
     console.log(`OpenAI API success - Model: ${model}, Usage: ${JSON.stringify(data.usage || {})}`);
-
-    // Check if response was truncated and retry with higher token limit
-    const finishReason = data.choices?.[0]?.finish_reason;
-    const content = data.choices?.[0]?.message?.content;
-    
-    if (finishReason === 'length' && tokenLimit < 600) {
-      console.log(`Response truncated (finish_reason: length), retrying with higher token limit...`);
-      
-      // Retry with higher token limit
-      const retryTokenLimit = Math.min(600, tokenLimit + 200);
-      const retryRequestBody: any = {
-        model,
-        messages,
-        [tokenParameter]: retryTokenLimit
-      };
-
-      // Add response format if specified
-      if (response_format) {
-        retryRequestBody.response_format = response_format;
-      }
-
-      // Only older GPT-4o models support temperature
-      if (isOlderGPT4) {
-        retryRequestBody.temperature = temperature;
-      }
-      
-      console.log(`Retrying with ${retryTokenLimit} tokens...`);
-
-      const retryResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openAIApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(retryRequestBody),
-      });
-
-      if (retryResponse.ok) {
-        const retryData = await retryResponse.json();
-        console.log(`Retry successful - Model: ${model}, Usage: ${JSON.stringify(retryData.usage || {})}`);
-        return new Response(JSON.stringify(retryData), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      } else {
-        console.error(`Retry failed with status ${retryResponse.status}, using original response`);
-      }
-    }
 
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

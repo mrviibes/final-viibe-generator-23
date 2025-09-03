@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { buildPopCultureSearchPrompt, buildGenerateTextMessages, getEffectiveConfig, MODEL_DISPLAY_NAMES, getSmartFallbackChain } from "../vibe-ai.config";
+import { buildPopCultureSearchPrompt, buildGenerateTextMessages, getEffectiveConfig, MODEL_DISPLAY_NAMES, getSmartFallbackChain, getRuntimeOverrides } from "../vibe-ai.config";
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -85,13 +85,18 @@ export class OpenAIService {
       temperature = 0.8,
       max_tokens = 2500,
       max_completion_tokens,
-      model = 'gpt-4.1-2025-04-14'
+      model = 'gpt-5-mini-2025-08-07'
     } = options;
 
     console.log(`Calling OpenAI backend API - Model: ${model}, Messages: ${messages.length}`);
+    const startTime = Date.now();
 
     try {
-      const { data, error } = await supabase.functions.invoke('openai-chat', {
+      // Create AbortController for 5-second timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      const invokePromise = supabase.functions.invoke('openai-chat', {
         body: {
           messages,
           options: {
@@ -103,6 +108,20 @@ export class OpenAIService {
           }
         }
       });
+
+      // Race between the API call and timeout
+      const { data, error } = await Promise.race([
+        invokePromise,
+        new Promise<never>((_, reject) => {
+          controller.signal.addEventListener('abort', () => {
+            reject(new Error('Request timed out after 5 seconds'));
+          });
+        })
+      ]);
+
+      clearTimeout(timeoutId);
+      const elapsed = Date.now() - startTime;
+      console.log(`Backend API completed - Model: ${model}, Elapsed: ${elapsed}ms`);
 
       if (error) {
         console.error('Backend API error:', error);
@@ -125,44 +144,26 @@ export class OpenAIService {
         throw new Error(`No content received from backend API (finish_reason: ${finishReason})`);
       }
 
-      // Check if response was truncated and retry with higher token limit
-      if (finishReason === 'length' && (max_completion_tokens || max_tokens || 150) < 600) {
-        console.log('Backend response truncated, retrying with higher token limit...');
-        try {
-          return await this.callBackendAPI(messages, {
-            ...options,
-            max_completion_tokens: 600,
-            model
-          });
-        } catch (retryError) {
-          console.error('Backend retry with higher tokens failed:', retryError);
-          throw new Error('Response truncated - content too long for model');
-        }
-      }
-
       // Parse JSON response
       try {
         const parsed = JSON.parse(content);
         console.log('Successfully parsed backend JSON response');
+        
+        // Add metadata about the API call for proper audit tracking
+        if (parsed && typeof parsed === 'object') {
+          parsed._apiMeta = {
+            modelUsed: model,
+            retryAttempt: 0,
+            originalModel: model,
+            textSpeed: 'fast',
+            backendUsed: true
+          };
+        }
+        
         return parsed;
       } catch (parseError) {
         console.error('JSON parse error from backend:', parseError);
         console.error('Raw content that failed to parse:', content);
-        
-        // If JSON parsing fails and we have token headroom, retry with higher limit
-        const currentTokens = max_completion_tokens || max_tokens || 150;
-        if (currentTokens < 600) {
-          console.log('Backend JSON parse failed, retrying with higher token limit...');
-          try {
-            return await this.callBackendAPI(messages, {
-              ...options,
-              max_completion_tokens: 600,
-              model
-            });
-          } catch (retryError) {
-            console.error('Backend retry with higher tokens failed:', retryError);
-          }
-        }
         
         // Clean content by removing common wrapping patterns
         let cleanedContent = content
@@ -174,6 +175,18 @@ export class OpenAIService {
         try {
           const parsed = JSON.parse(cleanedContent);
           console.log('Successfully parsed cleaned backend JSON:', parsed);
+          
+          // Add metadata for cleaned parse
+          if (parsed && typeof parsed === 'object') {
+            parsed._apiMeta = {
+              modelUsed: model,
+              retryAttempt: 0,
+              originalModel: model,
+              textSpeed: 'fast',
+              backendUsed: true
+            };
+          }
+          
           return parsed;
         } catch (cleanError) {
           // Final attempt: extract largest JSON block
@@ -182,6 +195,18 @@ export class OpenAIService {
             try {
               const extracted = JSON.parse(jsonMatch[0]);
               console.log('Successfully extracted JSON from backend response:', extracted);
+              
+              // Add metadata for extracted parse
+              if (extracted && typeof extracted === 'object') {
+                extracted._apiMeta = {
+                  modelUsed: model,
+                  retryAttempt: 0,
+                  originalModel: model,
+                  textSpeed: 'fast',
+                  backendUsed: true
+                };
+              }
+              
               return extracted;
             } catch (e) {
               console.error('Failed to parse extracted JSON:', e);
@@ -227,8 +252,29 @@ export class OpenAIService {
       temperature = 0.8,
       max_tokens = 2500,
       max_completion_tokens,
-      model = 'gpt-4.1-2025-04-14'
+      model = 'gpt-5-mini-2025-08-07'
     } = options;
+
+    // Check if strict mode is enabled - only use the user's selected model
+    const { strictModelEnabled } = getRuntimeOverrides();
+    
+    if (strictModelEnabled) {
+      console.log(`🔒 Strict mode enabled - using only selected model: ${MODEL_DISPLAY_NAMES[model] || model}`);
+      const result = await this.attemptChatJSON(messages, options);
+      
+      // Add metadata about the API call
+      if (result && typeof result === 'object') {
+        result._apiMeta = {
+          modelUsed: model,
+          retryAttempt: 0,
+          originalModel: model,
+          textSpeed: this.textSpeed,
+          strictMode: true
+        };
+      }
+      
+      return result;
+    }
 
     // Use smart fallback chain based on the requested model
     const retryModels = getSmartFallbackChain(model, 'text');
@@ -282,7 +328,7 @@ export class OpenAIService {
       temperature = 0.8,
       max_tokens = 2500,
       max_completion_tokens,
-      model = 'gpt-4.1-2025-04-14'
+      model = 'gpt-5-mini-2025-08-07'
     } = options;
 
     const isGPT5Model = model?.startsWith('gpt-5');
@@ -344,21 +390,6 @@ export class OpenAIService {
       throw new Error(`No content received from OpenAI (finish_reason: ${finishReason})`);
     }
 
-    // Check if response was truncated and retry with higher token limit
-    if (finishReason === 'length') {
-      console.log('Response truncated, retrying with higher token limit...');
-      try {
-        return await this.attemptChatJSON(messages, {
-          ...options,
-          max_completion_tokens: 600,
-          model
-        });
-      } catch (retryError) {
-        console.error('Retry with higher tokens failed:', retryError);
-        throw new Error('Response truncated - content too long for model');
-      }
-    }
-
     // Enhanced JSON parsing with cleanup
     try {
       const parsed = JSON.parse(content);
@@ -367,20 +398,6 @@ export class OpenAIService {
     } catch (parseError) {
       console.error('JSON parse error:', parseError);
       console.error('Raw content that failed to parse:', content);
-      
-      // If JSON parsing fails, retry once with higher token limit (might be truncated)
-      if (tokenLimit < 600) {
-        console.log('JSON parse failed, retrying with higher token limit...');
-        try {
-          return await this.attemptChatJSON(messages, {
-            ...options,
-            max_completion_tokens: 600,
-            model
-          });
-        } catch (retryError) {
-          console.error('Retry with higher tokens failed:', retryError);
-        }
-      }
       
       // Clean content by removing common wrapping patterns
       let cleanedContent = content
@@ -416,11 +433,23 @@ export class OpenAIService {
     const prompt = buildPopCultureSearchPrompt(category, searchTerm);
 
     try {
+      // Use effective model from settings if strict mode is enabled
+      const { strictModelEnabled } = getRuntimeOverrides();
+      const effectiveConfig = getEffectiveConfig();
+      const searchModel = strictModelEnabled ? effectiveConfig.generation.model : 'gpt-4.1-2025-04-14';
+      
+      // Use shorter prompt and token limit for GPT-4.1 fast path
+      const isGPT41 = searchModel.includes('gpt-4.1');
+      const maxTokens = isGPT41 ? 220 : 500;
+      const fastPrompt = isGPT41 ? 
+        `Find 5 ${category} items related to "${searchTerm}". JSON format: {"suggestions":[{"title":"","description":""}]}` : 
+        prompt;
+
       const result = await this.chatJSON([
-        { role: 'user', content: prompt }
+        { role: 'user', content: fastPrompt }
       ], {
-        max_completion_tokens: 500,
-        model: 'gpt-4.1-2025-04-14' // More reliable model
+        max_completion_tokens: maxTokens,
+        model: searchModel
       });
 
       // Post-process to ensure we have exactly 5 valid items
