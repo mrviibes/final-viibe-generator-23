@@ -116,7 +116,7 @@ export default function AiSettings() {
 
   const handleClearApiKey = () => {
     openAIService.clearApiKey();
-    openAIService.clearLastError();
+    
     setOpenaiConnectionStatus('unknown');
     toast({
       title: "API Key Cleared",
