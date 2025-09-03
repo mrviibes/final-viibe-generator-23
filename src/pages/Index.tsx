@@ -6168,7 +6168,7 @@ const Index = () => {
                           <div className="space-y-4">
                             <div className="text-center">
                               <label className="text-sm font-medium text-foreground">Additional Tags</label>
-                              <p className="text-xs text-muted-foreground mt-1">Add 3 to 6 short tags for the background: setting, objects, colors, vibe (e.g., balloons, confetti, sunny park)</p>
+                              <p className="text-xs text-muted-foreground mt-1">Insert visual tags for your Viibe</p>
                             </div>
                             <Input value={subjectTagInput} onChange={e => setSubjectTagInput(e.target.value)} onKeyDown={handleSubjectTagInputKeyDown} placeholder="Enter tags (press Enter or comma to add)" className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
                             
