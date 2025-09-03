@@ -22,12 +22,12 @@ export type { VibeCandidate, VibeResult } from '../vibe-ai.config';
 function getFallbackVariants(tone: string, category: string, subcategory: string): string[] {
   const baseFallback = TONE_FALLBACKS[tone.toLowerCase()] || TONE_FALLBACKS.humorous;
   
-  // Create 4 distinct variations based on tone and context
+  // Create 4 distinct variations - no "vibes/energy" appendages
   const variations = [
     baseFallback,
-    `${baseFallback} today`,
-    `${baseFallback} vibes`,
-    `${baseFallback} energy`
+    `${baseFallback} today.`,
+    `${baseFallback} always.`,
+    `${baseFallback} perfectly.`
   ];
   
   return variations;
@@ -85,11 +85,12 @@ async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: st
     const firstTag = inputs.tags && inputs.tags.length > 0 ? inputs.tags[0] : null;
     
     return fallbackVariants.map((line, index) => {
-      let finalLine = line;
-      // Blend first tag into the first two fallbacks
-      if (firstTag && index < 2) {
-        finalLine = `${line} ${firstTag}`;
-      }
+      // Validate fallback through postProcessLine to ensure no banned patterns
+      const processedFallback = postProcessLine(line, inputs.tone, inputs.tags || []);
+      const finalLine = processedFallback.blocked ? 
+        phraseCandidates(inputs.tone, inputs.tags)[index % 4] : 
+        processedFallback.line;
+      
       return {
         line: finalLine,
         blocked: true,
@@ -174,6 +175,7 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
   let retryAttempt = 0;
   let originalModel: string | undefined;
   let topUpUsed = false;
+  let localPadding: Set<string> = new Set(); // Track local padding lines
   
   // Get the effective config to check if strict mode is enabled
   const config = getEffectiveConfig();
@@ -257,27 +259,40 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
       finalCandidates.push(...tagBlockedLines);
     }
     
-    // Re-rank to prioritize tag inclusion - ensure at least 2 of 4 include tags
-    if (inputs.tags && inputs.tags.length > 0) {
-      const taggedCandidates: string[] = [];
-      const untaggedCandidates: string[] = [];
-      
-      finalCandidates.forEach(candidate => {
-        const hasTag = inputs.tags!.some(tag => 
-          candidate.toLowerCase().includes(tag.toLowerCase()) ||
-          // Check for close paraphrases
-          candidate.toLowerCase().includes(tag.toLowerCase().slice(0, 4))
-        );
-        if (hasTag) {
-          taggedCandidates.push(candidate);
-        } else {
-          untaggedCandidates.push(candidate);
-        }
-      });
-      
-      // Ensure we have at least 2 tagged options out of 4
-      finalCandidates = [...taggedCandidates.slice(0, 2), ...untaggedCandidates.slice(0, 2)];
-    }
+    // Build candidate metadata for ranking
+    const candidateMetadata = finalCandidates.map(line => ({
+      line,
+      tagged: inputs.tags ? inputs.tags.some(tag => 
+        line.toLowerCase().includes(tag.toLowerCase()) ||
+        line.toLowerCase().includes(tag.toLowerCase().slice(0, 4))
+      ) : false,
+      qualityScore: sentenceQualityScore(line, inputs.tone),
+      isLocal: localPadding.has(line)
+    }));
+    
+    console.log('🔍 Candidate analysis before ranking:');
+    candidateMetadata.forEach(c => {
+      console.log(`  "${c.line}" - Quality: ${c.qualityScore}, Tagged: ${c.tagged}, Local: ${c.isLocal}`);
+    });
+    
+    // Sort by: non-local first, then by quality score descending, then tagged first
+    candidateMetadata.sort((a, b) => {
+      // Local padding goes to bottom
+      if (a.isLocal !== b.isLocal) return a.isLocal ? 1 : -1;
+      // Within same local status, quality score descending
+      if (a.qualityScore !== b.qualityScore) return b.qualityScore - a.qualityScore;
+      // Within same quality, tagged first
+      if (a.tagged !== b.tagged) return a.tagged ? -1 : 1;
+      return 0;
+    });
+    
+    finalCandidates = candidateMetadata.map(c => c.line);
+    
+    console.log('✅ Final ranking:');
+    finalCandidates.forEach((line, index) => {
+      const meta = candidateMetadata.find(c => c.line === line);
+      console.log(`  ${index + 1}. "${line}" - Quality: ${meta?.qualityScore}, Tagged: ${meta?.tagged}, Local: ${meta?.isLocal}`);
+    });
     
     // Ensure we have exactly 4 options - use validated tone-specific phrases
     let paddingAttempts = 0;
@@ -293,6 +308,7 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
       const processedCandidate = postProcessLine(nextCandidate, inputs.tone, inputs.tags || []);
       if (!processedCandidate.blocked && !finalCandidates.includes(processedCandidate.line)) {
         finalCandidates.push(processedCandidate.line);
+        localPadding.add(processedCandidate.line); // Track as local padding
         console.log('✅ Padding: Added validated candidate:', processedCandidate.line);
       } else {
         console.log('❌ Padding: Rejected candidate:', nextCandidate, 'blocked:', processedCandidate.blocked);
@@ -300,13 +316,21 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
       }
     }
     
-    // If still not enough after all attempts, use basic fallbacks
+    // If still not enough after all attempts, use validated fallbacks
     while (finalCandidates.length < 4) {
       const fallbackVariants = getFallbackVariants(inputs.tone, inputs.category, inputs.subcategory);
       const nextFallback = fallbackVariants[finalCandidates.length % fallbackVariants.length];
-      if (!finalCandidates.includes(nextFallback)) {
-        finalCandidates.push(nextFallback);
-        console.log('⚡ Emergency fallback added:', nextFallback);
+      
+      // Validate emergency fallback too
+      const processedFallback = postProcessLine(nextFallback, inputs.tone, inputs.tags || []);
+      const finalFallback = processedFallback.blocked ? 
+        phraseCandidates(inputs.tone, inputs.tags)[finalCandidates.length % 4] : 
+        processedFallback.line;
+      
+      if (!finalCandidates.includes(finalFallback)) {
+        finalCandidates.push(finalFallback);
+        localPadding.add(finalFallback); // Track as local padding
+        console.log('⚡ Emergency fallback added:', finalFallback);
       } else {
         break; // Prevent infinite loop if all fallbacks are already used
       }
@@ -315,15 +339,37 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
     // Take only first 4 if we have more
     finalCandidates = finalCandidates.slice(0, 4);
     
-    // Shuffle the array to avoid always showing short ones first
-    for (let i = finalCandidates.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [finalCandidates[i], finalCandidates[j]] = [finalCandidates[j], finalCandidates[i]];
-    }
+    // Re-rank final list by quality with local padding at bottom
+    const finalMetadata = finalCandidates.map(line => ({
+      line,
+      tagged: inputs.tags ? inputs.tags.some(tag => 
+        line.toLowerCase().includes(tag.toLowerCase()) ||
+        line.toLowerCase().includes(tag.toLowerCase().slice(0, 4))
+      ) : false,
+      qualityScore: sentenceQualityScore(line, inputs.tone),
+      isLocal: localPadding.has(line)
+    }));
     
-    // Pick the first one after shuffling
+    finalMetadata.sort((a, b) => {
+      // Local padding goes to bottom
+      if (a.isLocal !== b.isLocal) return a.isLocal ? 1 : -1;
+      // Within same local status, quality score descending
+      if (a.qualityScore !== b.qualityScore) return b.qualityScore - a.qualityScore;
+      // Within same quality, tagged first
+      if (a.tagged !== b.tagged) return a.tagged ? -1 : 1;
+      return 0;
+    });
+    
+    finalCandidates = finalMetadata.map(c => c.line);
+    
+    console.log('📊 Final candidate quality scores:');
+    finalMetadata.forEach((meta, index) => {
+      console.log(`  ${index + 1}. "${meta.line}" - Quality: ${meta.qualityScore}, Tagged: ${meta.tagged}, Local: ${meta.isLocal}`);
+    });
+    
+    // Pick the first (highest quality) one - NO SHUFFLE
     picked = finalCandidates[0];
-    usedFallback = false;
+    usedFallback = localPadding.has(picked);
     if (!reason && tagOnlyBlocked.length > 0) {
       reason = 'Partial tag coverage but good results';
     }
@@ -345,9 +391,18 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
       usedFallback = false;
       reason = 'Used model output with partial tag coverage';
     } else {
-      // Genuine blocks (banned words, etc.) - use tone-specific phrases instead of generic fallbacks
+      // Genuine blocks (banned words, etc.) - use validated tone-specific phrases
       const phraseCandidatesList = phraseCandidates(inputs.tone, inputs.tags);
-      finalCandidates = phraseCandidatesList;
+      // Validate each phrase candidate
+      const validatedCandidates = phraseCandidatesList.map(phrase => {
+        const processed = postProcessLine(phrase, inputs.tone, inputs.tags || []);
+        return processed.blocked ? null : processed.line;
+      }).filter(Boolean);
+      
+      finalCandidates = validatedCandidates.length > 0 ? validatedCandidates : phraseCandidatesList;
+      
+      // Mark all as local padding
+      finalCandidates.forEach(line => localPadding.add(line));
       
       picked = finalCandidates[0];
       usedFallback = true;

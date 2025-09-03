@@ -430,7 +430,11 @@ export const BANNED_PATTERNS = [
   /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]/gu, // emojis
   /#\w+/g, // hashtags
   /["'""`]/g, // quotes
-  /\n|\r/g // newlines
+  /\n|\r/g, // newlines
+  // Ban "vibes/energy" endings and specific patterns
+  /\bvibes?\s*$/i,
+  /\benergy\s*$/i,
+  /\bold and direct as requested\s+(vibes?|energy)/i
 ];
 
 // Additional patterns for meta/filler phrases that should never appear
@@ -449,7 +453,10 @@ export const META_BANNED_PHRASES = [
   /just for you/i,
   /custom.*for you/i,
   /tailored.*for you/i,
-  /made.*for you/i
+  /made.*for you/i,
+  /\bvibes?\s+(activated?|on|ready|engaged)\b/i,
+  /\benergy\s+(activated?|mode|vibes?)\b/i,
+  /\bmode\s+(activated?|on|engaged)\b/i
 ];
 
 export const BANNED_WORDS = [
@@ -471,14 +478,14 @@ export const BANNED_WORDS = [
 ];
 
 export const TONE_FALLBACKS: Record<string, string> = {
-  humorous: "Short and witty like you asked",
-  savage: "Bold and direct as requested",
-  sentimental: "Heartfelt message coming right up",
-  nostalgic: "Memory lane vibes activated",
-  romantic: "Sweet words in progress",
-  inspirational: "Motivational mode engaged",
-  playful: "Fun and light as ordered",
-  serious: "Thoughtful message loading"
+  humorous: "Comedy finds you when you least expect it.",
+  savage: "Reality hits harder than expectations.",
+  sentimental: "Feelings matter more than we admit.",
+  nostalgic: "Yesterday's memories become today's treasures.",
+  romantic: "Hearts connect when minds align perfectly.",
+  inspirational: "Dreams become reality through consistent action.",
+  playful: "Fun happens when you stop overthinking.",
+  serious: "Professional excellence requires constant dedication."
 };
 
 // =========================
