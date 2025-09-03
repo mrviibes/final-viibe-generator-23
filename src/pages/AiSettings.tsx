@@ -276,28 +276,46 @@ export default function AiSettings() {
                 <Label>Typography Style</Label>
                 <Select
                   value={overrides.typographyStyle || 'negative-space'}
-                  onValueChange={(value) => updateOverride('typographyStyle', value as 'poster' | 'negative-space' | 'subtle-caption')}
+                  onValueChange={(value) => updateOverride('typographyStyle', value as 'negative-space' | 'meme-style' | 'lower-third' | 'side-bar' | 'badge-sticker' | 'subtle-caption')}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="poster">
-                      <div className="space-y-1">
-                        <div className="font-medium">Poster (Large Text)</div>
-                        <div className="text-sm text-muted-foreground">Bold, centered, dominant text</div>
-                      </div>
-                    </SelectItem>
                     <SelectItem value="negative-space">
                       <div className="space-y-1">
-                        <div className="font-medium">Negative Space</div>
+                        <div className="font-medium">Negative Space (Default)</div>
                         <div className="text-sm text-muted-foreground">Small text in empty areas</div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="meme-style">
+                      <div className="space-y-1">
+                        <div className="font-medium">Meme Top/Bottom</div>
+                        <div className="text-sm text-muted-foreground">Classic meme format with top and bottom text bands</div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="lower-third">
+                      <div className="space-y-1">
+                        <div className="font-medium">Lower Third</div>
+                        <div className="text-sm text-muted-foreground">Text banner at bottom</div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="side-bar">
+                      <div className="space-y-1">
+                        <div className="font-medium">Side Panel</div>
+                        <div className="text-sm text-muted-foreground">Text in vertical side panel</div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="badge-sticker">
+                      <div className="space-y-1">
+                        <div className="font-medium">Badge/Sticker</div>
+                        <div className="text-sm text-muted-foreground">Small corner badge style</div>
                       </div>
                     </SelectItem>
                     <SelectItem value="subtle-caption">
                       <div className="space-y-1">
-                        <div className="font-medium">Subtle Caption (Small)</div>
-                        <div className="text-sm text-muted-foreground">Small, unobtrusive text with flexible placement</div>
+                        <div className="font-medium">Subtle Caption</div>
+                        <div className="text-sm text-muted-foreground">Very small corner text</div>
                       </div>
                     </SelectItem>
                   </SelectContent>

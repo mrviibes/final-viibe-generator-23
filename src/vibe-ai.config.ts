@@ -879,7 +879,7 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   // EXACT TEXT RENDERING (if present) with enhanced quality controls
   if (handoff.key_line && handoff.key_line.trim()) {
     const cleanText = handoff.key_line.replace(/[""]/g, '"').replace(/['']/g, "'").replace(/[—–]/g, '-').trim();
-    parts.push(`"${cleanText}" as exact text only`);
+    parts.push(`EXACT TEXT: ${cleanText}`);
     
     // Enforce birthday-themed backgrounds for celebrations/birthday
     let background = handoff.rec_background;
@@ -1078,26 +1078,23 @@ export function getTypographyStyleZone(typography: string): string {
 }
 
 export function getTypographyStyleConstraints(typography: string): string {
-  // Add random seed for variety
-  const randomSeed = Math.floor(Math.random() * 1000);
-  
   switch (typography) {
     case 'negative-space':
-      return `Text in natural empty areas, 10-20% of image size, avoid covering main subject. SEED:${randomSeed}`;
+      return `Text in natural empty areas, 10-20% of image size, avoid covering main subject`;
     case 'meme-style':
-      return `Classic meme format with text bands at top and bottom, white outline, bold impact font. SEED:${randomSeed}`;
+      return `Classic meme layout: split text into TOP band and BOTTOM band, each band maximum 22% height, center-aligned text, Impact-like font, white text with black outline`;
     case 'lower-third':
-      return `Text banner at bottom 20% only, high contrast background, news-style overlay. SEED:${randomSeed}`;
+      return `Text banner at bottom 20% only, high contrast background, news-style overlay`;
     case 'side-bar':
-      return `Side panel text taking 25-30% width, vertical orientation, clear separation from main image. SEED:${randomSeed}`;
+      return `Side panel text taking 25-30% width, vertical orientation, clear separation from main image`;
     case 'badge-sticker':
-      return `Small corner badge or sticker style, doesn't cover main subject, minimal size. SEED:${randomSeed}`;
+      return `Small corner badge or sticker style, doesn't cover main subject, minimal size`;
     case 'subtle-caption':
-      return `Tiny corner caption only, maximum 8% of image area, very unobtrusive, one text instance only. SEED:${randomSeed}`;
+      return `Tiny corner caption only, maximum 8% of image area, very unobtrusive, one text instance only`;
     case 'poster':
-      return `Balanced poster text overlay, one text instance only, no credits or taglines. SEED:${randomSeed}`;
+      return `Balanced poster text overlay, one text instance only, no credits or taglines`;
     default:
-      return `Balanced text layout with clear readable space. SEED:${randomSeed}`;
+      return `Balanced text layout with clear readable space`;
   }
 }
 
