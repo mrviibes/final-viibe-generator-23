@@ -881,23 +881,43 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     const cleanText = handoff.key_line.replace(/[""]/g, '"').replace(/['']/g, "'").replace(/[—–]/g, '-').trim();
     parts.push(`EXACT TEXT: ${cleanText}`);
     
-    // Enforce birthday-themed backgrounds for celebrations/birthday
+    // Enhanced birthday-themed backgrounds for celebrations/birthday
     let background = handoff.rec_background;
     const isBirthday = handoff.category?.toLowerCase() === 'celebrations' && 
                       handoff.subcategory_primary?.toLowerCase().includes('birthday');
     
-    if (isBirthday && handoff.chosen_visual && handoff.chosen_visual.includes('Explosive savage realistic environment')) {
-      // Override non-birthday backgrounds with appropriate birthday elements
-      background = "birthday party scene with balloons, cake, confetti, celebration decorations";
+    if (isBirthday) {
+      // Replace "Clean" with "Vibrant, colorful" and ensure birthday objects are present
+      if (handoff.chosen_visual) {
+        let enhancedVisual = handoff.chosen_visual.replace(/\bClean\b/gi, 'Vibrant, colorful');
+        const visualParts = enhancedVisual.split(' - ');
+        if (visualParts.length >= 2) {
+          background = visualParts[1].trim();
+        }
+      }
+      
+      // Always inject concrete birthday elements for birthday subcategory
+      const birthdayObjects = ["balloons", "birthday cake", "confetti", "party decorations", "gift boxes", "streamers"];
+      const hasConcreteObjects = birthdayObjects.some(obj => background?.toLowerCase().includes(obj));
+      
+      if (!hasConcreteObjects) {
+        background = `vibrant birthday party scene with colorful balloons, birthday cake, confetti, celebration decorations and streamers`;
+      }
+      
+      // Add soft directive to ensure objects appear
+      background += " (include birthday balloons and cake)";
     } else if (!background && handoff.chosen_visual) {
       const visualParts = handoff.chosen_visual.split(' - ');
       background = visualParts.length >= 2 ? visualParts[1].trim() : `${handoff.category} themed background`;
     }
     
     if (!background) {
-      background = isBirthday ? "birthday celebration with balloons, cake, party decorations" : 
+      background = isBirthday ? "vibrant birthday celebration with colorful balloons, birthday cake, party decorations" : 
                    `${handoff.category || 'contextually appropriate'} themed background`;
     }
+    
+    // Log the final background phrase for verification
+    console.log(`Final background phrase: ${background}`);
     if (cleanBackground) {
       background = "clean, minimal background with high contrast for text";
     }
