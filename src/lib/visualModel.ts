@@ -1,5 +1,5 @@
 import { openAIService } from './openai';
-import { SYSTEM_PROMPTS, buildVisualGeneratorMessages, getStyleKeywords, getEffectiveConfig, isTemperatureSupported, getSmartFallbackChain, MODEL_DISPLAY_NAMES, BACKGROUND_PRESETS, getRuntimeOverrides } from '../vibe-ai.config';
+import { SYSTEM_PROMPTS, buildVisualGeneratorMessages, getStyleKeywords, getEffectiveConfig, isTemperatureSupported, getSmartFallbackChain, MODEL_DISPLAY_NAMES, BACKGROUND_PRESETS, getRuntimeOverrides, getContextualBans } from '../vibe-ai.config';
 
 export interface VisualInputs {
   category: string;
@@ -299,26 +299,54 @@ function computeTextAlignmentScore(option: VisualOption, finalLine: string): num
 function validateVisualOptions(options: VisualOption[], inputs: VisualInputs): VisualOption[] {
   if (!options || options.length === 0) return [];
   
-  // Enhanced validation with subcategory alignment
+  // Get contextual bans to filter out opposite meanings
+  const contextualBans = getContextualBans(inputs);
+  
+  // Enhanced validation with subcategory alignment and banned word filtering
   const preprocessed = options.filter(option => {
     if (!option || (!option.subject && !option.background && !option.prompt)) {
       return false;
     }
     
-    // Require subcategory alignment for sports
-    if (inputs.category === 'sports' && inputs.subcategory) {
+    // Check for banned words that create opposite meanings
+    const fullText = `${option.subject || ''} ${option.background || ''} ${option.prompt}`.toLowerCase();
+    const containsBannedWord = contextualBans.some(banned => 
+      fullText.includes(banned.toLowerCase())
+    );
+    
+    if (containsBannedWord) {
+      const foundBan = contextualBans.find(banned => fullText.includes(banned.toLowerCase()));
+      console.log(`🚫 Rejecting option with banned word "${foundBan}": ${option.subject?.substring(0, 50)}...`);
+      return false;
+    }
+    
+    // Require subcategory alignment for sports and other relevant categories
+    if (inputs.subcategory) {
       const subcategoryScore = computeSubcategoryAlignmentScore(option, inputs.subcategory);
       option.subcategoryAligned = subcategoryScore > 0;
       
-      // For basketball specifically, be more strict
-      if (inputs.subcategory.toLowerCase() === 'basketball') {
-        const anchors = getSubcategoryAnchors('', 'basketball');
-        const fullText = `${option.subject || ''} ${option.background || ''} ${option.prompt}`.toLowerCase();
-        const hasBasketballAnchor = anchors.some(anchor => fullText.includes(anchor.toLowerCase()));
+      // For sports categories, be more strict about domain relevance
+      if (inputs.category === 'sports') {
+        // For basketball specifically, enforce strict anchoring
+        if (inputs.subcategory.toLowerCase() === 'basketball') {
+          const anchors = getSubcategoryAnchors('', 'basketball');
+          const hasBasketballAnchor = anchors.some(anchor => fullText.includes(anchor.toLowerCase()));
+          
+          if (!hasBasketballAnchor) {
+            console.log(`🏀 Rejecting non-basketball option: ${option.subject?.substring(0, 50)}...`);
+            return false;
+          }
+        }
         
-        if (!hasBasketballAnchor) {
-          console.log(`🏀 Rejecting non-basketball option: ${option.subject?.substring(0, 50)}...`);
-          return false;
+        // For hockey, ensure hockey-specific content
+        if (inputs.subcategory.toLowerCase().includes('hockey')) {
+          const hockeyAnchors = ['hockey', 'puck', 'stick', 'rink', 'ice'];
+          const hasHockeyAnchor = hockeyAnchors.some(anchor => fullText.includes(anchor));
+          
+          if (!hasHockeyAnchor) {
+            console.log(`🏒 Rejecting non-hockey option: ${option.subject?.substring(0, 50)}...`);
+            return false;
+          }
         }
       }
     }
@@ -373,6 +401,42 @@ function validateVisualOptions(options: VisualOption[], inputs: VisualInputs): V
     }
   }
   
+  // CRITICAL: Ensure we have exactly 4 valid options by being more lenient if needed
+  if (dedupedOptions.length < 4) {
+    console.log(`⚠️ Only ${dedupedOptions.length} valid options found, need 4 - loosening validation`);
+    
+    // Reprocess with looser validation
+    const looserOptions = options.filter(option => {
+      if (!option || (!option.subject && !option.background && !option.prompt)) {
+        return false;
+      }
+      
+      // Still check for banned words (this is critical)
+      const fullText = `${option.subject || ''} ${option.background || ''} ${option.prompt}`.toLowerCase();
+      const containsBannedWord = contextualBans.some(banned => 
+        fullText.includes(banned.toLowerCase())
+      );
+      
+      return !containsBannedWord && !hasVagueFillers(option.prompt);
+    });
+    
+    // Merge with stricter options
+    const mergedOptions = [...dedupedOptions];
+    for (const opt of looserOptions) {
+      if (mergedOptions.length >= 4) break;
+      const dedupeKey = `${opt.subject?.toLowerCase() || ''}-${opt.background?.toLowerCase() || ''}-${opt.prompt.slice(0, 40)}`;
+      const alreadyExists = mergedOptions.some(existing => 
+        `${existing.subject?.toLowerCase() || ''}-${existing.background?.toLowerCase() || ''}-${existing.prompt.slice(0, 40)}` === dedupeKey
+      );
+      
+      if (!alreadyExists) {
+        mergedOptions.push(opt);
+      }
+    }
+    
+    return mergedOptions.slice(0, 4);
+  }
+  
   // Compute text alignment scores and reorder
   if (inputs.finalLine) {
     const optionsWithScores = dedupedOptions.map(opt => ({
@@ -405,12 +469,17 @@ function getSlotBasedFallbacks(inputs: VisualInputs): VisualOption[] {
   const primaryTags = tags.slice(0, 3).join(', ') || 'dynamic energy';
   const occasion = subcategory || 'general';
   
+  // Get contextual bans to avoid opposite meanings in fallbacks
+  const contextualBans = getContextualBans(inputs);
+  const negativeBans = contextualBans.length > 0 ? `, NO ${contextualBans.join(', ')}` : '';
+  
   // Enhanced text-aware fallbacks if finalLine exists
   if (finalLine) {
     const semanticKeywords = getSemanticKeywords(finalLine);
     console.log('🎯 Generating text-aware fallbacks for semantic keywords:', semanticKeywords);
     console.log('📝 Detected LGBTQ+ cues:', finalLine.toLowerCase().match(/(gay|queer|lgbt|lgbtq|pride|came out|coming out|boyfriend|drag)/gi) || 'none');
     console.log('📝 Detected award cues:', finalLine.toLowerCase().match(/(oscar|award|documentary)/gi) || 'none');
+    console.log('🚫 Contextual bans applied:', contextualBans);
     
     const textAwareFallbacks: VisualOption[] = [];
     const lowerFinalLine = finalLine.toLowerCase();
@@ -420,7 +489,7 @@ function getSlotBasedFallbacks(inputs: VisualInputs): VisualOption[] {
       textAwareFallbacks.push({
         subject: "Documentary poster motif with Oscar silhouette and subtle rainbow accents",
         background: "Realistic studio or festival wall with soft vignette and empty central space",
-        prompt: `Documentary-style poster concept featuring an Oscar silhouette and subtle rainbow accents, realistic modern composition with clean central negative space for large text [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [TEXT_HINT: dark text]`,
+        prompt: `Documentary-style poster concept featuring an Oscar silhouette and subtle rainbow accents, realistic modern composition with clean central negative space for large text [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: ${contextualBans.join(', ')}] [TEXT_HINT: dark text]`,
         textAligned: true
       });
     }
@@ -431,7 +500,7 @@ function getSlotBasedFallbacks(inputs: VisualInputs): VisualOption[] {
       textAwareFallbacks.push({
         subject: "Male couple holding hands with subtle rainbow pride accents",
         background: "Urban setting or park with soft natural lighting and clear text space",
-        prompt: `Two men holding hands or embracing, subtle rainbow pride flag accents in background, warm natural lighting, urban or park setting with clear negative space for text [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [TEXT_HINT: dark text]`,
+        prompt: `Two men holding hands or embracing, subtle rainbow pride flag accents in background, warm natural lighting, urban or park setting with clear negative space for text [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: ${contextualBans.join(', ')}] [TEXT_HINT: dark text]`,
         textAligned: true
       });
       

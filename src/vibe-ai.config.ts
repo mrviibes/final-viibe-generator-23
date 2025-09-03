@@ -336,16 +336,33 @@ Your task is to write 6 distinct options that vary significantly in structure, t
 Make each option distinctly different - avoid repeating similar phrases, structures, or concepts.
 Always output valid JSON only.`,
 
-  visual_generator: `Generate 4 visual concepts for graphics that MUST align with the provided text and tone. Be concise.
+  visual_generator: `You are an expert visual concept generator. Create diverse, high-quality visual concepts for image generation.
 
-RULES:
-- Return ONLY valid JSON - no markdown, no extra text
-- Each prompt: 40-60 words maximum
-- Generate exactly 4 diverse visual concepts with VARIED COMPOSITIONS
-- CRITICAL: Visual concepts MUST relate to the provided text/joke content and tone
-- ENSURE DIVERSITY: Include one background-only, one object close-up, one people/scene, one wide setting
-- Match subcategory theme: Birthday needs cakes/candles, Christmas needs trees/gifts, etc.
-- For Pride themes: Include rainbow, drag queens, parades, celebrations, fabulous elements
+CRITICAL REQUIREMENTS:
+- Generate exactly 4 completely different visual concepts that are ON-TOPIC and domain-specific
+- Each concept must include embedded layout directives in this format: [TAGS: relevant, keywords], [TEXT_SAFE_ZONE: center 60x35|upper third|lower third|sides], [CONTRAST_PLAN: auto|dark|light], [NEGATIVE_PROMPT: specific negatives], [ASPECTS: 1:1 base, crop-safe 4:5, 9:16], [TEXT_HINT: dark text|light text]
+- Focus on HIGH CONTRAST and professional image quality
+- Create balanced composition with clear hierarchy
+- Ensure text-safe zones don't interfere with main subjects
+- Vary camera angles, subjects, and compositions dramatically
+- Each concept should be 40-60 words with embedded tags
+
+DISAMBIGUATION GUARDRAILS:
+- When user mentions "night shift" or work contexts, show workplace/employee scenes, NOT graveyards/cemeteries
+- When user mentions sports, show ONLY that specific sport's equipment and environments
+- If user provides specific text content, ALL 4 concepts must relate to that exact semantic meaning
+- Reject opposite interpretations - if user means workplace "shift", don't show "graveyard shift" imagery
+- Include domain-specific anchors from subcategory in at least 3 of 4 concepts
+
+LAYOUT TAG REQUIREMENTS (must be embedded in each concept):
+- [TAGS: keyword1, keyword2, keyword3] - 3 relevant concept keywords
+- [TEXT_SAFE_ZONE: specific zone] - where text overlay will go
+- [CONTRAST_PLAN: strategy] - how to ensure text visibility  
+- [NEGATIVE_PROMPT: avoid these] - concept-specific things to avoid
+- [ASPECTS: ratios] - aspect ratio considerations
+- [TEXT_HINT: color] - suggested text color for optimal contrast
+
+Return JSON: {"concepts": ["concept1 with [TAGS]...", "concept2 with [TAGS]...", "concept3 with [TAGS]...", "concept4 with [TAGS]..."]}
 - For jokes: Match the humor and subject matter exactly
 - EXCLUDE music/singing content unless tags explicitly include music, singing, concert, or performance
 - HIGH CONTRAST: Ensure clear text placement zones with strong color contrast
@@ -363,8 +380,17 @@ Format:
   ]
 }`,
 
-  visual_generator_fast: `4 visual concepts, JSON only, 30 words max each with layout tags:
-{"options":[{"subject":"brief","background":"brief","prompt":"30 words max with [TAGS] and [TEXT_SAFE_ZONE] directives"}]}`
+  visual_generator_fast: `Generate 4 quick visual concepts for image generation. Focus on variety, relevance, and clear text placement zones.
+
+REQUIREMENTS:
+- 4 different visual concepts that match the user's specific context and meaning
+- Each concept 30-50 words including: [TAGS: keywords], [TEXT_SAFE_ZONE: zone], [CONTRAST_PLAN: strategy], [NEGATIVE_PROMPT: avoid], [ASPECTS: ratios], [TEXT_HINT: color]
+- Prioritize speed while maintaining quality, contrast, and semantic accuracy
+- Vary compositions: backgrounds, subjects, angles, scenes
+- ALL 4 concepts must be relevant to the provided subcategory and text content
+- Avoid opposite meanings or unrelated interpretations
+
+Return JSON: {"concepts": ["concept1 with [TAGS]...", "concept2 with [TAGS]...", "concept3 with [TAGS]...", "concept4 with [TAGS]..."]}`
 };
 
 // =========================
@@ -1140,6 +1166,49 @@ export const isTemperatureSupported = (modelId: string): boolean => {
 // MESSAGE BUILDERS - Centralized prompt construction
 // =====================================================================
 
+// Generate contextual negative prompts to prevent off-topic content
+export function getContextualBans(inputs: any): string[] {
+  const { finalLine, subcategory, tags = [] } = inputs;
+  const bans: string[] = [];
+  
+  // Core opposite/ambiguous bans
+  const oppositeMappings: Record<string, string[]> = {
+    'night shift': ['graveyard', 'cemetery', 'tombstone', 'death', 'grave'],
+    'grave': ['night shift', 'work schedule', 'employee'],
+    'shift': ['graveyard', 'cemetery'] // Only if not "grave shift"
+  };
+  
+  // Apply opposite bans based on finalLine content
+  if (finalLine) {
+    const lowerLine = finalLine.toLowerCase();
+    for (const [trigger, bannedWords] of Object.entries(oppositeMappings)) {
+      if (lowerLine.includes(trigger) && !lowerLine.includes('grave')) {
+        bans.push(...bannedWords);
+      }
+    }
+    
+    // Context-specific bans
+    if (lowerLine.includes('work') || lowerLine.includes('job') || lowerLine.includes('employee')) {
+      bans.push('graveyard', 'cemetery', 'tombstone', 'death');
+    }
+    if (lowerLine.includes('hockey') && !lowerLine.includes('street')) {
+      bans.push('basketball', 'soccer', 'football');
+    }
+  }
+  
+  // Subcategory-specific bans
+  if (subcategory) {
+    const lowerSub = subcategory.toLowerCase();
+    if (lowerSub.includes('hockey')) {
+      bans.push('basketball', 'soccer ball', 'football');
+    } else if (lowerSub.includes('basketball')) {
+      bans.push('hockey stick', 'puck', 'soccer ball', 'football');
+    }
+  }
+  
+  return [...new Set(bans)]; // Remove duplicates
+}
+
 // Helper to get style keywords for visual prompts
 export function getStyleKeywords(visualStyle?: string): string {
   const styles: Record<string, string> = {
@@ -1301,11 +1370,18 @@ export function buildVisualGeneratorMessages(inputs: any): Array<{role: string; 
   // Extract subcategory keywords for anchoring
   const subcategoryKeywords = extractSubcategoryKeywords(subcategory);
   
+  // Get contextual bans to prevent off-topic content
+  const contextualBans = getContextualBans(inputs);
+  
   // Check if music/singing content is actually relevant  
   const musicKeywords = ['music', 'song', 'sing', 'concert', 'band', 'album', 'lyrics', 'carol', 'choir'];
   const hasMusicRelevance = tags.some(tag => 
     musicKeywords.some(keyword => tag.toLowerCase().includes(keyword))
   ) || (finalLine && musicKeywords.some(keyword => finalLine.toLowerCase().includes(keyword)));
+
+  // Combine default and contextual negative prompts
+  const allNegatives = [...DEFAULT_NEGATIVE_PROMPT.split(', '), ...contextualBans];
+  const negativePromptSection = allNegatives.slice(0, 8).join(', ');
 
   // Add variety and creativity requirements
   const userPrompt = `${category}>${subcategory}, ${tone}, ${visualStyle || '3d-animated'}
@@ -1314,12 +1390,17 @@ ${finalLine ? `JOKE/TEXT: "${finalLine}" - VISUAL CONCEPTS MUST MATCH THIS CONTE
 
 SUBCATEGORY ANCHORING (CRITICAL):
 ${subcategoryKeywords.length > 0 ? `- Domain keywords to incorporate: ${subcategoryKeywords.join(', ')}
-- AT LEAST 3 of 4 concepts must include clear visual cues from these domain keywords
+- ALL 4 concepts must include clear visual cues from these domain keywords
 - Vary wording; don't copy the subcategory verbatim every time
 - Make domain connections natural and witty/sincere per tone, not generic or slogan-y` : ''}
 
+BANNED ELEMENTS (CRITICAL - DO NOT INCLUDE):
+${contextualBans.length > 0 ? `- STRICTLY FORBIDDEN: ${contextualBans.join(', ')}
+- These elements would create opposite/wrong meanings from the user's intent
+- Focus on the correct semantic interpretation of the text` : ''}
+
 TEXT ALIGNMENT REQUIREMENTS (CRITICAL):
-${finalLine ? `- AT LEAST TWO concepts must directly reflect the exact content/semantics of: "${finalLine}"
+${finalLine ? `- ALL 4 concepts must directly reflect the exact content/semantics of: "${finalLine}"
 - Avoid unrelated gag props (rubber chickens, potatoes, random animals) unless the text mentions them
 - For award/Oscar references, emphasize documentary/poster-like interpretations with award symbols
 - For LGBTQ/pride themes, include explicit visual cues: rainbow flags, male couples, pride parades, drag elements, wardrobe/mirror scenes
@@ -1352,7 +1433,7 @@ LAYOUT TAG REQUIREMENTS (EMBED IN EACH PROMPT):
 - [TAGS: ${tags.slice(0, 3).join(', ')}] (relevant concept keywords)
 - [TEXT_SAFE_ZONE: center 60x35] or "upper third", "lower third", "sides" (text placement zone)
 - [CONTRAST_PLAN: auto] or "dark", "light" (text contrast strategy)
-- [NEGATIVE_PROMPT: ${DEFAULT_NEGATIVE_PROMPT.split(', ').slice(0, 4).join(', ')}] (per-concept negatives)
+- [NEGATIVE_PROMPT: ${negativePromptSection}] (per-concept negatives including contextual bans)
 - [ASPECTS: 1:1 base, crop-safe 4:5, 9:16] (aspect ratio handling)
 - [TEXT_HINT: dark text] or "light text" (suggested text color)
 
