@@ -205,7 +205,7 @@ export interface IdeogramHandoff {
 // =========================
 
 // Enhanced negative prompt with stronger text quality controls
-export const DEFAULT_NEGATIVE_PROMPT = "misspellings, spelling errors, typos, distorted letters, corrupted text, extra characters, random symbols, unreadable fonts, blurry text, warped text, backwards text, upside down text, gibberish text, overlapping text, crowded composition, low contrast text, pixelated text, cut off text, partial text, incomplete words, text artifacts, malformed letters, wrong fonts, invisible text, faded text";
+export const DEFAULT_NEGATIVE_PROMPT = "misspellings, spelling errors, typos, distorted letters, corrupted text, extra characters, random symbols, unreadable fonts, blurry text, warped text, backwards text, upside down text, gibberish text, overlapping text, crowded composition, low contrast text, pixelated text, cut off text, partial text, incomplete words, text artifacts, malformed letters, wrong fonts, invisible text, faded text, watermarks, signatures, logos, credits, footnotes, subtitles, taglines, small print, lorem ipsum, microtext, extra text, duplicated text, brand text, UI text, unrequested captions";
 // Model fallback chains for retry strategy
 export const MODEL_FALLBACK_CHAINS = {
   text: [
@@ -879,6 +879,7 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   if (handoff.key_line && handoff.key_line.trim()) {
     const cleanText = handoff.key_line.replace(/[""]/g, '"').replace(/['']/g, "'").replace(/[—–]/g, '-').trim();
     parts.push(`EXACT TEXT: "${cleanText}" [PERFECT_SPELLING] [CRISP_FONT] [ID:${uniqueId}]`);
+    parts.push('Render ONLY this text. Do NOT add any other words, captions, logos, watermarks, signatures, credits, or small print anywhere in the image.');
   }
   
   // OCCASION/CATEGORY
@@ -1025,9 +1026,11 @@ export function getTypographyStyleZone(typography: string): string {
       const scOptions = [
         'TEXT ZONE: tiny bottom-right corner, maximum 8% image area',
         'TEXT ZONE: small top-left corner, very unobtrusive, max 6% area',
-        'TEXT ZONE: minimal bottom-left watermark style, under 10% area'
+        'TEXT ZONE: minimal bottom-left corner caption, under 8% area'
       ];
       return scOptions[randomSeed - 1];
+    case 'poster':
+      return 'TEXT ZONE: centered or balanced poster overlay with clear separation';
     default:
       return 'TEXT ZONE: poster-style overlay with clear separation';
   }
@@ -1050,7 +1053,9 @@ export function getTypographyStyleConstraints(typography: string): string {
       return `[SMALL_BADGE] [CORNER_EDGE] [NO_SUBJECT_COVER] [SIZE: small] [SEED:${randomSeed}]`;
     case 'subtle-caption':
       // CRITICAL FIX: Very strict size and placement constraints
-      return `[CORNER_ONLY] [MAX_SIZE: 8%] [TINY_FONT] [WATERMARK_STYLE] [MINIMAL] [NO_OVERLAP] [SEED:${randomSeed}]`;
+      return `[CORNER_ONLY] [MAX_SIZE: 8%] [TINY_FONT] [ONE_TEXT_INSTANCE] [NO_FOOTER] [NO_SIGNATURE] [NO_SECONDARY_CAPTION] [MINIMAL] [NO_OVERLAP] [SEED:${randomSeed}]`;
+    case 'poster':
+      return `[ONE_TEXT_INSTANCE] [NO_CREDITS] [NO_TAGLINE] [NO_FOOTER] [SEED:${randomSeed}]`;
     default:
       return `[BALANCED_LAYOUT] [CLEAR_TEXT_SPACE] [SEED:${randomSeed}]`;
   }

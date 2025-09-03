@@ -442,5 +442,5 @@ function enhancePromptForV3ExactText(prompt: string, isExactText: boolean): stri
   // For exact text requests, emphasize typography and clarity
   const basePrompt = prompt.replace(/EXACT TEXT:\s*/i, '');
   
-  return `${basePrompt}. Typography-focused render with clean, readable text placement. High contrast text against background. Professional text rendering quality.`;
+  return `${basePrompt}. Typography-focused render with clean, readable text placement. High contrast text against background. Professional text rendering quality. Render ONLY the specified text; no other text, captions, logos, watermarks, signatures, credits, or small print anywhere in the image.`;
 }
