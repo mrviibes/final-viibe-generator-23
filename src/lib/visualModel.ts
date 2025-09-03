@@ -49,8 +49,12 @@ function autoEnrichInputs(inputs: VisualInputs): VisualInputs {
   
   // Auto-add subcategory-derived tags
   if (inputs.subcategory && inputs.subcategory !== '-') {
-    const subcategoryKeywords = Array.from(buildVisualKeywordSet(inputs.subcategory)).slice(0, 4);
-    enriched.tags = [...inputs.tags, ...subcategoryKeywords].slice(0, 8);
+    const subcategoryTokens = inputs.subcategory
+      .toLowerCase()
+      .split(/[\s\-\/]+/)
+      .filter(token => token.length >= 3)
+      .slice(0, 4);
+    enriched.tags = [...inputs.tags, ...subcategoryTokens].slice(0, 8);
   }
   
   // Auto-seed category-specific tags if not provided
