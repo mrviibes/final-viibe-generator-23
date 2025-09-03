@@ -8,9 +8,10 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-import { ArrowLeft, RotateCcw, Settings, AlertTriangle, Info, ImageIcon } from "lucide-react";
+import { ArrowLeft, RotateCcw, Settings, AlertTriangle, Info, ImageIcon, Key, CheckCircle, XCircle, AlertCircle as AlertCircleIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { openAIService } from "@/lib/openai";
 import { 
   getRuntimeOverrides, 
   setRuntimeOverrides, 
@@ -34,6 +35,8 @@ export default function AiSettings() {
   const { toast } = useToast();
   const [overrides, setOverrides] = useState<AIRuntimeOverrides>({});
   const [hasChanges, setHasChanges] = useState(false);
+  const [openaiConnectionStatus, setOpenaiConnectionStatus] = useState<'unknown' | 'working' | 'quota-exceeded' | 'auth-failed' | 'network-error'>('unknown');
+  const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
 
   useEffect(() => {
     const current = getRuntimeOverrides();
@@ -42,6 +45,9 @@ export default function AiSettings() {
     delete cleanedOverrides.model;
     delete cleanedOverrides.temperature;
     setOverrides(cleanedOverrides);
+    
+    // Update OpenAI connection status
+    setOpenaiConnectionStatus(openAIService.getConnectionStatus());
   }, []);
 
   const updateOverride = (key: keyof AIRuntimeOverrides, value: any) => {
@@ -73,6 +79,58 @@ export default function AiSettings() {
     const current = getRuntimeOverrides();
     setOverrides(current);
     setHasChanges(false);
+  };
+
+  const getConnectionStatusIcon = () => {
+    switch (openaiConnectionStatus) {
+      case 'working':
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'quota-exceeded':
+      case 'auth-failed':
+        return <XCircle className="h-4 w-4 text-red-500" />;
+      case 'network-error':
+        return <AlertCircleIcon className="h-4 w-4 text-yellow-500" />;
+      default:
+        return <AlertCircleIcon className="h-4 w-4 text-muted-foreground" />;
+    }
+  };
+
+  const getConnectionStatusText = () => {
+    if (openAIService.isUsingBackend()) {
+      return 'Using Supabase backend';
+    }
+    
+    switch (openaiConnectionStatus) {
+      case 'working':
+        return 'Connected';
+      case 'quota-exceeded':
+        return 'Quota exceeded - add billing to OpenAI account';
+      case 'auth-failed':
+        return 'Invalid API key';
+      case 'network-error':
+        return 'Connection error';
+      default:
+        return openAIService.hasApiKey() ? 'API key set' : 'No API key';
+    }
+  };
+
+  const handleClearApiKey = () => {
+    openAIService.clearApiKey();
+    openAIService.clearLastError();
+    setOpenaiConnectionStatus('unknown');
+    toast({
+      title: "API Key Cleared",
+      description: "Now using Supabase backend for OpenAI requests."
+    });
+  };
+
+  const handleApiKeySet = (apiKey: string) => {
+    openAIService.setApiKey(apiKey);
+    setOpenaiConnectionStatus('unknown');
+    toast({
+      title: "API Key Set",
+      description: "OpenAI API key has been configured. Test it by generating content."
+    });
   };
 
   return (
@@ -309,6 +367,88 @@ export default function AiSettings() {
             </CardContent>
           </Card>
 
+          {/* OpenAI Connection */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Key className="h-5 w-5" />
+                OpenAI Connection
+              </CardTitle>
+              <CardDescription>
+                Manage your OpenAI API connection for text generation.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="flex items-center gap-2">
+                  {getConnectionStatusIcon()}
+                  <div>
+                    <div className="font-medium">Status</div>
+                    <div className="text-sm text-muted-foreground">
+                      {getConnectionStatusText()}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  {!openAIService.isUsingBackend() && (
+                    <Button variant="outline" size="sm" onClick={handleClearApiKey}>
+                      Clear Key
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={() => setShowApiKeyDialog(true)}>
+                    {openAIService.hasApiKey() && !openAIService.isUsingBackend() ? 'Update Key' : 'Set API Key'}
+                  </Button>
+                </div>
+              </div>
+
+              {openaiConnectionStatus === 'quota-exceeded' && (
+                <div className="p-3 border border-red-200 bg-red-50 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <XCircle className="h-4 w-4 text-red-500 mt-0.5" />
+                    <div className="text-sm">
+                      <div className="font-medium text-red-800">Quota Exceeded</div>
+                      <div className="text-red-700 mt-1">
+                        Your OpenAI account has insufficient credits. Add billing to your OpenAI account or use the Supabase backend.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {openaiConnectionStatus === 'auth-failed' && (
+                <div className="p-3 border border-red-200 bg-red-50 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <XCircle className="h-4 w-4 text-red-500 mt-0.5" />
+                    <div className="text-sm">
+                      <div className="font-medium text-red-800">Authentication Failed</div>
+                      <div className="text-red-700 mt-1">
+                        Your API key is invalid. Please check and update your OpenAI API key.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {openAIService.getLastError() && (
+                <div className="p-3 border border-yellow-200 bg-yellow-50 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <AlertCircleIcon className="h-4 w-4 text-yellow-600 mt-0.5" />
+                    <div className="text-sm">
+                      <div className="font-medium text-yellow-800">Last Error</div>
+                      <div className="text-yellow-700 mt-1 font-mono text-xs">
+                        {openAIService.getLastError()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="text-sm text-muted-foreground">
+                By default, this app uses the Supabase backend for OpenAI requests. You can optionally set your own API key to use OpenAI directly.
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Default Values */}
           <Card>
             <CardHeader>
@@ -469,6 +609,51 @@ export default function AiSettings() {
           </Card>
         </div>
       </div>
+
+      {/* API Key Dialog */}
+      {showApiKeyDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background p-6 rounded-lg max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">Set OpenAI API Key</h3>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="apikey">API Key</Label>
+                <Input
+                  id="apikey"
+                  type="password"
+                  placeholder="sk-..."
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const apiKey = (e.target as HTMLInputElement).value.trim();
+                      if (apiKey) {
+                        handleApiKeySet(apiKey);
+                        setShowApiKeyDialog(false);
+                        (e.target as HTMLInputElement).value = '';
+                      }
+                    }
+                  }}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setShowApiKeyDialog(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={() => {
+                  const input = document.getElementById('apikey') as HTMLInputElement;
+                  const apiKey = input?.value?.trim();
+                  if (apiKey) {
+                    handleApiKeySet(apiKey);
+                    setShowApiKeyDialog(false);
+                    input.value = '';
+                  }
+                }}>
+                  Save
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

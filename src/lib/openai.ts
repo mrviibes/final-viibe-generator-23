@@ -35,6 +35,8 @@ export class OpenAIService {
   private apiKey: string | null = null;
   private useBackendAPI: boolean = true; // Use Supabase backend by default
   private textSpeed: 'fast' | 'creative' = 'fast'; // Locked to fast
+  private lastError: string | null = null;
+  private connectionStatus: 'unknown' | 'working' | 'quota-exceeded' | 'auth-failed' | 'network-error' = 'unknown';
 
   constructor() {
     // Still support localStorage for fallback, but prefer backend

@@ -5055,16 +5055,43 @@ const Index = () => {
         });
       }
 
-      // Warn if fallbacks were used
+      // Warn if fallbacks were used with detailed reason
       if (vibeResult.audit.usedFallback) {
         console.warn('⚠️ Text generation used fallback variants. API may be unavailable or having issues.');
-        sonnerToast.warning('Text generation used fallback. Results may be less relevant to your tags.');
+        const connectionStatus = openAIService.getConnectionStatus();
+        const errorReason = connectionStatus === 'quota-exceeded' ? 'quota exceeded' :
+                            connectionStatus === 'auth-failed' ? 'authentication failed' :
+                            connectionStatus === 'network-error' ? 'network error' : 'API issue';
+        
+        sonnerToast.warning(`Used fallback (${errorReason})`, {
+          description: connectionStatus === 'quota-exceeded' ? 'Add billing to your OpenAI account or check AI Settings.' :
+                      connectionStatus === 'auth-failed' ? 'Check your API key in AI Settings.' :
+                      'Results may be less relevant to your tags.',
+          duration: 8000,
+        });
       } else if (vibeResult.audit.candidateCount < 4) {
         console.log(`✅ Generated ${vibeResult.audit.candidateCount} unique options from AI model`);
       }
     } catch (error) {
       console.error('❌ Error generating text:', error);
-      sonnerToast.error('Failed to generate text options. Please try again.');
+      
+      // Update OpenAI connection status for better error handling
+      const connectionStatus = openAIService.getConnectionStatus();
+      const lastError = openAIService.getLastError();
+      
+      if (connectionStatus === 'quota-exceeded') {
+        sonnerToast.error('OpenAI quota exceeded', {
+          description: 'Your OpenAI account has insufficient credits. Add billing or use AI Settings to manage your API key.',
+          duration: 10000,
+        });
+      } else if (connectionStatus === 'auth-failed') {
+        sonnerToast.error('OpenAI authentication failed', {
+          description: 'Your API key is invalid. Check AI Settings to update your API key.',
+          duration: 10000,
+        });
+      } else {
+        sonnerToast.error('Failed to generate text options. Please try again.');
+      }
     } finally {
       setIsGenerating(false);
     }
