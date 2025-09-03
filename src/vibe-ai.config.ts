@@ -340,13 +340,13 @@ export function injectPromptVariation(basePrompt: string): string {
 // 3) Prompts and System Messages
 // =========================
 export const SYSTEM_PROMPTS = {
-  vibe_maker: `Create a single line under 100 characters. Match the tone. Use tags as hints. Be witty or sincere, never cruel. JSON only: {"line":"..."}`,
+  vibe_maker: `Create a single line under 100 characters. Match the tone. Use tags as hints. Be witty or sincere, never cruel. Write complete, natural phrases - avoid filler words and awkward endings. JSON only: {"line":"..."}`,
   
-  vibe_generator: `Write 6 distinct short-form options in the specified tone. Vary structure, theme, and wording. No repetition. JSON only.`,
+  vibe_generator: `Write 6 distinct short-form options in the specified tone. Vary structure, theme, and wording. No repetition. Write complete, natural phrases that flow well - avoid filler words like "just" and awkward incomplete endings. JSON only.`,
 
-  visual_generator: `Generate 4 unique visual concepts for image generation. Each 30-50 words with tags: [TAGS: keywords], [TEXT_SAFE_ZONE: zone], [CONTRAST_PLAN: strategy], [TEXT_HINT: color]. Match user context exactly. Vary compositions dramatically. High contrast text zones. Ensure completely different layouts and compositions. JSON: {"concepts": ["...", "...", "...", "..."]}`,
+  visual_generator: `Generate 4 unique visual concepts for image generation. Each 30-50 words with tags: [TAGS: keywords], [TEXT_SAFE_ZONE: zone], [CONTRAST_PLAN: strategy], [TEXT_HINT: color]. Match user context exactly. Vary compositions dramatically. High contrast text zones. Write complete, natural descriptions that flow well - avoid filler words and awkward endings. JSON: {"concepts": ["...", "...", "...", "..."]}`,
 
-  visual_generator_fast: `Generate 4 distinct visual concepts. Each 20-40 words with: [TAGS: keywords], [TEXT_SAFE_ZONE: zone], [CONTRAST_PLAN: strategy], [TEXT_HINT: color]. Match context. Vary compositions significantly. No duplicate layouts. JSON: {"concepts": ["...", "...", "...", "..."]}`,
+  visual_generator_fast: `Generate 4 distinct visual concepts. Each 20-40 words with: [TAGS: keywords], [TEXT_SAFE_ZONE: zone], [CONTRAST_PLAN: strategy], [TEXT_HINT: color]. Match context. Vary compositions significantly. Write complete, natural descriptions - avoid filler words and incomplete phrases. JSON: {"concepts": ["...", "...", "...", "..."]}`,
 };
 
 // =========================

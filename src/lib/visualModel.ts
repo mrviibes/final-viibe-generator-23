@@ -727,6 +727,62 @@ function getDefaultFallbacks(inputs: VisualInputs): VisualOption[] {
   ];
 }
 
+// Text sanitization utility to clean up awkward flow
+function sanitizeTags(tags: string[]): string[] {
+  const fillerWords = ['just', 'really', 'very', 'like', 'maybe', 'kind of', 'sort of', 'basically', 'actually', 'literally'];
+  return tags
+    .map(tag => tag.trim())
+    .filter(tag => tag.length > 0)
+    .map(tag => {
+      // Remove filler words at start/end
+      let cleaned = tag;
+      fillerWords.forEach(filler => {
+        const regex = new RegExp(`\\b${filler}\\b`, 'gi');
+        cleaned = cleaned.replace(regex, '').trim();
+      });
+      return cleaned;
+    })
+    .filter(tag => tag.length > 0);
+}
+
+// Post-process option text to improve flow
+function postProcessOption(option: VisualOption): VisualOption {
+  if (!option.subject && !option.background) return option;
+  
+  const processText = (text: string): string => {
+    if (!text) return text;
+    
+    // Fix common awkward endings
+    let processed = text
+      .replace(/\bjust\s*$/i, '')
+      .replace(/\breally\s*$/i, '') 
+      .replace(/\baccents\s*$/i, 'accents throughout')
+      .replace(/\belements\s*$/i, 'elements featured')
+      .replace(/\bcolors\s*$/i, 'vibrant colors')
+      .trim();
+    
+    // Ensure it doesn't end with incomplete thoughts
+    if (processed && !processed.match(/[.!?]$/)) {
+      // Add contextual completion based on content
+      if (processed.includes('atmosphere')) {
+        processed += ' setting';
+      } else if (processed.includes('background')) {
+        processed += ' scene';
+      } else if (processed.includes('elements')) {
+        processed += ' featured';
+      }
+    }
+    
+    return processed;
+  };
+  
+  return {
+    ...option,
+    subject: option.subject ? processText(option.subject) : option.subject,
+    background: option.background ? processText(option.background) : option.background
+  };
+}
+
 export async function generateVisualRecommendations(
   inputs: VisualInputs,
   n: number = VISUAL_OPTIONS_COUNT
@@ -779,7 +835,8 @@ export async function generateVisualRecommendations(
         
         if (result?.options && Array.isArray(result.options)) {
           const visualOptions = result.options.slice(0, n);
-          const validatedOptions = validateVisualOptions(visualOptions, enrichedInputs);
+          const polishedOptions = visualOptions.map(postProcessOption);
+          const validatedOptions = validateVisualOptions(polishedOptions, enrichedInputs);
           
           // Merge fallbacks if we need more options
           if (validatedOptions.length < n) {
@@ -984,7 +1041,8 @@ export async function generateVisualRecommendations(
         subject: opt.subject || "",
         background: opt.background,
         prompt: opt.prompt
-      }));
+      }))
+      .map(postProcessOption);
 
     // Apply quality validation to reject vague options
     validOptions = validateVisualOptions(validOptions, enrichedInputs);
