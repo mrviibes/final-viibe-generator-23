@@ -79,6 +79,19 @@ function computeSubcategoryAlignmentScore(option: VisualOption, subcategory: str
 }
 
 // Auto-enrichment functions
+// Halloween context detection
+function isHalloweenContext(inputs: VisualInputs): boolean {
+  const halloweenKeywords = ['halloween', 'costume', 'pumpkin', 'spooky', 'witch', 'ghost', 'bats', 'cobweb', 'candy', 'jack-o-lantern', 'trick-or-treat', 'october', 'haunted'];
+  
+  const checkText = [
+    inputs.subcategory?.toLowerCase() || '',
+    inputs.finalLine?.toLowerCase() || '',
+    ...(inputs.tags?.map(t => t.toLowerCase()) || [])
+  ].join(' ');
+  
+  return halloweenKeywords.some(keyword => checkText.includes(keyword));
+}
+
 function autoEnrichInputs(inputs: VisualInputs): VisualInputs {
   const enriched = { ...inputs };
   
@@ -525,6 +538,74 @@ function getSlotBasedFallbacks(inputs: VisualInputs): VisualOption[] {
   // Get contextual bans to avoid opposite meanings in fallbacks
   const contextualBans = getContextualBans(inputs);
   const negativeBans = contextualBans.length > 0 ? `, NO ${contextualBans.join(', ')}` : '';
+  
+  // Halloween-specific fallbacks when context detected
+  if (isHalloweenContext(inputs)) {
+    console.log('🎃 Halloween context detected - generating Halloween-themed fallbacks');
+    
+    const halloweenFallbacks: VisualOption[] = [];
+    const lowerFinalLine = finalLine?.toLowerCase() || '';
+    
+    // Always include a background-only Halloween option
+    halloweenFallbacks.push({
+      subject: "moody Halloween backdrop with no people",
+      background: "moonlit pumpkins, candles, soft fog, subtle cobwebs",
+      prompt: `Moody Halloween scene with moonlit pumpkins, flickering candles, soft fog, and subtle cobwebs creating atmospheric lighting - clean negative space in the center for text, no people or faces [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: people, faces, ${contextualBans.join(', ')}] [TEXT_HINT: light text]`,
+      textAligned: true
+    });
+    
+    // LGBTQ+ Halloween party scene if relevant
+    const lgbtqPhrases = ['gay', 'queer', 'lgbt', 'lgbtq', 'pride', 'came out', 'coming out', 'boyfriend', 'drag'];
+    if (lgbtqPhrases.some(phrase => lowerFinalLine.includes(phrase))) {
+      halloweenFallbacks.push({
+        subject: "male couple in Halloween costumes with subtle rainbow accents",
+        background: "house party with pumpkins and warm lights",
+        prompt: `Male couple in creative Halloween costumes at a house party, subtle rainbow pride accents mixed with pumpkins and warm Halloween lighting, open lower-third area for text placement [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: lower third] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: ${contextualBans.join(', ')}] [TEXT_HINT: light text]`,
+        textAligned: true
+      });
+      
+      halloweenFallbacks.push({
+        subject: "costume prep scene with wardrobe and Halloween masks",
+        background: "dressing room with Halloween makeup and accessories",
+        prompt: `Halloween costume preparation at a mirror - makeup, masks, and fabric swatches, tasteful nod to cross-dressing with Halloween theme, side text-safe zone [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: sides] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: ${contextualBans.join(', ')}] [TEXT_HINT: dark text]`,
+        textAligned: true
+      });
+    } else {
+      // General Halloween couple/party scene
+      halloweenFallbacks.push({
+        subject: "people in creative Halloween costumes",
+        background: "festive Halloween party setting",
+        prompt: `Group of people in creative Halloween costumes at a festive party, pumpkins and decorations, warm party lighting with clear text area [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: upper third] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: ${contextualBans.join(', ')}] [TEXT_HINT: light text]`,
+        textAligned: true
+      });
+      
+      halloweenFallbacks.push({
+        subject: "Halloween decorations and costume accessories",
+        background: "spooky yet inviting Halloween setup",
+        prompt: `Halloween decorations with costume accessories and masks arranged artistically, spooky yet inviting atmosphere, clear negative space for text [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: people, ${contextualBans.join(', ')}] [TEXT_HINT: dark text]`,
+        textAligned: true
+      });
+    }
+    
+    // "Different but related" non-Halloween option as 4th
+    if (lgbtqPhrases.some(phrase => lowerFinalLine.includes(phrase))) {
+      halloweenFallbacks.push({
+        subject: "documentary-style poster motif with subtle rainbow accent",
+        background: "clean professional backdrop",
+        prompt: `Documentary-style poster motif with subtle rainbow accent and clean central space, professional modern composition, not Halloween-specific but aligned with pride themes [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: ${contextualBans.join(', ')}] [TEXT_HINT: dark text]`,
+        textAligned: true
+      });
+    } else {
+      halloweenFallbacks.push({
+        subject: "autumnal scene with warm colors",
+        background: "cozy fall setting",
+        prompt: `Warm autumnal scene with fall colors and cozy atmosphere, not Halloween-specific but seasonally relevant [TAGS: ${tags.join(', ')}] [TEXT_SAFE_ZONE: center 60x35] [CONTRAST_PLAN: auto] [NEGATIVE_PROMPT: ${contextualBans.join(', ')}] [TEXT_HINT: dark text]`,
+        textAligned: true
+      });
+    }
+    
+    return halloweenFallbacks.slice(0, 4);
+  }
   
   // Enhanced text-aware fallbacks if finalLine exists
   if (finalLine) {
@@ -1064,6 +1145,66 @@ export async function generateVisualRecommendations(
           ...validOptions.filter((opt: any) => !opt.subcategoryAligned)
         ].slice(0, 4);
       }
+    }
+
+    // Enforce Halloween 3-of-4 mix when context detected
+    if (isHalloweenContext(enrichedInputs)) {
+      console.log('🎃 Enforcing Halloween 3-of-4 mix...');
+      
+      // Count Halloween-themed options
+      const halloweenKeywords = ['halloween', 'pumpkin', 'ghost', 'witch', 'spooky', 'costume', 'candy', 'cobweb', 'bat', 'skull', 'skeleton', 'haunted', 'trick-or-treat', 'jack-o-lantern'];
+      const halloweenOptions = validOptions.filter(opt => {
+        const fullText = `${opt.subject || ''} ${opt.background || ''} ${opt.prompt}`.toLowerCase();
+        return halloweenKeywords.some(keyword => fullText.includes(keyword));
+      });
+      
+      // Count background-only options
+      const backgroundOnlyOptions = validOptions.filter(opt => {
+        const fullText = `${opt.subject || ''} ${opt.prompt}`.toLowerCase();
+        return fullText.includes('no people') || fullText.includes('no faces') || fullText.includes('backdrop') || !opt.subject || opt.subject.toLowerCase().includes('background');
+      });
+      
+      console.log(`🎃 Halloween concepts: ${halloweenOptions.length}/4`);
+      console.log(`✅ Background-only present: ${backgroundOnlyOptions.length > 0}`);
+      
+      // Ensure 3 Halloween options
+      if (halloweenOptions.length < 3) {
+        console.log('🎃 Adding Halloween fallbacks to meet 3-of-4 requirement');
+        const halloweenFallbacks = getSlotBasedFallbacks(enrichedInputs);
+        const needed = 3 - halloweenOptions.length;
+        
+        // Remove weakest non-Halloween options to make room
+        const nonHalloween = validOptions.filter(opt => {
+          const fullText = `${opt.subject || ''} ${opt.background || ''} ${opt.prompt}`.toLowerCase();
+          return !halloweenKeywords.some(keyword => fullText.includes(keyword));
+        });
+        
+        // Keep Halloween options + add Halloween fallbacks + keep one "different but relevant"
+        validOptions = [
+          ...halloweenOptions,
+          ...halloweenFallbacks.slice(0, needed),
+          ...nonHalloween.slice(0, 1) // Keep exactly one non-Halloween as "different but relevant"
+        ].slice(0, 4);
+      }
+      
+      // Ensure background-only Halloween option is first
+      if (backgroundOnlyOptions.length === 0) {
+        console.log('🎃 Ensuring background-only Halloween option is first');
+        const halloweenFallbacks = getSlotBasedFallbacks(enrichedInputs);
+        const backgroundOnlyFallback = halloweenFallbacks[0]; // First fallback is always background-only
+        
+        validOptions = [
+          backgroundOnlyFallback,
+          ...validOptions.slice(0, 3) // Keep 3 others
+        ];
+      } else {
+        // Reorder to put background-only first
+        const backgroundOnly = backgroundOnlyOptions[0];
+        const others = validOptions.filter(opt => opt !== backgroundOnly);
+        validOptions = [backgroundOnly, ...others.slice(0, 3)];
+      }
+      
+      console.log(`🎃 Final Halloween mix enforced: ${validOptions.length} options`);
     }
 
     // Check if we have enough text-aligned options

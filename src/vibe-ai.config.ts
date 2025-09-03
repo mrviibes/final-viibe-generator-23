@@ -1482,6 +1482,19 @@ function extractSubcategoryKeywords(subcategory: string): string[] {
   return [...new Set(enrichedTokens)].slice(0, 8); // Max 8 keywords
 }
 
+// Halloween context detection helper
+function checkHalloweenContext(inputs: any): boolean {
+  const halloweenKeywords = ['halloween', 'costume', 'pumpkin', 'spooky', 'witch', 'ghost', 'bats', 'cobweb', 'candy', 'jack-o-lantern', 'trick-or-treat', 'october', 'haunted'];
+  
+  const checkText = [
+    inputs.subcategory?.toLowerCase() || '',
+    inputs.finalLine?.toLowerCase() || '',
+    ...(inputs.tags?.map((t: string) => t.toLowerCase()) || [])
+  ].join(' ');
+  
+  return halloweenKeywords.some(keyword => checkText.includes(keyword));
+}
+
 // Builder for visual generator chat messages  
 export function buildVisualGeneratorMessages(inputs: any): Array<{role: string; content: string}> {
   const { category, subcategory, tone, tags, visualStyle, finalLine } = inputs;
@@ -1560,6 +1573,13 @@ ${finalLine ? `- ALL 4 concepts must directly reflect the exact content/semantic
 REQUIRED OBJECTS/SUBJECTS (must be visible in each concept):
 - ${subcategory === 'Ice Hockey' ? 'hockey stick and puck' : 'relevant category objects'}
 - Specific, tangible items matching the theme${additionalRequirements}
+
+SEASONAL MIX REQUIREMENTS:
+${checkHalloweenContext(inputs) ? `- HALLOWEEN THEMED: Make at least 3 of the 4 concepts clearly Halloween-themed (pumpkins, costumes, spooky elements, Halloween parties)
+- One concept MUST be background-only with Halloween elements but NO people (moonlit pumpkins, candles, fog, cobwebs)
+- For LGBTQ+ content: Include Halloween party scenes with male couples in costumes and subtle rainbow accents
+- The remaining concept should be different but still relevant (e.g., documentary/pride/seasonal non-Halloween)
+- Ensure Halloween atmosphere while maintaining text placement zones` : ''}
 
 VARIETY RULES:
 - Generate exactly one background-only concept with clean negative space
