@@ -5841,15 +5841,18 @@ const Index = () => {
                 {/* Show AI Assist form when selected and no options generated yet */}
                 {selectedCompletionOption === "ai-assist" && generatedOptions.length === 0 && <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div className="text-center mb-6">
-                      <p className="text-xl text-muted-foreground">Add relevant tags for content generation</p>
+                      <p className="text-xl text-muted-foreground">Add keywords (exact + tone hints)</p>
                     </div>
 
                     <div className="max-w-md mx-auto space-y-6">
-                      {/* Tags Input */}
+                      {/* Keywords Input */}
                       <div className="space-y-3">
-                        <Input value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={handleTagInputKeyDown} placeholder="Enter tags (press Enter or comma to add)" className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
+                        <Input value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={handleTagInputKeyDown} placeholder="happy birthday Jesse, celebration, fun (press Enter or comma to add)" className="text-center border-2 border-border bg-card hover:bg-accent/50 transition-colors p-6 h-auto min-h-[60px] text-base font-medium rounded-lg" />
+                        <p className="text-xs text-muted-foreground text-center">
+                          Keywords will be included exactly AND influence the writing tone
+                        </p>
                         
-                        {/* Display Tags */}
+                        {/* Display Keywords */}
                         {tags.length > 0 && <div className="flex flex-wrap gap-2 justify-center">
                             {tags.map((tag, index) => <Badge key={index} variant="secondary" className="px-3 py-1 text-sm flex items-center gap-1">
                                 {tag}

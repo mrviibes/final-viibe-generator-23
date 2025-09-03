@@ -691,19 +691,23 @@ export function postProcessLine(
     };
   }
 
-  // Tag coverage check
+  // Keyword coverage check - enforce exact inclusion
   if (tags && tags.length > 0) {
-    const hasTagCoverage = tags.some(tag => 
+    // For short keyword lists (<=4), require ALL keywords to be included
+    // For longer lists (>4), require at least 2 keywords
+    const requiredMatches = tags.length <= 4 ? tags.length : Math.min(2, tags.length);
+    
+    const matchedKeywords = tags.filter(tag => 
       cleaned.toLowerCase().includes(tag.toLowerCase()) ||
-      // Allow partial word matches for short tags
-      (tag.length > 3 && cleaned.toLowerCase().includes(tag.toLowerCase().slice(0, -1)))
+      // Allow partial word matches for longer keywords
+      (tag.length > 4 && cleaned.toLowerCase().includes(tag.toLowerCase().slice(0, -2)))
     );
     
-    if (!hasTagCoverage) {
+    if (matchedKeywords.length < requiredMatches) {
       return {
         line: cleaned,
         blocked: true,
-        reason: 'No tag coverage - missing required tags'
+        reason: `Must include ${requiredMatches} of ${tags.length} keywords. Found: ${matchedKeywords.join(', ')}`
       };
     }
   }
@@ -1178,7 +1182,7 @@ Return only: {"lines":["joke1\\nwith\\nnewlines","joke2\\nwith\\nnewlines","joke
   }
 
   const tagRequirement = inputs.tags && inputs.tags.length > 0 
-    ? `\n• CRITICAL: Each option must include at least one of these tags (or a clear paraphrase): ${inputs.tags.join(', ')}`
+    ? `\n• CRITICAL: Each option must include at least one of these exact words/phrases: ${inputs.tags.join(', ')}. Also use these keywords to infer the appropriate tone and style.`
     : '';
 
   const corePrompt = `Generate 6 concise options under 100 chars each for:
