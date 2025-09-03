@@ -341,9 +341,10 @@ Always output valid JSON only.`,
 RULES:
 - Return ONLY valid JSON - no markdown, no extra text
 - Each prompt: 40-60 words maximum
-- Generate exactly 4 diverse visual concepts
+- Generate exactly 4 diverse visual concepts with VARIED COMPOSITIONS
 - CRITICAL: Visual concepts MUST relate to the provided text/joke content and tone
-- Provide exactly one background-only concept and 3 distinct subject+background concepts
+- ENSURE DIVERSITY: Include one background-only, one object close-up, one people/scene, one wide setting
+- Match subcategory theme: Birthday needs cakes/candles, Christmas needs trees/gifts, etc.
 - For Pride themes: Include rainbow, drag queens, parades, celebrations, fabulous elements
 - For jokes: Match the humor and subject matter exactly
 - EXCLUDE music/singing content unless tags explicitly include music, singing, concert, or performance

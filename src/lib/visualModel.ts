@@ -22,6 +22,7 @@ export interface VisualOption {
   prompt: string;
   slot?: string;
   textAligned?: boolean;
+  subcategoryAligned?: boolean;
 }
 
 export interface VisualResult {
