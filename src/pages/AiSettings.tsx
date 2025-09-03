@@ -47,7 +47,7 @@ export default function AiSettings() {
     setOverrides(cleanedOverrides);
     
     // Update OpenAI connection status
-    setOpenaiConnectionStatus(openAIService.getConnectionStatus());
+    setOpenaiConnectionStatus('unknown');
   }, []);
 
   const updateOverride = (key: keyof AIRuntimeOverrides, value: any) => {
@@ -423,20 +423,6 @@ export default function AiSettings() {
                       <div className="font-medium text-red-800">Authentication Failed</div>
                       <div className="text-red-700 mt-1">
                         Your API key is invalid. Please check and update your OpenAI API key.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {openAIService.getLastError() && (
-                <div className="p-3 border border-yellow-200 bg-yellow-50 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <AlertCircleIcon className="h-4 w-4 text-yellow-600 mt-0.5" />
-                    <div className="text-sm">
-                      <div className="font-medium text-yellow-800">Last Error</div>
-                      <div className="text-yellow-700 mt-1 font-mono text-xs">
-                        {openAIService.getLastError()}
                       </div>
                     </div>
                   </div>

@@ -5058,7 +5058,6 @@ const Index = () => {
       // Warn if fallbacks were used with detailed reason
       if (vibeResult.audit.usedFallback) {
         console.warn('⚠️ Text generation used fallback variants. API may be unavailable or having issues.');
-        const connectionStatus = openAIService.getConnectionStatus();
         sonnerToast.warning('Used fallback (API issue)', {
           description: 'Results may be less relevant to your keywords.',
           duration: 8000,
@@ -5069,9 +5068,6 @@ const Index = () => {
     } catch (error) {
       console.error('❌ Error generating text:', error);
       
-      // Update OpenAI connection status for better error handling
-      const connectionStatus = openAIService.getConnectionStatus();
-      const lastError = openAIService.getLastError();
       
       sonnerToast.error('Failed to generate text options. Please try again.');
     } finally {
