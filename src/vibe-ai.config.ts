@@ -28,6 +28,8 @@ export interface AIRuntimeOverrides {
   typographyStyle?: 'poster' | 'negative_space';
   popCultureWebFacts?: boolean;
   popCultureRecency?: 'month' | 'year' | 'all';
+  contentFilterStrictness?: ContentFilterStrictness;
+  sensitiveTagHandling?: SensitiveTagHandling;
 }
 
 // Get runtime overrides from localStorage
@@ -98,6 +100,8 @@ export type Category =
   | "No Category";
 
 export type AspectPreset = "Square" | "Landscape" | "Portrait" | "Custom";
+export type ContentFilterStrictness = 'strict' | 'relaxed' | 'off';
+export type SensitiveTagHandling = 'auto-rewrite' | 'warn-only' | 'off';
 
 export interface AspectRatioSpec {
   preset: AspectPreset;

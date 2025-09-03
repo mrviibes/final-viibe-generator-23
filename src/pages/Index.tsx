@@ -4656,12 +4656,29 @@ const Index = () => {
   const handleAddTag = (tag: string) => {
     const trimmedTag = tag.trim();
     if (trimmedTag && !tags.includes(trimmedTag)) {
-      setTags([...tags, trimmedTag]);
+      const overrides = getRuntimeOverrides();
+      const tagHandling = overrides.sensitiveTagHandling ?? 'auto-rewrite';
       
-      // Check for sensitive content and show notice
-      const sanitizedResult = rewriteSensitiveTags([trimmedTag]);
-      if (sanitizedResult[0].wasSanitized) {
-        setSensitiveTagNotices(prev => ({ ...prev, [trimmedTag]: true }));
+      if (tagHandling === 'off') {
+        // No sanitization - use exact tag
+        setTags([...tags, trimmedTag]);
+      } else {
+        // Check for sensitive content
+        const sanitizedResult = rewriteSensitiveTags([trimmedTag]);
+        if (sanitizedResult[0].wasSanitized) {
+          if (tagHandling === 'auto-rewrite') {
+            // Replace with sanitized version
+            setTags([...tags, sanitizedResult[0].replacement]);
+            setSensitiveTagNotices(prev => ({ ...prev, [trimmedTag]: true }));
+          } else if (tagHandling === 'warn-only') {
+            // Keep original but show warning
+            setTags([...tags, trimmedTag]);
+            setSensitiveTagNotices(prev => ({ ...prev, [trimmedTag]: true }));
+          }
+        } else {
+          // No issues - use original tag
+          setTags([...tags, trimmedTag]);
+        }
       }
     }
     setTagInput("");
@@ -4903,10 +4920,22 @@ const Index = () => {
       }
       
       // Preprocess tags for sensitive content before generation
+      const overrides = getRuntimeOverrides();
+      const tagHandling = overrides.sensitiveTagHandling ?? 'auto-rewrite';
+      
       const allTags = fallbackTags;
-      const sanitizedTagResults = rewriteSensitiveTags(allTags);
-      const finalTags = sanitizedTagResults.map(result => result.replacement);
-      const sanitizedTags = sanitizedTagResults.filter(result => result.wasSanitized);
+      let finalTags = allTags;
+      let sanitizedTags: any[] = [];
+      
+      if (tagHandling !== 'off') {
+        const sanitizedTagResults = rewriteSensitiveTags(allTags);
+        if (tagHandling === 'auto-rewrite') {
+          finalTags = sanitizedTagResults.map(result => result.replacement);
+        } else {
+          finalTags = allTags; // Keep original tags even if problematic
+        }
+        sanitizedTags = sanitizedTagResults.filter(result => result.wasSanitized);
+      }
       
       // Store sanitized tags for audit display
       setLastSanitizedTags(sanitizedTags);

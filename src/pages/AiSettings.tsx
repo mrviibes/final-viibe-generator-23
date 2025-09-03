@@ -23,7 +23,9 @@ import {
   isTemperatureSupported,
   type AIRuntimeOverrides,
   type VisualStyle,
-  type Tone
+  type Tone,
+  type ContentFilterStrictness,
+  type SensitiveTagHandling
 } from "@/vibe-ai.config";
 import { clearPopCultureCache } from "@/lib/popCultureRAG";
 
