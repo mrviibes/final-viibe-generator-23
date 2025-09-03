@@ -38,14 +38,59 @@ const VISUAL_OPTIONS_COUNT = 4;
 
 // No longer enforce specific slots - allow flexible recommendations
 
+// Subcategory anchoring functions
+function getSubcategoryAnchors(category: string, subcategory: string): string[] {
+  const subcategoryMap: Record<string, string[]> = {
+    'basketball': ['basketball', 'court', 'hoop', 'dribble', 'shot', 'arena'],
+    'football': ['football', 'field', 'touchdown', 'helmet', 'stadium'],
+    'soccer': ['soccer', 'ball', 'goal', 'field', 'kick'],
+    'tennis': ['tennis', 'racket', 'court', 'serve', 'net'],
+    'baseball': ['baseball', 'bat', 'diamond', 'pitcher', 'home plate'],
+    'hockey': ['hockey', 'puck', 'rink', 'stick', 'goal'],
+    'golf': ['golf', 'club', 'ball', 'course', 'tee'],
+    'volleyball': ['volleyball', 'net', 'spike', 'court', 'serve'],
+    'swimming': ['pool', 'lanes', 'swimmer', 'goggles', 'stroke'],
+    'running': ['track', 'runner', 'finish line', 'marathon', 'sprint'],
+    'birthday': ['cake', 'candles', 'balloons', 'party', 'celebration'],
+    'christmas': ['tree', 'presents', 'ornaments', 'lights', 'santa'],
+    'wedding': ['rings', 'dress', 'flowers', 'ceremony', 'altar']
+  };
+  
+  return subcategoryMap[subcategory.toLowerCase()] || [];
+}
+
+function computeSubcategoryAlignmentScore(option: VisualOption, subcategory: string): number {
+  if (!subcategory || subcategory === '-') return 0;
+  
+  const anchors = getSubcategoryAnchors('', subcategory);
+  if (anchors.length === 0) return 0;
+  
+  const fullText = `${option.subject || ''} ${option.background || ''} ${option.prompt}`.toLowerCase();
+  let score = 0;
+  
+  anchors.forEach(anchor => {
+    if (fullText.includes(anchor.toLowerCase())) {
+      score += 2;
+    }
+  });
+  
+  return score;
+}
+
 // Auto-enrichment functions
 function autoEnrichInputs(inputs: VisualInputs): VisualInputs {
   const enriched = { ...inputs };
   
+  // Force subcategory anchors for sports
+  if (inputs.category === 'sports' && inputs.subcategory) {
+    const anchors = getSubcategoryAnchors(inputs.category, inputs.subcategory);
+    enriched.tags = [...inputs.tags, ...anchors].slice(0, 8);
+  }
+  
   // Auto-extract nouns from finalLine if provided
   if (inputs.finalLine && inputs.tags.length < 5) {
     const extractedNouns = extractNounsFromText(inputs.finalLine);
-    enriched.tags = [...inputs.tags, ...extractedNouns].slice(0, 8); // Max 8 tags
+    enriched.tags = [...enriched.tags, ...extractedNouns].slice(0, 8); // Max 8 tags
   }
   
   // Auto-add subcategory-derived tags
@@ -55,13 +100,13 @@ function autoEnrichInputs(inputs: VisualInputs): VisualInputs {
       .split(/[\s\-\/]+/)
       .filter(token => token.length >= 3)
       .slice(0, 4);
-    enriched.tags = [...inputs.tags, ...subcategoryTokens].slice(0, 8);
+    enriched.tags = [...enriched.tags, ...subcategoryTokens].slice(0, 8);
   }
   
   // Auto-seed category-specific tags if not provided
-  if (inputs.tags.length < 3) {
+  if (enriched.tags.length < 3) {
     const categoryTags = getCategorySpecificTags(inputs.category, inputs.subcategory);
-    enriched.tags = [...inputs.tags, ...categoryTags].slice(0, 6);
+    enriched.tags = [...enriched.tags, ...categoryTags].slice(0, 6);
   }
   
   // Pride/LGBTQ+ theme enhancement
@@ -254,7 +299,34 @@ function computeTextAlignmentScore(option: VisualOption, finalLine: string): num
 function validateVisualOptions(options: VisualOption[], inputs: VisualInputs): VisualOption[] {
   if (!options || options.length === 0) return [];
   
-  const validOptions = options.filter(opt => {
+  // Enhanced validation with subcategory alignment
+  const preprocessed = options.filter(option => {
+    if (!option || (!option.subject && !option.background && !option.prompt)) {
+      return false;
+    }
+    
+    // Require subcategory alignment for sports
+    if (inputs.category === 'sports' && inputs.subcategory) {
+      const subcategoryScore = computeSubcategoryAlignmentScore(option, inputs.subcategory);
+      option.subcategoryAligned = subcategoryScore > 0;
+      
+      // For basketball specifically, be more strict
+      if (inputs.subcategory.toLowerCase() === 'basketball') {
+        const anchors = getSubcategoryAnchors('', 'basketball');
+        const fullText = `${option.subject || ''} ${option.background || ''} ${option.prompt}`.toLowerCase();
+        const hasBasketballAnchor = anchors.some(anchor => fullText.includes(anchor.toLowerCase()));
+        
+        if (!hasBasketballAnchor) {
+          console.log(`🏀 Rejecting non-basketball option: ${option.subject?.substring(0, 50)}...`);
+          return false;
+        }
+      }
+    }
+    
+    return true;
+  });
+  
+  const validOptions = preprocessed.filter(opt => {
     // Reject if prompt is too short or vague
     if (!opt.prompt || opt.prompt.length < 15) {
       console.log(`Rejecting option with short prompt: ${opt.prompt}`);
@@ -389,10 +461,52 @@ function getSlotBasedFallbacks(inputs: VisualInputs): VisualOption[] {
   return getDefaultFallbacks(inputs);
 }
 
+function buildAnchoredVisualFallbacks(inputs: VisualInputs): VisualOption[] {
+  const { category, subcategory, tone, tags } = inputs;
+  
+  // Basketball-specific fallbacks
+  if (subcategory.toLowerCase() === 'basketball') {
+    return [
+      {
+        subject: "Basketball player mid-shot with ball in motion",
+        background: "Basketball court with hoop and arena lighting",
+        prompt: `Dynamic basketball player shooting the ball toward hoop, sports arena with dramatic lighting, ${tone} energy, basketball court setting with clear text space at top [BASKETBALL ANCHORS: player, ball, hoop, court] [TEXT_SAFE_ZONE: upper third] [CONTRAST_PLAN: auto]`,
+        subcategoryAligned: true
+      },
+      {
+        subject: "Close-up of basketball and hoop from court level",
+        background: "Basketball court with arena stands",
+        prompt: `Close-up basketball and hoop from ground perspective, pristine court surface, arena stands in background, ${tone} mood, sports photography [BASKETBALL ANCHORS: basketball, hoop, court] [TEXT_SAFE_ZONE: center] [CONTRAST_PLAN: auto]`,
+        subcategoryAligned: true
+      },
+      {
+        subject: "Basketball team celebration after game-winning shot",
+        background: "Basketball arena with cheering crowd",
+        prompt: `Basketball team players celebrating victory, multiple basketballs visible, arena setting with crowd, ${tone} celebration energy [BASKETBALL ANCHORS: team, arena, basketballs] [TEXT_SAFE_ZONE: sides] [CONTRAST_PLAN: auto]`,
+        subcategoryAligned: true
+      },
+      {
+        subject: "Basketball court from above with game elements",
+        background: "Arena lighting and court markings",
+        prompt: `Basketball court aerial view with game elements, court lines and basketball visible, arena lighting, ${tone} style [BASKETBALL ANCHORS: court, basketball, arena] [TEXT_SAFE_ZONE: corners] [CONTRAST_PLAN: auto]`,
+        subcategoryAligned: true
+      }
+    ];
+  }
+  
+  return [];
+}
+
 function getDefaultFallbacks(inputs: VisualInputs): VisualOption[] {
   const { category, subcategory, tone, tags, visualStyle, finalLine, specificEntity, subjectOption, dimensions } = inputs;
   const primaryTags = tags.slice(0, 3).join(', ') || 'dynamic energy';
   const occasion = subcategory || 'general';
+  
+  // Check for anchored fallbacks first
+  const anchoredFallbacks = buildAnchoredVisualFallbacks(inputs);
+  if (anchoredFallbacks.length > 0) {
+    return anchoredFallbacks;
+  }
   
   // Special handling for Ice Hockey with required objects
   if (subcategory === 'Ice Hockey') {
@@ -757,6 +871,25 @@ export async function generateVisualRecommendations(
 
     // Apply quality validation to reject vague options
     validOptions = validateVisualOptions(validOptions, enrichedInputs);
+
+    // Enforce basketball anchoring for basketball subcategory
+    if (enrichedInputs.category === 'sports' && enrichedInputs.subcategory?.toLowerCase() === 'basketball') {
+      const basketballAnchored = validOptions.filter((opt: any) => opt.subcategoryAligned).length;
+      console.log(`🏀 Basketball anchored options: ${basketballAnchored}/${validOptions.length}`);
+      
+      if (basketballAnchored < 3) {
+        console.log('🏀 Enforcing basketball anchoring with fallbacks');
+        const basketballFallbacks = buildAnchoredVisualFallbacks(enrichedInputs);
+        const needed = 3 - basketballAnchored;
+        
+        // Prioritize basketball fallbacks over generic ones
+        validOptions = [
+          ...validOptions.filter((opt: any) => opt.subcategoryAligned),
+          ...basketballFallbacks.slice(0, needed),
+          ...validOptions.filter((opt: any) => !opt.subcategoryAligned)
+        ].slice(0, 4);
+      }
+    }
 
     // Check if we have enough text-aligned options
     const textAlignedCount = validOptions.filter((opt: any) => opt.textAligned).length;

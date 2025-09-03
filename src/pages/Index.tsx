@@ -6133,7 +6133,7 @@ const Index = () => {
                                            <TooltipProvider>
                                              <Tooltip>
                                                <TooltipTrigger asChild>
-                                                 <span className="cursor-help">🎯</span>
+                                                 <span className="cursor-help">📍</span>
                                                </TooltipTrigger>
                                                <TooltipContent>
                                                  <p className="text-sm">Closest match to your message</p>
