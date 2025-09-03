@@ -249,15 +249,17 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
       finalCandidates = [...taggedCandidates.slice(0, 2), ...untaggedCandidates.slice(0, 2)];
     }
     
-    // Ensure we have exactly 4 options - use tone-specific phrases instead of generic fallbacks
+    // Ensure we have exactly 4 options - use validated tone-specific phrases
     while (finalCandidates.length < 4) {
+      console.log('Padding with local fallback due to filtered candidates');
       const phraseCandidatesList = phraseCandidates(inputs.tone, inputs.tags);
       let nextCandidate = phraseCandidatesList[finalCandidates.length % phraseCandidatesList.length];
       
-      if (!finalCandidates.includes(nextCandidate)) {
-        finalCandidates.push(nextCandidate);
+      // Validate through same filter as API candidates
+      const processedCandidate = postProcessLine(nextCandidate, inputs.tone, inputs.tags || []);
+      if (processedCandidate && !finalCandidates.includes(processedCandidate)) {
+        finalCandidates.push(processedCandidate);
       } else {
-        // Add variation to avoid exact duplicates
         finalCandidates.push(`${nextCandidate} energy`);
       }
     }

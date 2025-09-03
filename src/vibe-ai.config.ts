@@ -1186,7 +1186,9 @@ Return only: {"lines":["joke1\\nwith\\nnewlines","joke2\\nwith\\nnewlines","joke
   }
 
   const tagRequirement = inputs.tags && inputs.tags.length > 0 
-    ? `\n• CRITICAL: Each option must include at least one of these exact words/phrases: ${inputs.tags.join(', ')}. Also use these keywords to infer the appropriate tone and style.`
+    ? (inputs.tags.length <= 4 
+        ? `\n• CRITICAL: Each option must include ALL of these words/phrases: ${inputs.tags.join(', ')}.`
+        : `\n• CRITICAL: Each option must include at least TWO of these words/phrases: ${inputs.tags.join(', ')}.`)
     : '';
 
   const corePrompt = `Generate 6 concise options under 100 chars each for:
