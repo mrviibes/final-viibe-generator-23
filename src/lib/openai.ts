@@ -92,9 +92,9 @@ export class OpenAIService {
     const startTime = Date.now();
 
     try {
-      // Create AbortController for 5-second timeout
+      // Create AbortController for 15-second timeout (visual generation needs more time)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
 
       const invokePromise = supabase.functions.invoke('openai-chat', {
         body: {
@@ -114,7 +114,7 @@ export class OpenAIService {
         invokePromise,
         new Promise<never>((_, reject) => {
           controller.signal.addEventListener('abort', () => {
-            reject(new Error('Request timed out after 5 seconds'));
+            reject(new Error('Request timed out after 15 seconds'));
           });
         })
       ]);

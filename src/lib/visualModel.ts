@@ -509,7 +509,7 @@ export async function generateVisualRecommendations(
       
       // Strict timeout for fast mode
       const fastTimeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('FAST_TIMEOUT')), 6000); // 6s max
+        setTimeout(() => reject(new Error('FAST_TIMEOUT')), 8000); // 8s max, aligned with backend timeout
       });
       
       const fastRequestOptions: any = {
@@ -565,9 +565,9 @@ export async function generateVisualRecommendations(
     // Use centralized message builder for normal mode
     const messages = buildVisualGeneratorMessages(enrichedInputs);
     
-    // Create a timeout promise
+    // Create a timeout promise - allow retry chain even in strict mode for timeouts  
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('TIMEOUT')), strictModelEnabled ? 10000 : 15000);
+      setTimeout(() => reject(new Error('TIMEOUT')), 12000); // 12s for primary attempt
     });
 
     // Primary attempt - use model from AI settings
@@ -592,14 +592,61 @@ export async function generateVisualRecommendations(
         ]);
         console.log(`✅ Visual generation successful with ${MODEL_DISPLAY_NAMES[targetModel] || targetModel}`);
       } catch (strictError) {
-        console.log(`🔒 Strict mode failed, using fallbacks`);
-        const fallbacks = getSlotBasedFallbacks(enrichedInputs).slice(0, n);
-        return {
-          options: fallbacks,
-          model: 'fallback',
-          errorCode: 'STRICT_MODE_FAILED',
-          _debug: { strictMode: true, fallbackUsed: true }
-        };
+        // Allow retry chain even in strict mode for timeout/parse errors
+        if (strictError instanceof Error && (strictError.message.includes('timeout') || strictError.message.includes('TIMEOUT') || strictError.message.includes('JSON') || strictError.message.includes('parse'))) {
+          console.log(`🔒 Strict mode retry due to timeout/parse error...`);
+          
+          // Get smart fallback chain based on user's selected model
+          const fallbackChain = getSmartFallbackChain(targetModel, 'visual');
+          const nextModel = fallbackChain[1]; // Get next model after user's choice
+          
+          console.log(`🔄 Retrying with ${MODEL_DISPLAY_NAMES[nextModel] || nextModel}...`);
+          const compactUserPrompt = `${category}>${subcategory}, ${tone}. 4 visual JSON concepts.`;
+          
+          const compactMessages = [
+            { role: 'system', content: SYSTEM_PROMPTS.visual_generator },
+            { role: 'user', content: compactUserPrompt }
+          ];
+          
+          const retryTimeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('RETRY_TIMEOUT')), 8000); // 8s retry
+          });
+          
+          try {
+            const retryRequestOptions: any = {
+              max_completion_tokens: 450,
+              model: nextModel || 'o4-mini-2025-04-16'
+            };
+            
+            if (isTemperatureSupported(nextModel || 'o4-mini-2025-04-16')) {
+              retryRequestOptions.temperature = 0.7;
+            }
+            
+            result = await Promise.race([
+              openAIService.chatJSON(compactMessages, retryRequestOptions),
+              retryTimeoutPromise
+            ]);
+            console.log(`✅ Strict mode retry successful with ${MODEL_DISPLAY_NAMES[nextModel] || nextModel}`);
+          } catch (retryError) {
+            console.log(`🔒 Strict mode retry failed, using fallbacks`);
+            const fallbacks = getSlotBasedFallbacks(enrichedInputs).slice(0, n);
+            return {
+              options: fallbacks,
+              model: targetModel, // Show user's selected model, not "fallback"
+              errorCode: 'STRICT_MODE_FAILED',
+              _debug: { strictMode: true, fallbackUsed: true, fallbackReason: 'local fallback after retry failure' }
+            };
+          }
+        } else {
+          console.log(`🔒 Strict mode failed, using fallbacks`);
+          const fallbacks = getSlotBasedFallbacks(enrichedInputs).slice(0, n);
+          return {
+            options: fallbacks,
+            model: targetModel, // Show user's selected model, not "fallback"
+            errorCode: 'STRICT_MODE_FAILED',
+            _debug: { strictMode: true, fallbackUsed: true, fallbackReason: 'local fallback' }
+          };
+        }
       }
     } else {
       // Normal mode with fallback chain
@@ -625,7 +672,7 @@ export async function generateVisualRecommendations(
           
           // Use compact timeout for retry
           const retryTimeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('RETRY_TIMEOUT')), 10000);
+            setTimeout(() => reject(new Error('RETRY_TIMEOUT')), 8000); // 8s retry timeout
           });
           
             try {
