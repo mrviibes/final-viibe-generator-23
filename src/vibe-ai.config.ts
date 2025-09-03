@@ -890,6 +890,10 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     const cleanText = handoff.key_line.replace(/[""]/g, '"').replace(/['']/g, "'").replace(/[—–]/g, '-').trim();
     parts.push(`EXACT TEXT: ${cleanText}`);
     
+    // CRITICAL FIX: Add TEXT ZONE directive for EXACT TEXT requests
+    const typographyZone = getTypographyStyleZone(typographyStyle);
+    parts.push(typographyZone);
+    
     // Enhanced birthday-themed backgrounds for celebrations/birthday
     let background = handoff.rec_background;
     const isBirthday = handoff.category?.toLowerCase() === 'celebrations' && 
@@ -939,6 +943,11 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     }
     
     parts.push(`Clean ${handoff.visual_style || 'realistic'} ${subject || handoff.category} environment scene with ${background}.`);
+    
+    // STRENGTHEN anti-giant-text constraints for caption mode
+    if (typographyStyle === 'subtle-caption') {
+      parts.push("Do NOT place large central text overlay, keep text small and unobtrusive in corner only");
+    }
   } else {
     // Non-EXACT TEXT: use original labeling format
     // OCCASION/CATEGORY
@@ -1033,7 +1042,28 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     parts.push(`Avoid: ${handoff.negative_prompt}.`);
   }
   
-  return parts.join(' ');
+  const finalPrompt = parts.join(' ');
+  
+  // PROMPT VERIFICATION: Log final prompt when advanced details enabled
+  if (overrides.showAdvancedPromptDetails) {
+    console.log('🔍 IDEOGRAM PROMPT VERIFICATION:');
+    console.log('Typography Style:', typographyStyle);
+    console.log('Full Prompt:', finalPrompt);
+    if (handoff.key_line && typographyStyle === 'subtle-caption') {
+      console.log('⚠️  Caption Mode: Checking for TEXT ZONE directive and 8% size constraint...');
+      const hasTextZone = finalPrompt.includes('TEXT ZONE:');
+      const hasMaxArea = finalPrompt.includes('maximum 8%') || finalPrompt.includes('max 6%') || finalPrompt.includes('under 8%');
+      console.log('Has TEXT ZONE directive:', hasTextZone);
+      console.log('Has size constraint:', hasMaxArea);
+      if (!hasTextZone || !hasMaxArea) {
+        console.warn('❌ Missing critical caption constraints! Text may appear oversized.');
+      } else {
+        console.log('✅ Caption constraints properly applied.');
+      }
+    }
+  }
+  
+  return finalPrompt;
 }
 
 export function getAspectRatioForIdeogram(aspectRatio: string): 'ASPECT_10_16' | 'ASPECT_16_10' | 'ASPECT_9_16' | 'ASPECT_16_9' | 'ASPECT_3_2' | 'ASPECT_2_3' | 'ASPECT_4_3' | 'ASPECT_3_4' | 'ASPECT_1_1' | 'ASPECT_1_3' | 'ASPECT_3_1' {
@@ -1119,7 +1149,7 @@ export function getTypographyStyleConstraints(typography: string): string {
     case 'badge-sticker':
       return `Small corner badge or sticker style, doesn't cover main subject, minimal size`;
     case 'subtle-caption':
-      return `Tiny corner caption only, maximum 8% of image area, very unobtrusive, one text instance only`;
+      return `Tiny corner caption only, maximum 8% of image area, very unobtrusive, one text instance only, no large central text overlays`;
     case 'poster':
       return `Balanced poster text overlay, one text instance only, no credits or taglines`;
     default:
