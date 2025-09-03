@@ -163,55 +163,6 @@ export default function AiSettings() {
             </CardContent>
           </Card>
 
-          {/* Default Values */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Default Preferences</CardTitle>
-              <CardDescription>
-                Set default values for visual style and tone selections.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label>Default Visual Style</Label>
-                <Select
-                  value={overrides.defaultVisualStyle || AI_CONFIG.visual_defaults.style}
-                  onValueChange={(value) => updateOverride('defaultVisualStyle', value as VisualStyle)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select default style" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {VISUAL_STYLES.map(style => (
-                      <SelectItem key={style.id} value={style.id}>
-                        {style.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Default Tone</Label>
-                <Select
-                  value={overrides.defaultTone || "none"}
-                  onValueChange={(value) => updateOverride('defaultTone', value === "none" ? undefined : value as Tone)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="No default (user selects)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No default</SelectItem>
-                    {TONES.map(tone => (
-                      <SelectItem key={tone.id} value={tone.id}>
-                        {tone.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Image Generation */}
           <Card>
