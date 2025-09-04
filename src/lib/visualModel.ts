@@ -97,9 +97,8 @@ function isHalloweenContext(inputs: VisualInputs): boolean {
 function autoEnrichInputs(inputs: VisualInputs): VisualInputs {
   const enriched = { ...inputs };
   
-  // Derive design cues from context instead of user tags
-  const designCues = deriveDesignCues(inputs);
-  enriched.tags = [...designCues].slice(0, 8);
+  // Pass raw user tags to new generator instead of auto-enriched ones
+  enriched.tags = inputs.tags || [];
   
   // Add typography-aware zone - enforced for all styles
   if (!enriched.tags.some(tag => tag.includes('TEXT_SAFE_ZONE'))) {
@@ -1024,7 +1023,7 @@ export async function generateVisualRecommendations(
                 tone: enrichedInputs.tone,
                 finalLine: enrichedInputs.finalLine || '',
                 visualStyle: enrichedInputs.visualStyle || 'Realistic',
-                visualTags: enrichedInputs.tags || []
+                visualTags: inputs.tags || [] // Use raw user tags
               });
               
               const neededCount = n - validatedOptions.length;
@@ -1136,7 +1135,7 @@ export async function generateVisualRecommendations(
                 tone: enrichedInputs.tone,
                 finalLine: enrichedInputs.finalLine || '',
                 visualStyle: enrichedInputs.visualStyle || 'Realistic',
-                visualTags: enrichedInputs.tags || []
+                visualTags: inputs.tags || [] // Use raw user tags
               });
               
               fallbacks = promptOptions.slice(0, n).map(opt => ({
@@ -1167,7 +1166,7 @@ export async function generateVisualRecommendations(
               tone: enrichedInputs.tone,
               finalLine: enrichedInputs.finalLine || '',
               visualStyle: enrichedInputs.visualStyle || 'Realistic',
-              visualTags: enrichedInputs.tags || []
+              visualTags: inputs.tags || [] // Use raw user tags
             });
             
             fallbacks = promptOptions.slice(0, n).map(opt => ({
@@ -1453,7 +1452,7 @@ export async function generateVisualRecommendations(
           tone: enrichedInputs.tone,
           finalLine: enrichedInputs.finalLine || '',
           visualStyle: enrichedInputs.visualStyle || 'Realistic',
-          visualTags: enrichedInputs.tags || []
+          visualTags: inputs.tags || [] // Use raw user tags
         });
         
         fallbackOptions = promptOptions.map(opt => ({
