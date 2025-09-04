@@ -205,13 +205,99 @@ function sentence(parts: string[]): string {
     .trim();
 }
 
+// Case normalization mappings
+const CATEGORY_MAPPINGS: Record<string, string> = {
+  "celebrations": "Celebrations",
+  "sports": "Sports", 
+  "daily life": "Daily Life",
+  "vibes & punchlines": "Vibes & Punchlines",
+  "pop culture": "Pop Culture",
+  "no category (freeform)": "No Category (Freeform)"
+};
+
+const SUBCATEGORY_MAPPINGS: Record<string, string> = {
+  "birthday": "Birthday",
+  "anniversary": "Anniversary", 
+  "wedding": "Wedding",
+  "engagement": "Engagement",
+  "baby shower / new baby": "Baby shower / New baby",
+  "graduation": "Graduation",
+  "christmas": "Christmas",
+  "halloween": "Halloween",
+  "valentine's day": "Valentine's Day",
+  "new job / promotion": "New job / Promotion",
+  "basketball": "Basketball",
+  "football (american)": "Football (American)",
+  "soccer": "Soccer",
+  "baseball": "Baseball",
+  "hockey": "Hockey",
+  "tennis": "Tennis",
+  "golf": "Golf",
+  "volleyball": "Volleyball",
+  "running / track": "Running / Track",
+  "swimming": "Swimming"
+};
+
+const TONE_MAPPINGS: Record<string, string> = {
+  "humorous": "Humorous",
+  "savage": "Savage", 
+  "sentimental": "Sentimental",
+  "nostalgic": "Nostalgic",
+  "romantic": "Romantic",
+  "inspirational": "Inspirational",
+  "playful": "Playful",
+  "serious": "Serious"
+};
+
+function normalizeKey(input: string, mappings: Record<string, string>): string {
+  const normalized = norm(input).toLowerCase();
+  return mappings[normalized] || input;
+}
+
+function inferBirthdayContext(text: string, tags: string[]): { category: string, subcategory: string } {
+  const allText = [text, ...tags].join(" ").toLowerCase();
+  const birthdayTokens = ["birthday", "cake", "candles", "balloon", "party", "celebrate", "bday"];
+  
+  if (birthdayTokens.some(token => allText.includes(token))) {
+    console.log("🎂 Birthday context inferred from text/tags");
+    return { category: "Celebrations", subcategory: "Birthday" };
+  }
+  
+  return { category: "", subcategory: "" };
+}
+
 export function generateVisualPrompts(inputs: VisualPromptInputs): VisualPromptOption[] {
-  const category = norm(inputs.category) || "No Category (Freeform)";
-  const subcategory = norm(inputs.subcategory) || "_generic";
-  const toneKey = norm(inputs.tone) || "Serious";
   const text = norm(inputs.finalLine || "").slice(0, 100);
   const style = norm(inputs.visualStyle) || "Realistic";
   const tags = Array.isArray(inputs.visualTags) ? inputs.visualTags.map(norm).filter(Boolean) : [];
+
+  // Normalize inputs with case mappings
+  let category = normalizeKey(inputs.category, CATEGORY_MAPPINGS);
+  let subcategory = normalizeKey(inputs.subcategory, SUBCATEGORY_MAPPINGS);
+  let toneKey = normalizeKey(inputs.tone, TONE_MAPPINGS);
+
+  // Birthday inference guard
+  if (!category || category === inputs.category) { // No valid mapping found
+    const inferred = inferBirthdayContext(text, tags);
+    if (inferred.category) {
+      category = inferred.category;
+      subcategory = inferred.subcategory;
+    }
+  }
+
+  // Final fallbacks
+  if (!category || !IMAGERY[category]) {
+    category = "No Category (Freeform)";
+  }
+  if (!subcategory || (IMAGERY[category] && !IMAGERY[category][subcategory])) {
+    subcategory = category === "Celebrations" ? "Birthday" : "_generic";
+  }
+  if (!toneKey || !TONE_LEX[toneKey]) {
+    toneKey = "Serious";
+  }
+
+  console.log(`🎨 Visual Generator - Category: "${category}", Subcategory: "${subcategory}", Tone: "${toneKey}"`);
+  console.log(`🎨 Original inputs - Category: "${inputs.category}", Subcategory: "${inputs.subcategory}", Tone: "${inputs.tone}"`);
 
   const baseImagery = imageryFor(category, subcategory);
   const tone = toneFor(toneKey);
