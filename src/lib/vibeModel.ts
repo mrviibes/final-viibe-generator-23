@@ -159,9 +159,66 @@ function subcategoryRelevanceScore(line: string, subcategory: string): number {
   return Math.min(exactMatches * 15 + matches * 5, 40);
 }
 
-// Build anchored fallbacks for subcategory
+// Build anchored fallbacks for subcategory with baby shower specific seasoning
 function buildAnchoredFallbacks(tone: string, subcategory: string, tags?: string[]): string[] {
   if (!subcategory || subcategory === '-') return [];
+  
+  // Baby shower specific fallbacks for variety
+  const isBabyShower = subcategory.toLowerCase().includes('baby') && subcategory.toLowerCase().includes('shower');
+  if (isBabyShower) {
+    const babyShowerTemplates: Record<string, string[]> = {
+      humorous: [
+        `Baby prep mode: coffee in, sanity out.`,
+        `Nine months later and still not ready for this.`,
+        `Diaper duty training starts immediately.`,
+        `Sleep schedules are officially obsolete now.`
+      ],
+      savage: [
+        `Congratulations on your upcoming sleep deprivation.`,
+        `Hope you enjoyed those full nights while they lasted.`,
+        `Say goodbye to personal time forever.`,
+        `Welcome to the chaos you signed up for.`
+      ],
+      sentimental: [
+        `Tiny hands will soon hold your heart.`,
+        `Beautiful beginnings deserve perfect celebrations.`,
+        `Love multiplies when families grow.`,
+        `Every baby brings endless possibilities.`
+      ],
+      nostalgic: [
+        `Remember when weekends meant sleeping in?`,
+        `Those peaceful mornings are precious memories now.`,
+        `Simpler times before bottles and bedtime stories.`,
+        `When your biggest worry was what to watch.`
+      ],
+      romantic: [
+        `Growing families mean growing love stories.`,
+        `Two hearts creating a third miracle.`,
+        `Love letters written in tiny heartbeats.`,
+        `Partnership becomes parenthood beautifully.`
+      ],
+      inspirational: [
+        `Every parent was once somebody's miracle.`,
+        `Strength you never knew existed emerges.`,
+        `Greatest adventures begin with smallest steps.`,
+        `Courage grows when protecting what matters most.`
+      ],
+      playful: [
+        `Tiny boss arriving soon, prepare accordingly.`,
+        `Professional nap disruption services incoming.`,
+        `Advanced hide-and-seek training begins shortly.`,
+        `Cuteness overload warnings now in effect.`
+      ],
+      serious: [
+        `Parenting excellence requires constant adaptation.`,
+        `Responsible planning ensures successful transitions.`,
+        `Professional development includes family leadership.`,
+        `Strategic preparation builds confident caregivers.`
+      ]
+    };
+    
+    return babyShowerTemplates[tone.toLowerCase()] || babyShowerTemplates.humorous;
+  }
   
   const tokens = tokenizeSubcategory(subcategory);
   if (tokens.length === 0) return [];
@@ -256,6 +313,51 @@ function phraseCandidates(tone: string, tags?: string[]): string[] {
   };
   
   return toneMap[tone.toLowerCase()] || toneMap.humorous;
+}
+
+// Set-level variety guard to replace repetitive openings with subcategory-aware fallbacks
+function applyVarietyGuard(candidates: string[], inputs: VibeInputs): string[] {
+  const openingWords = candidates.map(line => {
+    const firstWord = line.trim().split(' ')[0].toLowerCase();
+    return firstWord;
+  });
+  
+  // Find duplicated openings
+  const wordCounts = openingWords.reduce((acc, word) => {
+    acc[word] = (acc[word] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  
+  const duplicatedWords = Object.keys(wordCounts).filter(word => wordCounts[word] > 1);
+  
+  if (duplicatedWords.length === 0) {
+    return candidates; // No duplicates, return as-is
+  }
+  
+  console.log(`🔄 Variety guard: Found duplicated openings: ${duplicatedWords.join(', ')}`);
+  
+  // Get subcategory-aware fallbacks
+  const fallbacks = buildAnchoredFallbacks(inputs.tone, inputs.subcategory, inputs.tags);
+  let fallbackIndex = 0;
+  
+  // Replace duplicates (keep first occurrence, replace others)
+  const seenWords = new Set<string>();
+  const result = candidates.map((line, index) => {
+    const firstWord = line.trim().split(' ')[0].toLowerCase();
+    
+    if (seenWords.has(firstWord)) {
+      // This is a duplicate, replace with fallback
+      const replacement = fallbacks[fallbackIndex % fallbacks.length] || line;
+      fallbackIndex++;
+      console.log(`🔄 Replaced duplicate "${line}" with "${replacement}"`);
+      return replacement;
+    } else {
+      seenWords.add(firstWord);
+      return line;
+    }
+  });
+  
+  return result;
 }
 
 export async function generateCandidates(inputs: VibeInputs, n: number = 4): Promise<VibeResult> {
@@ -444,6 +546,9 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
     
     // Take only first 4 if we have more
     finalCandidates = finalCandidates.slice(0, 4);
+    
+    // Apply set-level variety guard to replace repetitive openings
+    finalCandidates = applyVarietyGuard(finalCandidates, inputs);
     
     // Re-rank final list by quality with local padding at bottom
     const finalMetadata = finalCandidates.map(line => ({

@@ -697,24 +697,31 @@ export function postProcessLine(
     };
   }
 
-  // Keyword coverage check - enforce exact inclusion
+  // Keyword coverage check - enforce exact inclusion (relaxed for proper names)
   if (tags && tags.length > 0) {
-    // For short keyword lists (<=4), require ALL keywords to be included
-    // For longer lists (>4), require at least 2 keywords
-    const requiredMatches = tags.length <= 4 ? tags.length : Math.min(2, tags.length);
-    
-    const matchedKeywords = tags.filter(tag => 
-      cleaned.toLowerCase().includes(tag.toLowerCase()) ||
-      // Allow partial word matches for longer keywords
-      (tag.length > 4 && cleaned.toLowerCase().includes(tag.toLowerCase().slice(0, -2)))
+    // Filter out proper names from tag requirements (capitalized single words)
+    const contentTags = tags.filter(tag => 
+      !(tag.length <= 15 && /^[A-Z][a-z]+$/.test(tag.trim()))
     );
     
-    if (matchedKeywords.length < requiredMatches) {
-      return {
-        line: cleaned,
-        blocked: true,
-        reason: `Must include ${requiredMatches} of ${tags.length} keywords. Found: ${matchedKeywords.join(', ')}`
-      };
+    if (contentTags.length > 0) {
+      // For short keyword lists (<=4), require ALL keywords to be included
+      // For longer lists (>4), require at least 2 keywords
+      const requiredMatches = contentTags.length <= 4 ? contentTags.length : Math.min(2, contentTags.length);
+      
+      const matchedKeywords = contentTags.filter(tag => 
+        cleaned.toLowerCase().includes(tag.toLowerCase()) ||
+        // Allow partial word matches for longer keywords
+        (tag.length > 4 && cleaned.toLowerCase().includes(tag.toLowerCase().slice(0, -2)))
+      );
+      
+      if (matchedKeywords.length < requiredMatches) {
+        return {
+          line: cleaned,
+          blocked: true,
+          reason: `Must include ${requiredMatches} of ${contentTags.length} content keywords. Found: ${matchedKeywords.join(', ')}`
+        };
+      }
     }
   }
 
@@ -1427,6 +1434,12 @@ Tags: ${inputs.tags?.join(', ') || 'none'}
 ${inputs.recipient_name && inputs.recipient_name !== "-" ? `Target: ${inputs.recipient_name}` : ''}
 
 ${tagRequirement}${specialInstructions}
+
+VARIETY REQUIREMENTS:
+• CRITICAL: Maximum 2 of 6 options can use proper names (like ${inputs.recipient_name || 'names'})
+• CRITICAL: No two options can start with the same word or phrase
+• CRITICAL: Vary sentence structures - mix statements, questions, commands
+• Use different opening patterns: pronouns, actions, descriptives, etc.
 
 QUALITY REQUIREMENTS:
 • Each option must be a complete sentence with a subject and verb, using natural punctuation
