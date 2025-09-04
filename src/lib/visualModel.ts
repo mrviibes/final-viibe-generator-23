@@ -1,6 +1,7 @@
 import { openAIService } from './openai';
 import { SYSTEM_PROMPTS, buildVisualGeneratorMessages, getStyleKeywords, getEffectiveConfig, isTemperatureSupported, getSmartFallbackChain, MODEL_DISPLAY_NAMES, BACKGROUND_PRESETS, getRuntimeOverrides, getContextualBans } from '../vibe-ai.config';
 import { generateHeuristicVisuals } from './visualHeuristics';
+import { generateVisualPrompts } from './visualPromptGenerator';
 
 export interface VisualInputs {
   category: string;
@@ -1375,15 +1376,40 @@ export async function generateVisualRecommendations(
     // Use contextual fallbacks instead of generic ones
     let fallbackOptions = getSlotBasedFallbacks(enrichedInputs);
     
-    // If fallbacks are insufficient, add heuristic options
+    // Use new four-angle prompt generator for primary fallbacks
     if (fallbackOptions.length < 4) {
       try {
-        const heuristicOptions = generateHeuristicVisuals(enrichedInputs);
+        const promptOptions = generateVisualPrompts({
+          category: enrichedInputs.category,
+          subcategory: enrichedInputs.subcategory,
+          tone: enrichedInputs.tone,
+          finalLine: enrichedInputs.finalLine || '',
+          visualStyle: enrichedInputs.visualStyle || 'Realistic',
+          visualTags: enrichedInputs.tags || []
+        });
+        
         const neededCount = 4 - fallbackOptions.length;
-        fallbackOptions.push(...heuristicOptions.slice(0, neededCount));
-        console.log(`🎯 VISUAL AI: Added ${neededCount} heuristic fallback options`);
-      } catch (heuristicError) {
-        console.warn('Heuristic fallback generation failed:', heuristicError);
+        const convertedOptions = promptOptions.slice(0, neededCount).map(opt => ({
+          subject: opt.subject,
+          background: opt.background,
+          prompt: opt.prompt,
+          textAligned: true
+        }));
+        
+        fallbackOptions.push(...convertedOptions);
+        console.log(`🎯 VISUAL AI: Added ${neededCount} four-angle prompt options`);
+      } catch (promptError) {
+        console.warn('Four-angle prompt generation failed, using heuristic fallback:', promptError);
+        
+        // Fallback to heuristics if prompt generator fails
+        try {
+          const heuristicOptions = generateHeuristicVisuals(enrichedInputs);
+          const neededCount = 4 - fallbackOptions.length;
+          fallbackOptions.push(...heuristicOptions.slice(0, neededCount));
+          console.log(`🎯 VISUAL AI: Added ${neededCount} heuristic fallback options`);
+        } catch (heuristicError) {
+          console.warn('Heuristic fallback generation failed:', heuristicError);
+        }
       }
     }
     
