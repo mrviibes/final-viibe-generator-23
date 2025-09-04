@@ -1016,8 +1016,31 @@ export async function generateVisualRecommendations(
           
           // Merge fallbacks if we need more options
           if (validatedOptions.length < n) {
-            const fallbacks = getSlotBasedFallbacks(enrichedInputs).slice(0, n - validatedOptions.length);
-            validatedOptions.push(...fallbacks);
+            // Use four-angle prompt generator as primary fallback
+            try {
+              const promptOptions = generateVisualPrompts({
+                category: enrichedInputs.category,
+                subcategory: enrichedInputs.subcategory,
+                tone: enrichedInputs.tone,
+                finalLine: enrichedInputs.finalLine || '',
+                visualStyle: enrichedInputs.visualStyle || 'Realistic',
+                visualTags: enrichedInputs.tags || []
+              });
+              
+              const neededCount = n - validatedOptions.length;
+              const convertedOptions = promptOptions.slice(0, neededCount).map(opt => ({
+                subject: opt.subject,
+                background: opt.background,
+                prompt: opt.prompt,
+                textAligned: true
+              }));
+              
+              validatedOptions.push(...convertedOptions);
+            } catch (promptError) {
+              // Fall back to slot-based only if prompt generator fails
+              const fallbacks = getSlotBasedFallbacks(enrichedInputs).slice(0, n - validatedOptions.length);
+              validatedOptions.push(...fallbacks);
+            }
           }
           
           return {
@@ -1103,8 +1126,29 @@ export async function generateVisualRecommendations(
             ]);
             console.log(`✅ Strict mode retry successful with ${MODEL_DISPLAY_NAMES[nextModel] || nextModel}`);
           } catch (retryError) {
-            console.log(`🔒 Strict mode retry failed, using fallbacks`);
-            const fallbacks = getSlotBasedFallbacks(enrichedInputs).slice(0, n);
+            console.log(`🔒 Strict mode retry failed, using four-angle fallbacks`);
+            
+            let fallbacks = [];
+            try {
+              const promptOptions = generateVisualPrompts({
+                category: enrichedInputs.category,
+                subcategory: enrichedInputs.subcategory,
+                tone: enrichedInputs.tone,
+                finalLine: enrichedInputs.finalLine || '',
+                visualStyle: enrichedInputs.visualStyle || 'Realistic',
+                visualTags: enrichedInputs.tags || []
+              });
+              
+              fallbacks = promptOptions.slice(0, n).map(opt => ({
+                subject: opt.subject,
+                background: opt.background,
+                prompt: opt.prompt,
+                textAligned: true
+              }));
+            } catch (promptError) {
+              fallbacks = getSlotBasedFallbacks(enrichedInputs).slice(0, n);
+            }
+            
             return {
               options: fallbacks,
               model: targetModel, // Show user's selected model, not "fallback"
@@ -1113,8 +1157,28 @@ export async function generateVisualRecommendations(
             };
           }
         } else {
-          console.log(`🔒 Strict mode failed, using fallbacks`);
-          const fallbacks = getSlotBasedFallbacks(enrichedInputs).slice(0, n);
+          console.log(`🔒 Strict mode failed, using four-angle fallbacks`);
+          
+          let fallbacks = [];
+          try {
+            const promptOptions = generateVisualPrompts({
+              category: enrichedInputs.category,
+              subcategory: enrichedInputs.subcategory,
+              tone: enrichedInputs.tone,
+              finalLine: enrichedInputs.finalLine || '',
+              visualStyle: enrichedInputs.visualStyle || 'Realistic',
+              visualTags: enrichedInputs.tags || []
+            });
+            
+            fallbacks = promptOptions.slice(0, n).map(opt => ({
+              subject: opt.subject,
+              background: opt.background,
+              prompt: opt.prompt,
+              textAligned: true
+            }));
+          } catch (promptError) {
+            fallbacks = getSlotBasedFallbacks(enrichedInputs).slice(0, n);
+          }
           return {
             options: fallbacks,
             model: targetModel, // Show user's selected model, not "fallback"
@@ -1373,11 +1437,15 @@ export async function generateVisualRecommendations(
       }
     }
     
-    // Use contextual fallbacks instead of generic ones
-    let fallbackOptions = getSlotBasedFallbacks(enrichedInputs);
+    // Use four-angle prompt generator as primary fallback
+    let fallbackOptions = [];
     
-    // Use new four-angle prompt generator for primary fallbacks
-    if (fallbackOptions.length < 4) {
+    // Only use Halloween-specific fallbacks if Halloween context is detected
+    if (isHalloweenContext(enrichedInputs)) {
+      fallbackOptions = getSlotBasedFallbacks(enrichedInputs);
+      console.log(`🎃 Using Halloween-specific fallbacks (${fallbackOptions.length} options)`);
+    } else {
+      // Use four-angle prompt generator for all other contexts
       try {
         const promptOptions = generateVisualPrompts({
           category: enrichedInputs.category,
@@ -1388,28 +1456,16 @@ export async function generateVisualRecommendations(
           visualTags: enrichedInputs.tags || []
         });
         
-        const neededCount = 4 - fallbackOptions.length;
-        const convertedOptions = promptOptions.slice(0, neededCount).map(opt => ({
+        fallbackOptions = promptOptions.map(opt => ({
           subject: opt.subject,
           background: opt.background,
           prompt: opt.prompt,
           textAligned: true
         }));
-        
-        fallbackOptions.push(...convertedOptions);
-        console.log(`🎯 VISUAL AI: Added ${neededCount} four-angle prompt options`);
+        console.log(`🎯 VISUAL AI: Using four-angle prompt generator (${fallbackOptions.length} options)`);
       } catch (promptError) {
-        console.warn('Four-angle prompt generation failed, using heuristic fallback:', promptError);
-        
-        // Fallback to heuristics if prompt generator fails
-        try {
-          const heuristicOptions = generateHeuristicVisuals(enrichedInputs);
-          const neededCount = 4 - fallbackOptions.length;
-          fallbackOptions.push(...heuristicOptions.slice(0, neededCount));
-          console.log(`🎯 VISUAL AI: Added ${neededCount} heuristic fallback options`);
-        } catch (heuristicError) {
-          console.warn('Heuristic fallback generation failed:', heuristicError);
-        }
+        console.warn('Four-angle prompt generation failed, using slot-based fallback:', promptError);
+        fallbackOptions = getSlotBasedFallbacks(enrichedInputs);
       }
     }
     
