@@ -282,7 +282,6 @@ export function generateVisualPrompts(inputs: VisualPromptInputs): VisualPromptO
 
   const baseImagery = imageryFor(category, subcategory);
   const tone = toneFor(toneKey);
-  const styleLead = join(stylePhrases(style));
 
   // Filter out bracketed control tags and build clean object pools
   const cleanTags = tags.filter(tag => !tag.includes('[') && !tag.includes(']'));
@@ -294,7 +293,7 @@ export function generateVisualPrompts(inputs: VisualPromptInputs): VisualPromptO
 
   // Lane 1: OBJECTS (no people)
   const laneObjects = clamp(sentence([
-    `${styleLead}, close-up of ${join(propsTight)}`,
+    `Close-up of ${join(propsTight)}`,
     `${tone.light}; ${tone.mood}`,
     "clear negative space for headline"
   ]));
@@ -304,7 +303,7 @@ export function generateVisualPrompts(inputs: VisualPromptInputs): VisualPromptO
     "friends gathered", "group of people", "laughter", "candid moment", "natural gestures"
   ];
   const laneGroup = clamp(sentence([
-    `${styleLead}, wide ${subcategory.toLowerCase()} scene with ${join(propsWide)}`,
+    `Wide ${subcategory.toLowerCase()} scene with ${join(propsWide)}`,
     `${join(groupPhrases)}`,
     `${tone.light}; ${tone.verb}`
   ]));
@@ -312,7 +311,7 @@ export function generateVisualPrompts(inputs: VisualPromptInputs): VisualPromptO
   // Lane 3: SOLO (one person doing a subcategory-relevant action)
   const soloAction = SOLO_ACTION[subcategory] || SOLO_ACTION["_default"];
   const laneSolo = clamp(sentence([
-    `${styleLead}, single person ${soloAction}`,
+    `Single person ${soloAction}`,
     `surrounded by ${join(pickN(objects, 3))}`,
     `${tone.light}; ${tone.mood}`
   ]));
@@ -322,7 +321,7 @@ export function generateVisualPrompts(inputs: VisualPromptInputs): VisualPromptO
     "symbolic arrangement", "unexpected perspective", "graphic balance", "tasteful negative space"
   ];
   const laneCreative = clamp(sentence([
-    `${styleLead}, ${join(creativeExtra)} using ${join(propsSym)}`,
+    `${join(creativeExtra)} using ${join(propsSym)}`,
     `${tone.light}; ${tone.verb}`
   ]));
 
