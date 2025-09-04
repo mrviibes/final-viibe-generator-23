@@ -95,47 +95,9 @@ function isHalloweenContext(inputs: VisualInputs): boolean {
 function autoEnrichInputs(inputs: VisualInputs): VisualInputs {
   const enriched = { ...inputs };
   
-  // Force subcategory anchors for sports
-  if (inputs.category === 'sports' && inputs.subcategory) {
-    const anchors = getSubcategoryAnchors(inputs.category, inputs.subcategory);
-    enriched.tags = [...inputs.tags, ...anchors].slice(0, 8);
-  }
-  
-  // Auto-extract nouns from finalLine if provided
-  if (inputs.finalLine && inputs.tags.length < 5) {
-    const extractedNouns = extractNounsFromText(inputs.finalLine);
-    enriched.tags = [...enriched.tags, ...extractedNouns].slice(0, 8); // Max 8 tags
-  }
-  
-  // Auto-add subcategory-derived tags
-  if (inputs.subcategory && inputs.subcategory !== '-') {
-    const subcategoryTokens = inputs.subcategory
-      .toLowerCase()
-      .split(/[\s\-\/]+/)
-      .filter(token => token.length >= 3)
-      .slice(0, 4);
-    enriched.tags = [...enriched.tags, ...subcategoryTokens].slice(0, 8);
-  }
-  
-  // Auto-seed category-specific tags if not provided
-  if (enriched.tags.length < 3) {
-    const categoryTags = getCategorySpecificTags(inputs.category, inputs.subcategory);
-    enriched.tags = [...enriched.tags, ...categoryTags].slice(0, 6);
-  }
-  
-  // Pride/LGBTQ+ theme enhancement
-  if (inputs.finalLine) {
-    const prideKeywords = ['pride', 'parade', 'rainbow', 'gay', 'lesbian', 'drag', 'queens', 'queer', 'lgbtq'];
-    const hasPrideTheme = prideKeywords.some(keyword => 
-      inputs.finalLine!.toLowerCase().includes(keyword) || 
-      inputs.tone.toLowerCase().includes(keyword)
-    );
-    
-    if (hasPrideTheme) {
-      const prideEnhancementTags = ['rainbow', 'parade', 'celebration', 'colorful', 'drag queens', 'fabulous'];
-      enriched.tags = [...enriched.tags, ...prideEnhancementTags].slice(0, 8);
-    }
-  }
+  // Derive design cues from context instead of user tags
+  const designCues = deriveDesignCues(inputs);
+  enriched.tags = [...designCues].slice(0, 8);
   
   // Add typography-aware zone - enforced for all styles
   if (!enriched.tags.some(tag => tag.includes('TEXT_SAFE_ZONE'))) {
@@ -149,6 +111,90 @@ function autoEnrichInputs(inputs: VisualInputs): VisualInputs {
   }
   
   return enriched;
+}
+
+function deriveDesignCues(inputs: VisualInputs): string[] {
+  const cues: string[] = [];
+  
+  // 1. Derive from subcategory context (not literal words)
+  if (inputs.subcategory && inputs.subcategory !== '-') {
+    const subcategoryCues = getSubcategoryDesignCues(inputs.subcategory);
+    cues.push(...subcategoryCues);
+  }
+  
+  // 2. Derive from tone atmosphere
+  const toneAtmosphere = getToneAtmosphere(inputs.tone);
+  cues.push(...toneAtmosphere);
+  
+  // 3. Extract meaningful visual concepts from text (not proper names)
+  if (inputs.finalLine) {
+    const visualConcepts = extractVisualConcepts(inputs.finalLine);
+    cues.push(...visualConcepts);
+  }
+  
+  // 4. Remove duplicate and filter out proper names/fluff
+  return sanitizeDesignCues(cues).slice(0, 6);
+}
+
+function getSubcategoryDesignCues(subcategory: string): string[] {
+  const cueMap: Record<string, string[]> = {
+    'baby shower': ['pastels', 'gentle lighting', 'celebration', 'party setup'],
+    'birthday': ['celebration', 'party atmosphere', 'festive'],
+    'wedding': ['elegant', 'romantic lighting', 'ceremony'],
+    'halloween': ['spooky atmosphere', 'orange lighting', 'autumn'],
+    'christmas': ['warm lighting', 'festive', 'cozy'],
+    'basketball': ['athletic', 'court setting', 'sports energy'],
+    'football': ['stadium atmosphere', 'competitive energy'],
+    'default': ['modern', 'clean composition']
+  };
+  
+  return cueMap[subcategory.toLowerCase()] || cueMap['default'];
+}
+
+function getToneAtmosphere(tone: string): string[] {
+  const atmosphereMap: Record<string, string[]> = {
+    'humorous': ['playful mood', 'bright atmosphere'],
+    'sentimental': ['warm lighting', 'soft atmosphere'],
+    'savage': ['bold contrast', 'dramatic lighting'],
+    'nostalgic': ['warm tones', 'vintage atmosphere'],
+    'romantic': ['soft lighting', 'intimate setting'],
+    'inspirational': ['uplifting atmosphere', 'bright energy'],
+    'playful': ['vibrant colors', 'fun atmosphere'],
+    'serious': ['professional lighting', 'clean composition']
+  };
+  
+  return atmosphereMap[tone.toLowerCase()] || ['balanced atmosphere'];
+}
+
+function extractVisualConcepts(text: string): string[] {
+  const lowerText = text.toLowerCase();
+  const concepts: string[] = [];
+  
+  // Extract specific visual themes (not names or adjectives)
+  if (lowerText.includes('gay') || lowerText.includes('came out')) {
+    concepts.push('pride celebration', 'rainbow accents');
+  }
+  if (lowerText.includes('drag') || lowerText.includes('queens')) {
+    concepts.push('performance stage', 'dramatic makeup');
+  }
+  if (lowerText.includes('oscar') || lowerText.includes('documentary')) {
+    concepts.push('film poster', 'award ceremony');
+  }
+  if (lowerText.includes('cross') && lowerText.includes('dress')) {
+    concepts.push('wardrobe setting', 'mirror scene');
+  }
+  
+  return concepts;
+}
+
+function sanitizeDesignCues(cues: string[]): string[] {
+  const properNamesPattern = /\b[A-Z][a-z]+\b/; // Basic proper name detection
+  const fluffWords = ['amazing', 'great', 'awesome', 'nice', 'good', 'bad', 'beautiful'];
+  
+  return cues
+    .filter(cue => !properNamesPattern.test(cue)) // Remove proper names
+    .filter(cue => !fluffWords.some(fluff => cue.toLowerCase().includes(fluff))) // Remove fluff
+    .filter((cue, index, self) => self.indexOf(cue) === index); // Remove duplicates
 }
 
 function extractNounsFromText(text: string): string[] {
@@ -826,15 +872,18 @@ function sanitizeTags(tags: string[]): string[] {
     .filter(tag => tag.length > 0);
 }
 
-// Post-process option text to improve flow
+// Post-process option text to improve flow and remove tag bleed
 function postProcessOption(option: VisualOption): VisualOption {
   if (!option.subject && !option.background) return option;
   
   const processText = (text: string): string => {
     if (!text) return text;
     
+    // Remove proper names and adjective bleed first
+    let processed = removeNameAndAdjectiveBleed(text);
+    
     // Fix common awkward endings
-    let processed = text
+    processed = processed
       .replace(/\bjust\s*$/i, '')
       .replace(/\breally\s*$/i, '') 
       .replace(/\baccents\s*$/i, 'accents throughout')
@@ -860,8 +909,52 @@ function postProcessOption(option: VisualOption): VisualOption {
   return {
     ...option,
     subject: option.subject ? processText(option.subject) : option.subject,
-    background: option.background ? processText(option.background) : option.background
+    background: option.background ? processText(option.background) : option.background,
+    prompt: option.prompt ? removeNameAndAdjectiveBleed(option.prompt) : option.prompt
   };
+}
+
+function removeNameAndAdjectiveBleed(text: string): string {
+  // Remove common proper names that bleed through
+  const namePatterns = [
+    /\bAbby\b/gi,
+    /\bJesse\b/gi,
+    /\bMary\b/gi,
+    /\bJohn\b/gi,
+    /\bSarah\b/gi
+  ];
+  
+  // Remove repetitive adjectives that add no visual value
+  const fluffAdjectives = [
+    /\bamazing\b/gi,
+    /\bawesome\b/gi,
+    /\bgreat\b/gi,
+    /\bnice\b/gi,
+    /\bbeautiful\b/gi,
+    /\bwonderful\b/gi,
+    /\bfantastic\b/gi
+  ];
+  
+  let cleaned = text;
+  
+  // Remove name patterns
+  namePatterns.forEach(pattern => {
+    cleaned = cleaned.replace(pattern, '');
+  });
+  
+  // Remove fluff adjectives
+  fluffAdjectives.forEach(pattern => {
+    cleaned = cleaned.replace(pattern, '');
+  });
+  
+  // Clean up extra spaces and normalize
+  cleaned = cleaned
+    .replace(/\s+/g, ' ')
+    .replace(/^\s+|\s+$/g, '')
+    .replace(/,\s*,/g, ',') // Remove double commas
+    .replace(/,\s*$/, ''); // Remove trailing commas
+  
+  return cleaned;
 }
 
 export async function generateVisualRecommendations(

@@ -1534,10 +1534,14 @@ export function buildVisualGeneratorMessages(inputs: any): Array<{role: string; 
   const allNegatives = [...DEFAULT_NEGATIVE_PROMPT.split(', '), ...contextualBans];
   const negativePromptSection = allNegatives.slice(0, 8).join(', ');
 
-  // Add variety and creativity requirements
-  const userPrompt = `${category}>${subcategory}, ${tone}, ${visualStyle || '3d-animated'}
-Tags: ${tags.slice(0, 4).join(', ')}
-${finalLine ? `JOKE/TEXT: "${finalLine}" - VISUAL CONCEPTS MUST MATCH THIS CONTENT AND TONE` : ''}
+  // Build contextual prompt focusing on actual meaning
+  const userPrompt = `CONTEXT: ${subcategory} | TONE: ${tone} | STYLE: ${visualStyle || 'Illustrated'}
+${finalLine ? `TEXT LINE: "${finalLine}" - Create visuals that match this ACTUAL CONTENT and TONE` : ''}
+
+CRITICAL INSTRUCTION: Focus on the ACTUAL SCENE, MOOD, and SUBCATEGORY. Do NOT repeat user's proper names or generic adjectives from input tags. Create authentic visual concepts based on the text meaning and subcategory atmosphere.
+
+${['baby shower', 'birthday', 'wedding'].includes(subcategory?.toLowerCase() || '') ? 
+  `CELEBRATION FOCUS: Base visuals on ${subcategory} atmosphere and ${tone} mood. Use contextual elements like party setup, decorations, and celebration scenes - NOT user's personal tags.` : ''}
 
 SUBCATEGORY ANCHORING (CRITICAL):
 ${subcategoryKeywords.length > 0 ? `- Domain keywords to incorporate: ${subcategoryKeywords.join(', ')}
