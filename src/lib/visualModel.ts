@@ -1,5 +1,6 @@
 import { openAIService } from './openai';
 import { SYSTEM_PROMPTS, buildVisualGeneratorMessages, getStyleKeywords, getEffectiveConfig, isTemperatureSupported, getSmartFallbackChain, MODEL_DISPLAY_NAMES, BACKGROUND_PRESETS, getRuntimeOverrides, getContextualBans } from '../vibe-ai.config';
+import { generateHeuristicVisuals } from './visualHeuristics';
 
 export interface VisualInputs {
   category: string;
@@ -1372,7 +1373,19 @@ export async function generateVisualRecommendations(
     }
     
     // Use contextual fallbacks instead of generic ones
-    const fallbackOptions = getSlotBasedFallbacks(enrichedInputs);
+    let fallbackOptions = getSlotBasedFallbacks(enrichedInputs);
+    
+    // If fallbacks are insufficient, add heuristic options
+    if (fallbackOptions.length < 4) {
+      try {
+        const heuristicOptions = generateHeuristicVisuals(enrichedInputs);
+        const neededCount = 4 - fallbackOptions.length;
+        fallbackOptions.push(...heuristicOptions.slice(0, neededCount));
+        console.log(`🎯 VISUAL AI: Added ${neededCount} heuristic fallback options`);
+      } catch (heuristicError) {
+        console.warn('Heuristic fallback generation failed:', heuristicError);
+      }
+    }
     
     return {
       options: fallbackOptions,
