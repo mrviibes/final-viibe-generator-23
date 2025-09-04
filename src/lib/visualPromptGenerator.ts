@@ -119,46 +119,27 @@ const IMAGERY: Record<string, Record<string, string[]>> = {
 };
 
 const TONE_LEX: Record<string, any> = {
-  "Humorous": {
-    mood: ["playful energy","light, cheeky vibe"],
-    light: ["bright, even lighting","crisp, lively color"],
-    verbs: ["leans into the joke","keeps it witty"]
-  },
-  "Savage": {
-    mood: ["edgy attitude","bold confidence"],
-    light: ["hard contrast","dramatic shadows"],
-    verbs: ["cuts with dry wit","keeps it unapologetic"]
-  },
-  "Sentimental": {
-    mood: ["tender, heartfelt","intimate warmth"],
-    light: ["soft glow","gentle highlights"],
-    verbs: ["centers emotion","keeps it sincere"]
-  },
-  "Nostalgic": {
-    mood: ["bittersweet memory","retro charm"],
-    light: ["golden-hour warmth","subtle film grain"],
-    verbs: ["hints at the past","embraces vintage cues"]
-  },
-  "Romantic": {
-    mood: ["soft, loving","dreamy"],
-    light: ["creamy bokeh","rose-tinted palette"],
-    verbs: ["keeps it affectionate","leans into warmth"]
-  },
-  "Inspirational": {
-    mood: ["uplifting","hopeful"],
-    light: ["sunrise hues","open, airy light"],
-    verbs: ["aims upward","sparkles with optimism"]
-  },
-  "Playful": {
-    mood: ["whimsical","bouncy"],
-    light: ["vivid color","dynamic angle"],
-    verbs: ["keeps it fun","invites a grin"]
-  },
-  "Serious": {
-    mood: ["matter-of-fact","respectful"],
-    light: ["neutral palette","clean composition"],
-    verbs: ["keeps it direct","stays grounded"]
-  }
+  "Humorous": { mood: "playful energy", light: "bright color", verb: "leans into the joke" },
+  "Savage": { mood: "edgy attitude", light: "hard contrast", verb: "cuts with dry wit" },
+  "Sentimental": { mood: "tender warmth", light: "soft glow", verb: "centers emotion" },
+  "Nostalgic": { mood: "retro charm", light: "golden-hour warmth", verb: "hints at the past" },
+  "Romantic": { mood: "dreamy affection", light: "creamy bokeh", verb: "leans into warmth" },
+  "Inspirational": { mood: "hopeful uplift", light: "sunrise hues", verb: "aims upward" },
+  "Playful": { mood: "whimsical vibe", light: "vivid color", verb: "keeps it fun" },
+  "Serious": { mood: "matter-of-fact", light: "neutral palette", verb: "keeps it direct" }
+};
+
+// Subcategory-specific SOLO actions for the third lane
+const SOLO_ACTION: Record<string, string> = {
+  "Birthday": "blowing out candles on a cake",
+  "Graduation": "tossing a mortarboard cap",
+  "Wedding": "holding a bouquet close to the chest",
+  "Anniversary": "toasting with champagne",
+  "Valentine's Day": "holding a heart-shaped box of chocolates",
+  "Basketball": "dribbling toward the hoop",
+  "Soccer": "tying cleats at the sideline",
+  "Work / Office": "typing on a laptop near a sunlit window",
+  "_default": "interacting with the key props"
 };
 
 // Helper functions
@@ -301,55 +282,57 @@ export function generateVisualPrompts(inputs: VisualPromptInputs): VisualPromptO
 
   const baseImagery = imageryFor(category, subcategory);
   const tone = toneFor(toneKey);
-  const styleBits = stylePhrases(style);
-  const neg = negativeFor(style);
+  const styleLead = join(stylePhrases(style));
 
-  // Build object pools
-  const objectsLiteral = uniq([...tags, ...baseImagery]).slice(0, 5);
-  const objectsContext = pickN(baseImagery, 4);
-  const objectsMood = pickN([...baseImagery].reverse(), 3);
-  const objectsCreative = pickN(uniq([...tags, ...baseImagery]).reverse(), 4);
+  // Filter out bracketed control tags and build clean object pools
+  const cleanTags = tags.filter(tag => !tag.includes('[') && !tag.includes(']'));
+  const objects = uniq([...baseImagery, ...cleanTags]);
+  const propsTight = pickN(objects, 4);
+  const propsWide = pickN(objects, 6);
+  const propsMood = pickN([...objects].reverse(), 3);
+  const propsSym = pickN(objects, 4);
 
-  // Short mood/lighting strings
-  const moodStr = pickN(tone.mood, 1)[0] || "";
-  const lightStr = pickN(tone.light, 1)[0] || "";
-  const verbStr = pickN(tone.verbs, 1)[0] || "";
+  // Lane 1: OBJECTS (no people)
+  const laneObjects = clamp(sentence([
+    `${styleLead}, close-up of ${join(propsTight)}`,
+    `${tone.light}; ${tone.mood}`,
+    "clear negative space for headline"
+  ]));
 
-  // Shared prefix
-  const styleLead = join(styleBits);
+  // Lane 2: GROUP (people visible)
+  const groupPhrases = [
+    "friends gathered", "group of people", "laughter", "candid moment", "natural gestures"
+  ];
+  const laneGroup = clamp(sentence([
+    `${styleLead}, wide ${subcategory.toLowerCase()} scene with ${join(propsWide)}`,
+    `${join(groupPhrases)}`,
+    `${tone.light}; ${tone.verb}`
+  ]));
 
-  // Generate four distinct prompts
-  const literalLine = sentence([
-    `${styleLead}, close-up of ${join(objectsLiteral)}.`,
-    `${lightStr}; ${moodStr}.`,
-    "Clear negative space for headline."
-  ]);
+  // Lane 3: SOLO (one person doing a subcategory-relevant action)
+  const soloAction = SOLO_ACTION[subcategory] || SOLO_ACTION["_default"];
+  const laneSolo = clamp(sentence([
+    `${styleLead}, single person ${soloAction}`,
+    `surrounded by ${join(pickN(objects, 3))}`,
+    `${tone.light}; ${tone.mood}`
+  ]));
 
-  const contextLine = sentence([
-    `${styleLead}, wide ${subcategory.toLowerCase()} scene with ${join(objectsContext)}.`,
-    `${lightStr}; ${verbStr}.`,
-    "Environmental storytelling."
-  ]);
+  // Lane 4: CREATIVE (symbolic / abstract / collage)
+  const creativeExtra = [
+    "symbolic arrangement", "unexpected perspective", "graphic balance", "tasteful negative space"
+  ];
+  const laneCreative = clamp(sentence([
+    `${styleLead}, ${join(creativeExtra)} using ${join(propsSym)}`,
+    `${tone.light}; ${tone.verb}`
+  ]));
 
-  const moodLine = sentence([
-    `${styleLead}, ${join(objectsMood)} in selective focus.`,
-    `${lightStr}; conveys ${moodStr}.`,
-    "Light-driven composition."
-  ]);
-
-  const creativeLine = sentence([
-    `${styleLead}, symbolic arrangement of ${join(objectsCreative)}.`,
-    `${lightStr}; ${verbStr}.`,
-    "Unexpected perspective, graphic balance."
-  ]);
-
-  const roles = ['literal', 'context', 'mood', 'creative'];
-  const prompts = [literalLine, contextLine, moodLine, creativeLine];
+  const lanes = [laneObjects, laneGroup, laneSolo, laneCreative];
+  const roles = ['objects', 'group', 'solo', 'creative'];
   
-  return prompts.map((prompt, index) => ({
+  return lanes.map((prompt, index) => ({
     subject: `${subcategory} scene`,
     background: `${toneKey} atmosphere`,
-    prompt: clamp(prompt),
-    role: roles[index] || 'creative'
+    prompt: prompt,
+    role: roles[index]
   }));
 }
