@@ -28,6 +28,67 @@ import { normalizeTypography, suggestContractions, isTextMisspelled } from "@/li
 import { BACKGROUND_PRESETS, getRuntimeOverrides, setRuntimeOverrides, TONES, VISUAL_STYLES, DEFAULT_NEGATIVE_PROMPT } from "../vibe-ai.config";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
+// Helper function to extract and clean negative prompt tokens from visual options
+function extractNegativePromptFromVisual(visualPrompt: string): { cleanPrompt: string; negativePrompt: string } {
+  if (!visualPrompt) return { cleanPrompt: '', negativePrompt: '' };
+  
+  // Extract [NEGATIVE_PROMPT: ...] token
+  const negativeMatch = visualPrompt.match(/\[NEGATIVE_PROMPT:\s*([^\]]+)\]/i);
+  let extractedNegative = negativeMatch ? negativeMatch[1].trim() : '';
+  
+  // Clean the main prompt by removing all bracketed metadata while preserving the core description
+  let cleanPrompt = visualPrompt
+    // Remove specific metadata tokens
+    .replace(/\[TAGS:[^\]]*\]/gi, '')
+    .replace(/\[TEXT_SAFE_ZONE:[^\]]*\]/gi, '')
+    .replace(/\[CONTRAST_PLAN:[^\]]*\]/gi, '')
+    .replace(/\[NEGATIVE_PROMPT:[^\]]*\]/gi, '')
+    .replace(/\[TEXT_HINT:[^\]]*\]/gi, '')
+    .replace(/\[ASPECTS:[^\]]*\]/gi, '')
+    // Clean up extra spaces and dashes
+    .replace(/\s*-\s*$/, '') // Remove trailing dashes
+    .replace(/\s+/g, ' ') // Normalize spaces
+    .trim();
+  
+  // QA logging for negative prompt extraction
+  const runtimeOverrides = getRuntimeOverrides();
+  if (runtimeOverrides.showAdvancedPromptDetails && extractedNegative) {
+    console.log('🔍 NEGATIVE PROMPT EXTRACTION:');
+    console.log('Original prompt:', visualPrompt.substring(0, 100) + '...');
+    console.log('Extracted negative:', extractedNegative);
+    console.log('Cleaned prompt:', cleanPrompt.substring(0, 100) + '...');
+  }
+  
+  return { 
+    cleanPrompt, 
+    negativePrompt: extractedNegative 
+  };
+}
+
+// Helper function to merge negative prompts with the default
+function mergeNegativePrompts(defaultPrompt: string, extractedPrompt: string): string {
+  if (!extractedPrompt) return defaultPrompt;
+  
+  // Combine unique terms from both prompts
+  const defaultTerms = defaultPrompt.split(',').map(term => term.trim().toLowerCase());
+  const extractedTerms = extractedPrompt.split(',').map(term => term.trim().toLowerCase());
+  
+  // Merge unique terms
+  const allTerms = [...new Set([...defaultTerms, ...extractedTerms])];
+  const merged = allTerms.join(', ');
+  
+  // QA logging for negative prompt merging
+  const runtimeOverrides = getRuntimeOverrides();
+  if (runtimeOverrides.showAdvancedPromptDetails && extractedPrompt) {
+    console.log('🔍 NEGATIVE PROMPT MERGE:');
+    console.log('Default:', defaultPrompt);
+    console.log('Extracted:', extractedPrompt);
+    console.log('Merged:', merged);
+  }
+  
+  return merged;
+}
+
 const styleOptions = [{
   id: "celebrations",
   name: "Celebrations",
@@ -4323,13 +4384,14 @@ const Index = () => {
       });
     }
 
-    // Visual AI Recommendation selection - show all generated options
+    // Visual AI Recommendation selection - show all generated options (with metadata stripped)
     if (selectedSubjectOption === "ai-assist" && visualOptions.length > 0) {
       if (selectedVisualIndex !== null && visualOptions[selectedVisualIndex]) {
-        // Show selected option
+        // Show selected option with cleaned prompt
         const option = visualOptions[selectedVisualIndex];
+        const { cleanPrompt } = extractNegativePromptFromVisual(option.prompt);
         const optionTitle = `Selected: Option ${selectedVisualIndex + 1} (${option.slot?.replace('-', ' ') || 'Visual'})`;
-        const compactDescription = `${option.subject} - ${option.background}`;
+        const compactDescription = cleanPrompt || `${option.subject} - ${option.background}`;
         selections.push({
           title: optionTitle,
           subtitle: compactDescription,
@@ -4832,7 +4894,10 @@ const Index = () => {
       const aspectRatio = selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || "Landscape";
       const textTagsStr = tags.join(', ') || "None";
       const visualTagsStr = subjectTags.join(', ') || "None";
-      const chosenVisual = selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].prompt : selectedSubjectOption === "design-myself" && subjectDescription ? subjectDescription : "";
+      // Extract and clean visual prompt, and get additional negative prompt terms
+      const rawVisual = selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].prompt : selectedSubjectOption === "design-myself" && subjectDescription ? subjectDescription : "";
+      const { cleanPrompt: chosenVisual, negativePrompt: extractedNegative } = extractNegativePromptFromVisual(rawVisual);
+      const mergedNegativePrompt = mergeNegativePrompts(negativePrompt, extractedNegative);
       const subcategorySecondary = selectedStyle === 'pop-culture' && selectedPick ? selectedPick : undefined;
       // Get selected visual recommendation details
       let recSubject = undefined;
@@ -4862,7 +4927,7 @@ const Index = () => {
         visual_tags_csv: visualTagsStr,
         ai_text_assist_used: selectedCompletionOption === "ai-assist",
         ai_visual_assist_used: selectedSubjectOption === "ai-assist",
-        negative_prompt: negativePrompt,
+        negative_prompt: mergedNegativePrompt,
         rec_subject: recSubject,
         rec_background: recBackground
       });
@@ -6262,11 +6327,11 @@ const Index = () => {
                                     )}
                                  </div>
                                </CardHeader>
-                               <CardContent className="pt-0">
-                                 <p className="text-sm text-muted-foreground line-clamp-2">
-                                   {option.subject} - {option.background}
-                                 </p>
-                               </CardContent>
+                                <CardContent className="pt-0">
+                                  <p className="text-sm text-muted-foreground line-clamp-2">
+                                    {extractNegativePromptFromVisual(option.prompt).cleanPrompt || `${option.subject} - ${option.background}`}
+                                  </p>
+                                </CardContent>
                              </Card>)}
                          </div>
                       </div>}
@@ -6714,9 +6779,9 @@ const Index = () => {
                       </tr>
                       <tr>
                         <td className="p-3 text-sm">Visual AI Recommendations</td>
-                        <td className="p-3 text-sm">
-                          {selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? `${visualOptions[selectedVisualIndex].subject} - ${visualOptions[selectedVisualIndex].background}` : "Not selected"}
-                        </td>
+                         <td className="p-3 text-sm">
+                           {selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? (extractNegativePromptFromVisual(visualOptions[selectedVisualIndex].prompt).cleanPrompt || `${visualOptions[selectedVisualIndex].subject} - ${visualOptions[selectedVisualIndex].background}`) : "Not selected"}
+                         </td>
                       </tr>
                       <tr>
                         <td className="p-3 text-sm">Aspect Ratio</td>
@@ -6855,7 +6920,13 @@ const Index = () => {
                 </div>
 
                 {/* Negative Prompt Display - Compact */}
-                {negativePrompt.trim() && (
+                {(() => {
+                  // Determine the actual negative prompt to display (merged if visual option has tokens)
+                  const rawVisual = selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].prompt : '';
+                  const { negativePrompt: extractedNegative } = extractNegativePromptFromVisual(rawVisual);
+                  const displayedNegativePrompt = mergeNegativePrompts(negativePrompt, extractedNegative);
+                  
+                  return displayedNegativePrompt.trim() && (
                   <div className="space-y-4">
                     <Collapsible defaultOpen={(() => {
                       const runtimeOverrides = getRuntimeOverrides();
@@ -6874,20 +6945,21 @@ const Index = () => {
                             size="sm" 
                             className="absolute top-2 right-2"
                             onClick={() => {
-                              navigator.clipboard.writeText(negativePrompt);
+                              navigator.clipboard.writeText(displayedNegativePrompt);
                               toast({ title: "Negative prompt copied to clipboard" });
                             }}
                           >
                             <Copy className="h-4 w-4" />
                           </Button>
                           <p className="text-sm text-foreground font-mono leading-relaxed pr-12">
-                            {negativePrompt}
+                            {displayedNegativePrompt}
                           </p>
                         </div>
                       </CollapsibleContent>
                     </Collapsible>
                   </div>
-                )}
+                );
+                })()}
             </div>
           </>}
 
@@ -6976,8 +7048,10 @@ const Index = () => {
                 const tone = selectedTextStyleObj?.name || 'Humorous';
                 const allTags = [...tags, ...subjectTags];
 
-                // Get chosen visual concept if selected
-                const chosenVisual = selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].prompt : undefined;
+                // Get chosen visual concept if selected and clean it
+                const rawVisual = selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].prompt : undefined;
+                const { cleanPrompt: chosenVisual, negativePrompt: extractedNegative } = extractNegativePromptFromVisual(rawVisual || '');
+                const mergedNegativePrompt = mergeNegativePrompts(negativePrompt, extractedNegative);
 
                 // Build comprehensive Ideogram handoff payload
                 const categoryName = selectedStyle ? styleOptions.find(s => s.id === selectedStyle)?.name || "" : "";
@@ -7001,7 +7075,7 @@ const Index = () => {
                   visual_tags_csv: subjectTags.join(', '),
                   ai_text_assist_used: selectedCompletionOption === "ai-assist",
                   ai_visual_assist_used: selectedSubjectOption === "ai-assist",
-                  negative_prompt: negativePrompt,
+                  negative_prompt: mergedNegativePrompt,
                   // Visual AI Recommendations
                   rec_subject: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].subject : selectedSubjectOption === "design-myself" ? subjectDescription : undefined,
                   rec_background: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined
@@ -7105,8 +7179,10 @@ const Index = () => {
               const tone = selectedTextStyleObj?.name || 'Humorous';
               const allTags = [...tags, ...subjectTags];
 
-              // Get chosen visual concept if selected
-              const chosenVisual = selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].prompt : undefined;
+              // Get chosen visual concept if selected and clean it
+              const rawVisual = selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].prompt : undefined;
+              const { cleanPrompt: chosenVisual, negativePrompt: extractedNegative } = extractNegativePromptFromVisual(rawVisual || '');
+              const mergedNegativePrompt = mergeNegativePrompts(negativePrompt, extractedNegative);
 
               // Build comprehensive Ideogram handoff payload
               const categoryName = selectedStyle ? styleOptions.find(s => s.id === selectedStyle)?.name || "" : "";
@@ -7130,7 +7206,7 @@ const Index = () => {
                 visual_tags_csv: subjectTags.join(', '),
                 ai_text_assist_used: selectedCompletionOption === "ai-assist",
                 ai_visual_assist_used: selectedSubjectOption === "ai-assist",
-                negative_prompt: negativePrompt,
+                negative_prompt: mergedNegativePrompt,
                 // Visual AI Recommendations
                 rec_subject: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].subject : selectedSubjectOption === "design-myself" ? subjectDescription : undefined,
                 rec_background: selectedVisualIndex !== null && visualOptions[selectedVisualIndex] ? visualOptions[selectedVisualIndex].background : undefined

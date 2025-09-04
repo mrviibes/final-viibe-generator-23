@@ -1044,10 +1044,8 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     }
   }
   
-  // GLOBAL NEGATIVE PROMPT ENFORCEMENT
-  if (handoff.negative_prompt) {
-    parts.push(`Avoid: ${handoff.negative_prompt}.`);
-  }
+  // GLOBAL NEGATIVE PROMPT ENFORCEMENT - now used by Ideogram API
+  // Remove "Avoid:" injection from main prompt since it goes to negative_prompt field
   
   const finalPrompt = parts.join(' ');
   

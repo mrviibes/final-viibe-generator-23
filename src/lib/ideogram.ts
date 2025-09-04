@@ -67,7 +67,7 @@ export function buildIdeogramHandoff(params: {
     rec_background
   } = params;
   
-  const baseNotes = "high contrast, clean layout, social safe margins, no logos";
+  const baseNotes = "high contrast, clean layout, social safe margins";
   const visualConcept = chosen_visual ? ` | concept: ${chosen_visual}` : '';
   const tagReference = tags_csv ? ` | tags: ${tags_csv}` : '';
   
