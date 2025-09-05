@@ -4,16 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, RotateCcw, Settings, AlertTriangle, ImageIcon } from "lucide-react";
+import { ArrowLeft, RotateCcw, Settings, AlertTriangle, Lock, Shield } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { isAdmin, setAdminSession, clearAdminSession } from "@/lib/adminGate";
 import { 
   getRuntimeOverrides, 
   setRuntimeOverrides, 
   clearRuntimeOverrides,
-  AI_CONFIG,
   AVAILABLE_MODELS,
   MODEL_DISPLAY_NAMES,
   type AIRuntimeOverrides
@@ -24,28 +24,44 @@ export default function AiSettings() {
   const { toast } = useToast();
   const [overrides, setOverrides] = useState<AIRuntimeOverrides>({});
   const [hasChanges, setHasChanges] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [pinInput, setPinInput] = useState("");
+  const [pinError, setPinError] = useState("");
 
   useEffect(() => {
-    const current = getRuntimeOverrides();
-    setOverrides(current);
+    const adminAuth = isAdmin();
+    setIsAuthenticated(adminAuth);
+    if (adminAuth) {
+      const current = getRuntimeOverrides();
+      setOverrides(current);
+    }
   }, []);
 
-  // Get effective configuration with runtime overrides applied
-  const getEffectiveConfig = () => {
-    return {
-      ...AI_CONFIG,
-      spellcheck: {
-        ...AI_CONFIG.spellcheck,
-        enabled: overrides.spellcheckEnabled ?? AI_CONFIG.spellcheck.enabled
-      },
-      generation: {
-        ...AI_CONFIG.generation,
-        model: overrides.model ?? AI_CONFIG.generation.model
-      }
-    };
+  const handlePinSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const correctPin = import.meta.env.VITE_ADMIN_PIN || "admin2025";
+    
+    if (pinInput === correctPin) {
+      setAdminSession();
+      setIsAuthenticated(true);
+      setPinError("");
+      const current = getRuntimeOverrides();
+      setOverrides(current);
+      toast({
+        title: "Admin Access Granted",
+        description: "Welcome to the admin settings panel."
+      });
+    } else {
+      setPinError("Invalid PIN. Access denied.");
+      setPinInput("");
+    }
   };
 
-  const effectiveConfig = getEffectiveConfig();
+  const handleSignOut = () => {
+    clearAdminSession();
+    setIsAuthenticated(false);
+    navigate("/");
+  };
 
   const updateOverride = (key: keyof AIRuntimeOverrides, value: any) => {
     const newOverrides = { ...overrides, [key]: value };
@@ -58,17 +74,18 @@ export default function AiSettings() {
     setHasChanges(false);
     toast({
       title: "Settings Saved",
-      description: "AI configuration has been updated successfully."
+      description: "Admin configuration has been updated successfully."
     });
   };
 
   const resetToDefaults = () => {
     clearRuntimeOverrides();
-    setOverrides({});
+    const defaults = getRuntimeOverrides(); // Gets the forced defaults
+    setOverrides(defaults);
     setHasChanges(false);
     toast({
       title: "Settings Reset",
-      description: "All AI settings have been reset to defaults."
+      description: "All settings have been reset to system defaults."
     });
   };
 
@@ -78,6 +95,52 @@ export default function AiSettings() {
     setHasChanges(false);
   };
 
+  // PIN entry form for non-admin users
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="flex justify-center mb-4">
+              <Shield className="h-12 w-12 text-primary" />
+            </div>
+            <CardTitle>Admin Access Required</CardTitle>
+            <CardDescription>
+              Enter your admin PIN to access AI settings
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handlePinSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="pin">Admin PIN</Label>
+                <Input
+                  id="pin"
+                  type="password"
+                  value={pinInput}
+                  onChange={(e) => setPinInput(e.target.value)}
+                  placeholder="Enter PIN"
+                  className={pinError ? "border-destructive" : ""}
+                />
+                {pinError && (
+                  <p className="text-sm text-destructive">{pinError}</p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button type="submit" className="flex-1">
+                  Access Settings
+                </Button>
+                <Button type="button" variant="outline" onClick={() => navigate("/")}>
+                  Back
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Admin settings interface
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -96,20 +159,29 @@ export default function AiSettings() {
               </Button>
               <div className="flex items-center gap-2">
                 <Settings className="h-5 w-5" />
-                <h1 className="text-xl font-semibold">AI Settings</h1>
+                <h1 className="text-xl font-semibold">Admin Settings</h1>
+                <Badge variant="secondary" className="gap-1">
+                  <Lock className="h-3 w-3" />
+                  Admin Only
+                </Badge>
               </div>
             </div>
             
-            {hasChanges && (
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={discardChanges}>
-                  Discard
-                </Button>
-                <Button size="sm" onClick={saveChanges}>
-                  Save Changes
-                </Button>
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              {hasChanges && (
+                <>
+                  <Button variant="outline" size="sm" onClick={discardChanges}>
+                    Discard
+                  </Button>
+                  <Button size="sm" onClick={saveChanges}>
+                    Save Changes
+                  </Button>
+                </>
+              )}
+              <Button variant="ghost" size="sm" onClick={handleSignOut}>
+                Sign Out
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -117,225 +189,120 @@ export default function AiSettings() {
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="grid gap-6">
 
-          {/* Model Settings */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Model Configuration</CardTitle>
-              <CardDescription>
-                Using GPT-4.1 for consistent, reliable text generation.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                <div>
-                  <p className="font-medium">AI Model</p>
-                  <p className="text-sm text-muted-foreground">GPT-4.1 (2025-04-14)</p>
-                </div>
-                <Badge variant="secondary">Fixed</Badge>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Content Settings */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Content Generation</CardTitle>
-              <CardDescription>
-                Configure text processing and quality controls.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label>Spellcheck Enabled</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Automatically check generated text for spelling errors
-                  </p>
-                </div>
-                <Switch
-                  checked={overrides.spellcheckEnabled ?? AI_CONFIG.spellcheck.enabled}
-                  onCheckedChange={(checked) => updateOverride('spellcheckEnabled', checked)}
-                />
-              </div>
-
-              <Separator />
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label>Clean Background Default</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Default to clean backgrounds for better text visibility
-                  </p>
-                </div>
-                <Switch
-                  checked={overrides.cleanBackgroundDefault ?? false}
-                  onCheckedChange={(checked) => updateOverride('cleanBackgroundDefault', checked)}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label>Spelling Guarantee Default</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Default to guaranteed correct spelling mode
-                  </p>
-                </div>
-                <Switch
-                  checked={overrides.spellingGuaranteeDefault ?? false}
-                  onCheckedChange={(checked) => updateOverride('spellingGuaranteeDefault', checked)}
-                />
-              </div>
-
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label>Fast visual recommendations</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Generate visual options faster (3-6s) but with less reliability. Recommended: OFF
-                  </p>
-                </div>
-                <Switch
-                  checked={overrides.fastVisualsEnabled ?? false}
-                  onCheckedChange={(checked) => updateOverride('fastVisualsEnabled', checked)}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label>Magic Prompt Enabled</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Use enhanced prompt engineering for better results (Turbo/V2 only - ignored by V3)
-                  </p>
-                </div>
-                <Switch
-                  checked={overrides.magicPromptEnabled ?? true}
-                  onCheckedChange={(checked) => updateOverride('magicPromptEnabled', checked)}
-                />
-              </div>
-
-              <Separator />
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label>Show Advanced Prompt Details</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Show full technical prompts and negative prompt details by default
-                  </p>
-                </div>
-                <Switch
-                  checked={overrides.showAdvancedPromptDetails ?? false}
-                  onCheckedChange={(checked) => updateOverride('showAdvancedPromptDetails', checked)}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-
-          {/* Image Generation */}
-          <Card>
+          {/* Locked Customer Settings */}
+          <Card className="border-primary/20">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <ImageIcon className="h-5 w-5" />
-                Image Generation
+                <Lock className="h-5 w-5" />
+                Customer Settings (Locked)
               </CardTitle>
               <CardDescription>
-                Configure image generation model and typography settings.
+                These settings are locked for all customers and cannot be changed.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Image Model</Label>
-                <Select
-                  value={overrides.ideogramModel || 'V_2A_TURBO'}
-                  onValueChange={(value) => updateOverride('ideogramModel', value as 'V_2A_TURBO' | 'V_3')}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="V_2A_TURBO">
-                      <div className="space-y-1">
-                        <div className="font-medium">Turbo (Default)</div>
-                        <div className="text-sm text-muted-foreground">Fast and reliable</div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="V_3">
-                      <div className="space-y-1">
-                        <div className="font-medium">V3 (Premium)</div>
-                        <div className="text-sm text-muted-foreground">Higher quality, auto-fallback to Turbo if unavailable</div>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-sm text-muted-foreground">
-                  V3 provides higher quality but may cost more and occasionally fallback to Turbo.
-                </p>
+              <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                <div>
+                  <p className="font-medium">Spellcheck</p>
+                  <p className="text-sm text-muted-foreground">Always enabled for all users</p>
+                </div>
+                <Badge variant="secondary">Always ON</Badge>
               </div>
-
-              <div className="space-y-2">
-                <Label>Typography Style</Label>
-                <Select
-                  value={overrides.typographyStyle || 'negative-space'}
-                  onValueChange={(value) => updateOverride('typographyStyle', value as 'negative-space' | 'meme-style' | 'lower-third' | 'side-bar' | 'badge-sticker' | 'subtle-caption')}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="negative-space">
-                      <div className="space-y-1">
-                        <div className="font-medium">Negative Space (Default)</div>
-                        <div className="text-sm text-muted-foreground">Small text in empty areas</div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="meme-style">
-                      <div className="space-y-1">
-                        <div className="font-medium">Meme Top/Bottom</div>
-                        <div className="text-sm text-muted-foreground">Classic meme format with top and bottom text bands</div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="lower-third">
-                      <div className="space-y-1">
-                        <div className="font-medium">Lower Third</div>
-                        <div className="text-sm text-muted-foreground">Text banner at bottom</div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="side-bar">
-                      <div className="space-y-1">
-                        <div className="font-medium">Side Panel</div>
-                        <div className="text-sm text-muted-foreground">Text in vertical side panel</div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="badge-sticker">
-                      <div className="space-y-1">
-                        <div className="font-medium">Badge/Sticker</div>
-                        <div className="text-sm text-muted-foreground">Small corner badge style</div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="subtle-caption">
-                      <div className="space-y-1">
-                        <div className="font-medium">Subtle Caption</div>
-                        <div className="text-sm text-muted-foreground">Very small corner text</div>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-sm text-muted-foreground">
-                  Poster style creates larger, more prominent text like the examples you prefer.
-                </p>
+              <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                <div>
+                  <p className="font-medium">Image Model</p>
+                  <p className="text-sm text-muted-foreground">Locked to Ideogram V3</p>
+                </div>
+                <Badge variant="secondary">V3 Only</Badge>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                <div>
+                  <p className="font-medium">Text Model</p>
+                  <p className="text-sm text-muted-foreground">Locked to GPT-4.1 (2025-04-14)</p>
+                </div>
+                <Badge variant="secondary">GPT-4.1</Badge>
               </div>
             </CardContent>
           </Card>
 
-          {/* Danger Zone */}
+          {/* Admin Controls */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Admin Controls</CardTitle>
+              <CardDescription>
+                Advanced settings available only to administrators.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label>Strict Model Lock</Label>
+                  <p className="text-sm text-muted-foreground">
+                    When ON, all users are locked to GPT-4.1. When OFF, admin can select different models.
+                  </p>
+                </div>
+                <Switch
+                  checked={overrides.strictModelEnabled ?? true}
+                  onCheckedChange={(checked) => updateOverride('strictModelEnabled', checked)}
+                />
+              </div>
+
+              {!overrides.strictModelEnabled && (
+                <div className="space-y-2">
+                  <Label>Admin Text Model Override</Label>
+                  <Select
+                    value={overrides.model || 'gpt-4.1-2025-04-14'}
+                    onValueChange={(value) => updateOverride('model', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {AVAILABLE_MODELS.map((model) => (
+                        <SelectItem key={model} value={model}>
+                          {MODEL_DISPLAY_NAMES[model] || model}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground">
+                    Only applies when Strict Model Lock is OFF. Customers still see GPT-4.1.
+                  </p>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label>Admin Image Model Override</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Admin can switch to Turbo for testing. Customers remain locked to V3.
+                  </p>
+                </div>
+                <Select
+                  value={overrides.ideogramModel || 'V_3'}
+                  onValueChange={(value) => updateOverride('ideogramModel', value as 'V_2A_TURBO' | 'V_3')}
+                >
+                  <SelectTrigger className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="V_3">V3 (Default)</SelectItem>
+                    <SelectItem value="V_2A_TURBO">Turbo (Testing)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Reset Settings */}
           <Card className="border-destructive">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-destructive">
                 <AlertTriangle className="h-5 w-5" />
-                Reset Settings
+                Reset All Settings
               </CardTitle>
               <CardDescription>
-                Clear all customizations and return to default AI configuration.
+                Clear all admin overrides and return to system defaults.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -345,7 +312,7 @@ export default function AiSettings() {
                 className="gap-2"
               >
                 <RotateCcw className="h-4 w-4" />
-                Reset to Defaults
+                Reset to System Defaults
               </Button>
             </CardContent>
           </Card>

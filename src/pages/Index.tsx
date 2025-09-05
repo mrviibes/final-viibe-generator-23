@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Search, Loader2, AlertCircle, ArrowLeft, ArrowRight, X, Download, Settings, ChevronDown, Copy } from "lucide-react";
+import { isAdmin } from "@/lib/adminGate";
 import { openAIService, OpenAISearchResult } from "@/lib/openai";
 import { ApiKeyDialog } from "@/components/ApiKeyDialog";
 import { IdeogramKeyDialog } from "@/components/IdeogramKeyDialog";
@@ -4937,9 +4938,9 @@ const Index = () => {
       const prompt = buildIdeogramPrompt(ideogramPayload);
       const aspectForIdeogram = getAspectRatioForIdeogram(aspectRatio);
       const styleForIdeogram = getStyleTypeForIdeogram(visualStyle);
-      // Get model from runtime overrides
+      // Get model from runtime overrides - force V3 for customers, admin can override
       const runtimeOverrides = getRuntimeOverrides();
-      let chosenModel = runtimeOverrides.ideogramModel || 'V_2A_TURBO';
+      let chosenModel = isAdmin() ? (runtimeOverrides.ideogramModel || 'V_3') : 'V_3';
       
       // Force V_3 for EXACT TEXT prompts to improve text rendering
       const isExactTextPrompt = prompt.includes('EXACT TEXT TOP:') || prompt.includes('EXACT TEXT:');
@@ -5167,15 +5168,17 @@ const Index = () => {
           <div></div>
           <StepProgress currentStep={currentStep} />
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate("/ai-settings")}
-              className="gap-2"
-            >
-              <Settings className="h-4 w-4" />
-              AI Settings
-            </Button>
+            {isAdmin() && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate("/ai-settings")}
+                className="gap-2"
+              >
+                <Settings className="h-4 w-4" />
+                Admin Settings
+              </Button>
+            )}
           </div>
         </div>
         
@@ -6557,8 +6560,8 @@ const Index = () => {
                       <Loader2 className="h-8 w-8 animate-spin text-primary" />
                       <p className="text-muted-foreground text-lg">Generating image...</p>
                       {(() => {
-                        const runtimeOverrides = getRuntimeOverrides();
-                        const chosenModel = runtimeOverrides.ideogramModel || 'V_2A_TURBO';
+                      const runtimeOverrides = getRuntimeOverrides();
+                        const chosenModel = isAdmin() ? (runtimeOverrides.ideogramModel || 'V_3') : 'V_3';
                         if (chosenModel === 'V_3') {
                           return <p className="text-muted-foreground text-sm">We'll try Ideogram V3 first and automatically use Turbo if V3 is unavailable.</p>;
                         }
@@ -7094,9 +7097,9 @@ const Index = () => {
                 let styleType = getStyleTypeForIdeogram(visualStyle);
                 let model: 'V_1' | 'V_1_TURBO' | 'V_2' | 'V_2_TURBO' | 'V_2A' | 'V_2A_TURBO' | 'V_3' = 'V_2_TURBO';
 
-                // Get model from AI settings instead of auto-selecting based on style
+                // Get model from AI settings - force V3 for customers, admin can override
                 const runtimeOverrides = getRuntimeOverrides();
-                let chosenModel = runtimeOverrides.ideogramModel || 'V_2A_TURBO';
+                let chosenModel = isAdmin() ? (runtimeOverrides.ideogramModel || 'V_3') : 'V_3';
                 
                 // Force V_3 for EXACT TEXT prompts to improve text rendering
                 const isExactTextPrompt = promptText.includes('EXACT TEXT TOP:') || promptText.includes('EXACT TEXT:');

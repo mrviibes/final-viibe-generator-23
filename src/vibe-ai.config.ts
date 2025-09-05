@@ -36,30 +36,24 @@ export function getRuntimeOverrides(): AIRuntimeOverrides {
     const stored = localStorage.getItem('ai-runtime-overrides');
     let overrides: AIRuntimeOverrides = stored ? JSON.parse(stored) : {};
     
-    // Migrate legacy ideogram model setting
+    // Force defaults for locked customer settings
+    overrides.spellcheckEnabled = true; // Always ON
     if (!overrides.ideogramModel) {
-      const legacyModel = localStorage.getItem('ideogram_selected_model');
-      if (legacyModel === 'V_3') {
-        overrides.ideogramModel = 'V_3';
-        setRuntimeOverrides({ ideogramModel: 'V_3' });
-        localStorage.removeItem('ideogram_selected_model');
-      }
+      overrides.ideogramModel = 'V_3'; // Default to V3
     }
-
-    // Set defaults if not explicitly set (fastVisualsEnabled OFF for reliability)
+    
+    // Set admin defaults if not explicitly set
     if (overrides.strictModelEnabled === undefined) {
       overrides.strictModelEnabled = true;
-    }
-    if (overrides.fastVisualsEnabled === undefined) {
-      overrides.fastVisualsEnabled = false; // Default OFF for reliability
     }
     
     return overrides;
   } catch {
-    // Set defaults as fallback (fastVisualsEnabled OFF for reliability)
+    // Set forced defaults as fallback
     const defaults = {
-      strictModelEnabled: true,
-      fastVisualsEnabled: false // Default OFF for reliability
+      spellcheckEnabled: true,
+      ideogramModel: 'V_3' as const,
+      strictModelEnabled: true
     };
     setRuntimeOverrides(defaults);
     return defaults;
@@ -223,14 +217,14 @@ export const MODEL_FALLBACK_CHAINS = {
   ]
 };
 
-// Available models for UI
+// Available models for UI  
 export const AVAILABLE_MODELS = [
-  { value: 'gpt-4o-mini', label: 'GPT-4o Mini (Fast)', isRecommended: true },
-  { value: 'gpt-5-mini-2025-08-07', label: 'GPT-5 Mini', isRecommended: false },
-  { value: 'gpt-5-2025-08-07', label: 'GPT-5 (Flagship)', isRecommended: false },
-  { value: 'gpt-4.1-2025-04-14', label: 'GPT-4.1', isRecommended: false },
-  { value: 'o4-mini-2025-04-16', label: 'O4 Mini (Fast Reasoning)', isRecommended: false },
-  { value: 'o3-2025-04-16', label: 'O3 (Powerful Reasoning)', isRecommended: false },
+  'gpt-4o-mini',
+  'gpt-5-mini-2025-08-07',
+  'gpt-5-2025-08-07', 
+  'gpt-4.1-2025-04-14',
+  'o4-mini-2025-04-16',
+  'o3-2025-04-16'
 ];
 
 // Friendly model names for display
