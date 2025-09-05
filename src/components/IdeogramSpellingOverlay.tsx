@@ -27,6 +27,12 @@ export function IdeogramSpellingOverlay({
 
   const { isExactText, extractedText } = detectExactTextRequest(originalPrompt);
   
+  // Check for TOP/BOTTOM pattern to display target lines
+  const topBottomMatch = originalPrompt.match(/EXACT TEXT TOP:\s*["']([^"']+)["']\s*EXACT TEXT BOTTOM:\s*["']([^"']+)["']/i);
+  const displayText = topBottomMatch 
+    ? `TOP: "${topBottomMatch[1]}" | BOTTOM: "${topBottomMatch[2]}"`
+    : extractedText;
+  
   // Only show for exact text requests or when spelling guarantee is enabled
   if (!isExactText && !showSpellingGuarantee) return null;
 
@@ -53,7 +59,7 @@ export function IdeogramSpellingOverlay({
                   V3 model temporarily unavailable. Using V2A_TURBO may affect text rendering quality.
                   {isExactText && (
                     <span className="block mt-1">
-                      Expected text: <strong>"{extractedText}"</strong>
+                      Expected text: <strong>"{displayText}"</strong>
                     </span>
                   )}
                 </p>
@@ -67,7 +73,7 @@ export function IdeogramSpellingOverlay({
                   Using V3 model for enhanced text rendering.
                   {isExactText && (
                     <span className="block mt-1">
-                      Target text: <strong>"{extractedText}"</strong>
+                      Target text: <strong>"{displayText}"</strong>
                     </span>
                   )}
                 </p>

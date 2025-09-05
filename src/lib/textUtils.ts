@@ -58,7 +58,18 @@ export function isTextMisspelled(originalText: string, renderedText: string): bo
 }
 
 export function detectExactTextRequest(prompt: string): { isExactText: boolean; extractedText: string } {
-  // Look for EXACT TEXT patterns
+  // Look for new TOP/BOTTOM pattern first
+  const topBottomPattern = /EXACT TEXT TOP:\s*["']([^"']+)["']\s*EXACT TEXT BOTTOM:\s*["']([^"']+)["']/i;
+  const topBottomMatch = prompt.match(topBottomPattern);
+  
+  if (topBottomMatch) {
+    return { 
+      isExactText: true, 
+      extractedText: `${topBottomMatch[1]} ${topBottomMatch[2]}` 
+    };
+  }
+  
+  // Look for original EXACT TEXT patterns
   const exactTextPattern = /EXACT TEXT:\s*["']([^"']+)["']/i;
   const match = prompt.match(exactTextPattern);
   

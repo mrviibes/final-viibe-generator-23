@@ -4939,9 +4939,16 @@ const Index = () => {
       const styleForIdeogram = getStyleTypeForIdeogram(visualStyle);
       // Get model from runtime overrides
       const runtimeOverrides = getRuntimeOverrides();
-      const chosenModel = runtimeOverrides.ideogramModel || 'V_2A_TURBO';
+      let chosenModel = runtimeOverrides.ideogramModel || 'V_2A_TURBO';
+      
+      // Force V_3 for EXACT TEXT prompts to improve text rendering
+      const isExactTextPrompt = prompt.includes('EXACT TEXT TOP:') || prompt.includes('EXACT TEXT:');
+      if (isExactTextPrompt) {
+        chosenModel = 'V_3';
+        console.log('🎯 EXACT TEXT detected - forcing V_3 model for better text rendering');
+      }
       // Force magic prompt OFF for exact text prompts
-      const isExactTextPrompt = prompt.includes('EXACT TEXT:') || prompt.includes('[PERFECT_SPELLING]');
+      // Note: isExactTextPrompt already defined above for model selection
       const magicPromptEnabled = isExactTextPrompt ? false : (runtimeOverrides.magicPromptEnabled ?? true);
       console.log('=== Ideogram Generation Debug ===');
       
@@ -7089,7 +7096,15 @@ const Index = () => {
 
                 // Get model from AI settings instead of auto-selecting based on style
                 const runtimeOverrides = getRuntimeOverrides();
-                const chosenModel = runtimeOverrides.ideogramModel || 'V_2A_TURBO';
+                let chosenModel = runtimeOverrides.ideogramModel || 'V_2A_TURBO';
+                
+                // Force V_3 for EXACT TEXT prompts to improve text rendering
+                const isExactTextPrompt = promptText.includes('EXACT TEXT TOP:') || promptText.includes('EXACT TEXT:');
+                if (isExactTextPrompt) {
+                  chosenModel = 'V_3';
+                  console.log('🎯 EXACT TEXT detected - forcing V_3 model for better text rendering');
+                }
+                
                 model = chosenModel;
                 console.log(`🎨 Using Ideogram model from AI Settings: ${chosenModel}`);
 

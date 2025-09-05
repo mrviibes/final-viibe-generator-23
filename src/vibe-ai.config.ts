@@ -11,6 +11,8 @@
     - v1.1.0 added runtime overrides system
 */
 
+import { detectExactTextRequest } from './lib/textUtils';
+
 // Runtime overrides (stored in localStorage)
 export interface AIRuntimeOverrides {
   model?: string;
@@ -957,7 +959,17 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
   // EXACT TEXT RENDERING (if present) with enhanced quality controls
   if (handoff.key_line && handoff.key_line.trim()) {
     const cleanText = handoff.key_line.replace(/[""]/g, '"').replace(/['']/g, "'").replace(/[—–]/g, '-').trim();
-    parts.push(`EXACT TEXT: ${cleanText}`);
+    
+    // Check if this is an EXACT TEXT request for meme format
+    const { isExactText } = detectExactTextRequest(cleanText);
+    if (isExactText) {
+      // Split into TOP/BOTTOM for meme layout
+      const { top, bottom } = splitMemeLines(cleanText);
+      parts.push(`EXACT TEXT TOP: "${top}"`);
+      parts.push(`EXACT TEXT BOTTOM: "${bottom}"`);
+    } else {
+      parts.push(`EXACT TEXT: ${cleanText}`);
+    }
     
     // CRITICAL FIX: Add TEXT ZONE directive for EXACT TEXT requests
     const typographyZone = getTypographyStyleZone(typographyStyle);
@@ -1302,7 +1314,48 @@ export function getTypographyStyleConstraints(typography: string): string {
 }
 
 // =========================
-// 10) Legacy Support Functions
+// 10) Text Processing and Layout Functions
+// =========================
+
+// Split meme text into TOP and BOTTOM lines intelligently
+export function splitMemeLines(text: string): { top: string; bottom: string } {
+  const words = text.trim().split(/\s+/);
+  const totalWords = words.length;
+  
+  if (totalWords <= 4) {
+    // Short text: put first half on top, rest on bottom
+    const splitPoint = Math.ceil(totalWords / 2);
+    return {
+      top: words.slice(0, splitPoint).join(' '),
+      bottom: words.slice(splitPoint).join(' ')
+    };
+  }
+  
+  // Longer text: look for natural break points
+  const midPoint = Math.floor(totalWords / 2);
+  
+  // Check for punctuation near midpoint
+  for (let i = midPoint - 1; i <= midPoint + 1; i++) {
+    if (i >= 0 && i < totalWords - 1) {
+      const word = words[i];
+      if (word.match(/[,.!?;:]$/)) {
+        return {
+          top: words.slice(0, i + 1).join(' '),
+          bottom: words.slice(i + 1).join(' ')
+        };
+      }
+    }
+  }
+  
+  // No punctuation found, split at midpoint
+  return {
+    top: words.slice(0, midPoint).join(' '),
+    bottom: words.slice(midPoint).join(' ')
+  };
+}
+
+// =========================
+// 11) Legacy Support Functions
 // =========================
 export function buildDeveloperPrompt(inputs: VibeInputs): string {
   const {
