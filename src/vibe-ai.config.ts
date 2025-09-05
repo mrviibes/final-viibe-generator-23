@@ -949,7 +949,12 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
       subject = visualParts.length >= 2 ? visualParts[0].trim() : handoff.chosen_visual;
     }
     
-    parts.push(`Clean ${handoff.visual_style || 'realistic'} ${subject || handoff.category} environment scene with ${background}.`);
+    // Use chosen_visual as primary scene description, fallback to generic
+    if (handoff.chosen_visual) {
+      parts.push(handoff.chosen_visual);
+    } else {
+      parts.push(`Clean ${handoff.visual_style || 'realistic'} ${subject || handoff.category} environment scene with ${background}.`);
+    }
     
     // STRENGTHEN anti-giant-text constraints for caption mode
     if (typographyStyle === 'subtle-caption') {
@@ -962,14 +967,15 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
       parts.push(`Occasion: ${handoff.category}, ${handoff.subcategory_primary}${handoff.subcategory_secondary ? ` (${handoff.subcategory_secondary})` : ''}.`);
     }
     
-    // MAIN SUBJECT
-    let subject = handoff.rec_subject;
-    if (!subject && handoff.chosen_visual) {
-      const visualParts = handoff.chosen_visual.split(' - ');
-      subject = visualParts.length >= 2 ? visualParts[0].trim() : handoff.chosen_visual;
-    }
-    if (subject) {
-      parts.push(`Subject: ${subject}.`);
+    // Use chosen_visual as primary scene description if available
+    if (handoff.chosen_visual) {
+      parts.push(handoff.chosen_visual);
+    } else {
+      // Fallback to component-based description
+      let subject = handoff.rec_subject;
+      if (subject) {
+        parts.push(`Subject: ${subject}.`);
+      }
     }
     
     // BACKGROUND WITH ON-THEME ELEMENTS
@@ -987,15 +993,21 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     parts.push(`Background: ${background}.`);
   }
   
-  // PEOPLE INCLUSION (when recommended)
+  // PEOPLE INCLUSION (lane-aware directives)
   const peopleKeywords = ['friends', 'crowd', 'people', 'group', 'party', 'audience', 'performers', 'celebrating', 'family', 'parents', 'kids', 'children'];
-  const needsPeople = peopleKeywords.some(keyword => 
-    handoff.chosen_visual?.toLowerCase().includes(keyword) || 
-    handoff.rec_subject?.toLowerCase().includes(keyword) ||
-    handoff.rec_background?.toLowerCase().includes(keyword)
+  const soloKeywords = ['single person', 'one person', 'individual', 'solo'];
+  
+  const hasGroup = peopleKeywords.some(keyword => 
+    handoff.chosen_visual?.toLowerCase().includes(keyword)
   );
-  if (needsPeople) {
+  const hasSolo = soloKeywords.some(keyword => 
+    handoff.chosen_visual?.toLowerCase().includes(keyword)
+  );
+  
+  if (hasGroup && !hasSolo) {
     parts.push("Include multiple people clearly visible in the scene.");
+  } else if (hasSolo && !hasGroup) {
+    parts.push("Include exactly one person in the scene.");
   }
   
   // COMPOSITION & STYLE WITH ENHANCED DIRECTIVES
