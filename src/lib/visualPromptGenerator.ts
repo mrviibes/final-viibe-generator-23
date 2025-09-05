@@ -65,7 +65,8 @@ const IMAGERY: Record<string, Record<string, string[]>> = {
     "Christmas": ["string lights","ornaments","evergreen tree","wrapped gifts"],
     "Halloween": ["jack-o'-lanterns","cobwebs","moonlit yard","costumes"],
     "Valentine's Day": ["hearts","roses","chocolates"],
-    "New job / Promotion": ["confetti","office desk","congrats banner"]
+    "New job / Promotion": ["confetti","office desk","congrats banner"],
+    "Celebration (Generic)": ["streamers","ribbons","festive lights","confetti","gift wrap","bows"]
   },
   "Sports": {
     "Basketball": ["indoor court","hoop","net","sneakers","scoreboard"],
@@ -129,6 +130,20 @@ const TONE_LEX: Record<string, any> = {
   "Serious": { mood: "matter-of-fact", light: "neutral palette", verb: "keeps it direct" }
 };
 
+// Subcategory keyword mappings for inference
+const SUBCATEGORY_KEYWORDS: Record<string, string[]> = {
+  "Christmas": ["christmas", "sweater", "ornaments", "tinsel", "lights", "tree", "ugly sweater", "xmas"],
+  "Halloween": ["halloween", "costume", "pumpkin", "spooky", "witch", "cobwebs"],
+  "Wedding": ["wedding", "bride", "groom", "rings", "vows", "marriage"],
+  "Graduation": ["graduation", "diploma", "cap", "gown", "graduate"],
+  "Baby shower / New baby": ["baby shower", "rattle", "crib", "newborn", "infant"],
+  "Valentine's Day": ["valentine", "heart", "roses", "cupid", "romantic"],
+  "Birthday": ["birthday", "cake", "candles", "balloons", "party", "bday"],
+  "Anniversary": ["anniversary", "years together", "milestone"],
+  "Work / Office": ["work", "office", "job", "meeting", "desk"],
+  "Gym / Fitness": ["gym", "workout", "fitness", "exercise", "training"]
+};
+
 // Subcategory-specific SOLO actions for the third lane
 const SOLO_ACTION: Record<string, string> = {
   "Birthday": "blowing out candles on a cake",
@@ -136,6 +151,8 @@ const SOLO_ACTION: Record<string, string> = {
   "Wedding": "holding a bouquet close to the chest",
   "Anniversary": "toasting with champagne",
   "Valentine's Day": "holding a heart-shaped box of chocolates",
+  "Christmas": "tugging at loose tinsel on a sweater",
+  "Halloween": "adjusting a costume mask",
   "Basketball": "dribbling toward the hoop",
   "Soccer": "tying cleats at the sideline",
   "Work / Office": "typing on a laptop near a sunlit window",
@@ -174,7 +191,11 @@ function stylePhrases(style: string): string[] {
 
 function negativeFor(style: string): string {
   const s = STYLE_DESCRIPTORS[style] || STYLE_DESCRIPTORS["Realistic"];
-  return s.negative.join(", ");
+  return [
+    ...s.negative,
+    "background lettering",
+    "banners with words"
+  ].join(", ");
 }
 
 function sentence(parts: string[]): string {
@@ -235,13 +256,21 @@ function normalizeKey(input: string, mappings: Record<string, string>): string {
   return mappings[normalized] || input;
 }
 
-function inferBirthdayContext(text: string, tags: string[]): { category: string, subcategory: string } {
+function inferOccasion(text: string, tags: string[]): { category: string, subcategory: string } {
   const allText = [text, ...tags].join(" ").toLowerCase();
-  const birthdayTokens = ["birthday", "cake", "candles", "balloon", "party", "celebrate", "bday"];
   
-  if (birthdayTokens.some(token => allText.includes(token))) {
-    console.log("🎂 Birthday context inferred from text/tags");
-    return { category: "Celebrations", subcategory: "Birthday" };
+  // Check all subcategory keywords
+  for (const [subcategory, keywords] of Object.entries(SUBCATEGORY_KEYWORDS)) {
+    if (keywords.some(keyword => allText.includes(keyword))) {
+      console.log(`🎯 ${subcategory} context inferred from text/tags`);
+      
+      // Determine appropriate category based on subcategory
+      if (["Christmas", "Halloween", "Wedding", "Graduation", "Baby shower / New baby", "Valentine's Day", "Birthday", "Anniversary"].includes(subcategory)) {
+        return { category: "Celebrations", subcategory };
+      } else if (["Work / Office", "Gym / Fitness"].includes(subcategory)) {
+        return { category: "Daily Life", subcategory };
+      }
+    }
   }
   
   return { category: "", subcategory: "" };
@@ -257,9 +286,9 @@ export function generateVisualPrompts(inputs: VisualPromptInputs): VisualPromptO
   let subcategory = normalizeKey(inputs.subcategory, SUBCATEGORY_MAPPINGS);
   let toneKey = normalizeKey(inputs.tone, TONE_MAPPINGS);
 
-  // Birthday inference guard
+  // Occasion inference from text/tags
   if (!category || category === inputs.category) { // No valid mapping found
-    const inferred = inferBirthdayContext(text, tags);
+    const inferred = inferOccasion(text, tags);
     if (inferred.category) {
       category = inferred.category;
       subcategory = inferred.subcategory;
@@ -271,7 +300,7 @@ export function generateVisualPrompts(inputs: VisualPromptInputs): VisualPromptO
     category = "No Category (Freeform)";
   }
   if (!subcategory || (IMAGERY[category] && !IMAGERY[category][subcategory])) {
-    subcategory = category === "Celebrations" ? "Birthday" : "_generic";
+    subcategory = category === "Celebrations" ? "Celebration (Generic)" : "_generic";
   }
   if (!toneKey || !TONE_LEX[toneKey]) {
     toneKey = "Serious";
@@ -313,7 +342,8 @@ export function generateVisualPrompts(inputs: VisualPromptInputs): VisualPromptO
   const laneSolo = clamp(sentence([
     `Single person ${soloAction}`,
     `surrounded by ${join(pickN(objects, 3))}`,
-    `${tone.light}; ${tone.mood}`
+    `${tone.light}; ${tone.mood}`,
+    `[NEGATIVE_PROMPT: ${negativeFor(style)}, no idle posed subject]`
   ]));
 
   // Lane 4: CREATIVE (symbolic / abstract / collage)

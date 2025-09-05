@@ -11,7 +11,8 @@ const IMAGERY_ELEMENTS: Record<string, Record<string, string[]>> = {
     "graduation": ["graduation cap", "diploma", "celebration", "achievements", "ceremony"],
     "christmas": ["christmas tree", "presents", "snow", "holiday lights", "festive"],
     "halloween": ["pumpkins", "costumes", "spooky", "candy", "autumn"],
-    "valentine's day": ["hearts", "roses", "romantic", "red colors", "love"]
+    "valentine's day": ["hearts", "roses", "romantic", "red colors", "love"],
+    "celebration (generic)": ["streamers", "ribbons", "festive lights", "confetti", "gift wrap", "bows"]
   },
   "sports": {
     "basketball": ["basketball court", "basketball hoop", "player dribbling", "crowd cheering", "arena"],
@@ -134,10 +135,17 @@ export function generateHeuristicVisuals(inputs: VisualInputs): VisualOption[] {
   let baseElements: string[] = [];
   if (IMAGERY_ELEMENTS[categoryKey]?.[subcategoryKey]) {
     baseElements = IMAGERY_ELEMENTS[categoryKey][subcategoryKey];
+  } else if (categoryKey === "celebrations" && subcategoryKey === "celebration (generic)") {
+    // Use generic celebration elements to avoid birthday bias
+    baseElements = IMAGERY_ELEMENTS[categoryKey]["celebration (generic)"];
   } else if (IMAGERY_ELEMENTS[categoryKey]) {
-    // Use category-level generic elements if subcategory not defined
-    const categoryElements = Object.values(IMAGERY_ELEMENTS[categoryKey]).flat();
-    baseElements = [...new Set(categoryElements)]; // Remove duplicates
+    // For Daily Life categories, flatten is okay; for Celebrations, use generic
+    if (categoryKey === "celebrations") {
+      baseElements = IMAGERY_ELEMENTS[categoryKey]["celebration (generic)"];
+    } else {
+      const categoryElements = Object.values(IMAGERY_ELEMENTS[categoryKey]).flat();
+      baseElements = [...new Set(categoryElements)]; // Remove duplicates
+    }
   } else {
     baseElements = IMAGERY_ELEMENTS["no category"]["generic"];
   }

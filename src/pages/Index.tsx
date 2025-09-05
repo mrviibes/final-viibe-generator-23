@@ -4293,7 +4293,7 @@ const Index = () => {
   const getErrorMessage = (errorCode?: string) => {
     switch (errorCode) {
       case 'timeout':
-        return '⏰ AI generation timed out (30s). Try "Regenerate" or check your connection.';
+        return '⏰ Used category-aware fallback (AI timed out). Try "Regenerate" for model-backed recommendations.';
       case 'unauthorized':
         return '🔑 API key issue detected. Check your OpenAI key in settings.';
       case 'network':
@@ -4301,7 +4301,7 @@ const Index = () => {
       case 'parse_error':
         return '📄 Response parsing failed. Try "Regenerate" for a fresh attempt.';
       default:
-        return '⚠️ Used fallback options (AI timed out). Try "Regenerate" for fresh AI recommendations.';
+        return '⚠️ Used category-aware fallback options (AI timed out). Try "Regenerate" for fresh AI recommendations.';
     }
   };
 
