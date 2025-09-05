@@ -409,7 +409,7 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
   // Extract API metadata if available
   const apiMeta = (candidateResults as any)._apiMeta || null;
   
-  // Enhanced 4-lane validation
+  // Enhanced Universal Contract validation
   const allLines = candidateResults.map(c => c.line);
   const qualityCheck = validateFourLaneOutput(
     allLines, 
@@ -421,11 +421,13 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
   
   // Log quality issues for debugging
   if (!qualityCheck.valid && getRuntimeOverrides().showAdvancedPromptDetails) {
-    console.log('🔍 4-LANE QUALITY ISSUES:');
+    console.log('🔍 UNIVERSAL CONTRACT VALIDATION ISSUES:');
     qualityCheck.issues.forEach(issue => console.log(`  - ${issue}`));
+    console.log('All tags present:', qualityCheck.details.allTagsPresent.missingTags);
     console.log('Tag placements:', qualityCheck.details.tagPlacement.placements);
     console.log('Lengths:', qualityCheck.details.lengthDiversity.lengths);
     console.log('Opening words:', qualityCheck.details.openingVariety.openingWords);
+    console.log('Punctuation violations:', qualityCheck.details.punctuationWhitelist.violations);
   }
   
   // Filter out blocked candidates and remove duplicates

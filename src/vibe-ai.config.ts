@@ -638,6 +638,29 @@ export function postProcessLine(
     cleaned = cleaned.replace(/\s*\n\s*/g, ' ');
   }
 
+  // Universal Contract: Check punctuation whitelist first
+  const bannedPunctuation = /[—""'']/g;
+  if (bannedPunctuation.test(cleaned)) {
+    return {
+      line: cleaned,
+      blocked: true,
+      reason: 'Universal Contract violation: Contains banned punctuation (em-dashes, fancy quotes)'
+    };
+  }
+
+  // Universal Contract: Check all tags are present (case-insensitive)
+  if (tags && tags.length > 0) {
+    const cleanedLower = cleaned.toLowerCase();
+    const missingTags = tags.filter(tag => !cleanedLower.includes(tag.toLowerCase()));
+    if (missingTags.length > 0) {
+      return {
+        line: cleaned,
+        blocked: true,
+        reason: `Universal Contract violation: Missing required tags: ${missingTags.join(', ')}`
+      };
+    }
+  }
+
   // Check for banned patterns (meta-responses, instructional content)
   const isBannedPattern = BANNED_PATTERNS.some(pattern => pattern.test(cleaned));
   if (isBannedPattern) {
@@ -1536,63 +1559,41 @@ Return only: {"lines":["joke1\\nwith\\nnewlines","joke2\\nwith\\nnewlines","joke
   }
 
   const tagRequirement = inputs.tags && inputs.tags.length > 0 
-    ? (inputs.tags.length <= 4 
-        ? `\n• CRITICAL: Each option must include ALL of these words/phrases: ${inputs.tags.join(', ')}.`
-        : `\n• CRITICAL: Each option must include at least TWO of these words/phrases: ${inputs.tags.join(', ')}.`)
+    ? `\n• UNIVERSAL CONTRACT RULE: Every single line must include ALL of these words/phrases: ${inputs.tags.join(', ')}. No exceptions. Case-insensitive matching is fine.`
     : '';
 
-  // Define 4-lane system for variety enforcement
-  const getBirthdayLanes = (tone: string) => {
-    const toneMap: Record<string, string[]> = {
-      'Humorous': [
-        'food/cake themed humor',
-        'age/years themed humor', 
-        'party/celebration themed humor',
-        'surprise/roast themed humor'
-      ],
-      'Savage': [
-        'age-related roasts',
-        'getting older burns',
-        'party failure roasts', 
-        'birthday reality checks'
-      ],
-      'Sentimental': [
-        'cake and wishes sentiments',
-        'another year of growth',
-        'celebration of life moments',
-        'gratitude and reflection'
-      ],
-      'Inspirational': [
-        'new year, new possibilities',
-        'age brings wisdom',
-        'celebrating achievements',
-        'future dreams and goals'
-      ]
-    };
-    return toneMap[tone] || [
-      'celebration themed content',
-      'age/milestone themed content',
-      'party/festive themed content', 
-      'personal growth themed content'
-    ];
-  };
+  // Universal Contract 4-lane system enforcement
+  const universalContractLanes = `
+• UNIVERSAL CONTRACT FOUR LANES (use exactly one of each):
+  1. Platform/Prop - joke about tools/gear/stage of the ${inputs.subcategory}
+  2. Audience/Reaction - joke about how people respond to ${inputs.subcategory}  
+  3. Skill/Ability - joke about competence/style in ${inputs.subcategory}
+  4. Absurdity/Lifestyle - wild comparison or exaggerated scenario for ${inputs.subcategory}
 
-  const getGenericLanes = (subcategory: string, tone: string) => [
-    `${subcategory} experience focus`,
-    `${subcategory} emotion focus`,
-    `${subcategory} action focus`,
-    `${subcategory} outcome focus`
+• TAG PLACEMENT VARIETY: No two options should place tags in same position (leading/middle/closing)
+• LENGTH VARIETY: Mix approximately 50, 70, 90, and ≤100 characters 
+• PUNCTUATION RULES: Use only commas, periods, colons. NO em-dashes (—), NO double dashes (--)
+• TONE ENFORCEMENT: ${inputs.tone} wording throughout (Playful=cheeky, Savage=sharp, etc.)
+• NO RANDOM NAMES unless provided as tags
+• CATEGORY ANCHORING: Treat "${inputs.category}" as theme, "${inputs.subcategory}" refines it`;
+
+  const getUniversalLanes = (subcategory: string) => [
+    `Platform/Prop - tools/gear/stage of ${subcategory}`,
+    `Audience/Reaction - how people respond to ${subcategory}`,
+    `Skill/Ability - competence/style in ${subcategory}`,
+    `Absurdity/Lifestyle - wild comparisons for ${subcategory}`
   ];
 
-  const isBirthday = inputs.subcategory?.toLowerCase().includes('birthday');
-  const lanes = isBirthday ? getBirthdayLanes(inputs.tone) : getGenericLanes(inputs.subcategory || inputs.category, inputs.tone);
+  const lanes = getUniversalLanes(inputs.subcategory || inputs.category);
 
-  const corePrompt = `Generate exactly 4 distinct options for ${inputs.category} > ${inputs.subcategory} in ${inputs.tone} tone.
+  const corePrompt = `${universalContractLanes}
 
-CRITICAL TEXT GENERATION RULES:
+Generate exactly 4 distinct options for ${inputs.category} > ${inputs.subcategory} in ${inputs.tone} tone.
+
+UNIVERSAL CONTRACT ENFORCEMENT:
 • Each option must be ≤100 characters (hard limit)
 • Each option must be a complete, standalone line with clear subject and verb
-• Each option must match ${inputs.tone} tone consistently
+• Each option must match ${inputs.tone} tone consistently  
 • Each option must be clearly about ${inputs.subcategory || inputs.category}
 
 TAG PLACEMENT REQUIREMENTS:

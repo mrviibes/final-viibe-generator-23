@@ -64,24 +64,24 @@ export const CATEGORY_LANES: CategoryLanes = {
   'sports': {
     'hockey': [
       { 
-        name: 'rivalry_competition', 
-        description: 'Team rivalry and competitive spirit',
-        keywords: ['rival', 'opponent', 'team', 'compete', 'win', 'defeat'] 
+        name: 'Platform/Prop', 
+        description: 'Equipment, rink, gear, ice-related jokes',
+        keywords: ['stick', 'puck', 'skates', 'ice', 'rink', 'helmet', 'gear'] 
       },
       { 
-        name: 'clutch_moments', 
-        description: 'High-pressure game situations',
-        keywords: ['clutch', 'pressure', 'overtime', 'crucial', 'moment', 'decisive'] 
+        name: 'Audience/Reaction', 
+        description: 'How fans, crowd, family react to performance',
+        keywords: ['fans', 'crowd', 'cheer', 'boo', 'reaction', 'audience'] 
       },
       { 
-        name: 'superstition_ritual', 
-        description: 'Sports superstitions and rituals',
-        keywords: ['lucky', 'ritual', 'tradition', 'superstition', 'habit', 'routine'] 
+        name: 'Skill/Ability', 
+        description: 'Hockey skills, technique, performance level',
+        keywords: ['skill', 'shoot', 'pass', 'skate', 'goal', 'technique'] 
       },
       { 
-        name: 'player_banter', 
-        description: 'Player personality and locker room banter',
-        keywords: ['player', 'attitude', 'trash-talk', 'style', 'swagger', 'confidence'] 
+        name: 'Absurdity/Lifestyle', 
+        description: 'Wild comparisons, exaggerated hockey scenarios',
+        keywords: ['crazy', 'wild', 'impossible', 'ridiculous', 'extreme'] 
       }
     ]
   },
@@ -131,29 +131,65 @@ export function getLanesForCategory(category: string, subcategory: string): Lane
     }
   }
   
-  // Default generic lanes based on category
+  // Default universal lanes based on specification
   return [
     { 
-      name: 'experience_focus', 
-      description: `${subcategory} experience and participation`,
-      keywords: ['experience', 'participate', 'engage', 'involved'] 
+      name: 'Platform/Prop', 
+      description: `Tools, equipment, stage, props related to ${subcategory}`,
+      keywords: ['tools', 'equipment', 'gear', 'stage', 'props', 'platform'] 
     },
     { 
-      name: 'emotion_focus', 
-      description: `Emotional response and feelings about ${subcategory}`,
-      keywords: ['feel', 'emotion', 'reaction', 'response'] 
+      name: 'Audience/Reaction', 
+      description: `How people respond, audience reactions to ${subcategory}`,
+      keywords: ['people', 'audience', 'crowd', 'reaction', 'response', 'watch'] 
     },
     { 
-      name: 'action_focus', 
-      description: `Active participation and doing in ${subcategory}`,
-      keywords: ['do', 'action', 'perform', 'execute'] 
+      name: 'Skill/Ability', 
+      description: `Competence, technique, style in ${subcategory}`,
+      keywords: ['skill', 'ability', 'technique', 'competence', 'style', 'talent'] 
     },
     { 
-      name: 'outcome_focus', 
-      description: `Results and consequences of ${subcategory}`,
-      keywords: ['result', 'outcome', 'consequence', 'effect'] 
+      name: 'Absurdity/Lifestyle', 
+      description: `Wild comparisons, exaggerated scenarios for ${subcategory}`,
+      keywords: ['wild', 'crazy', 'ridiculous', 'extreme', 'absurd', 'lifestyle'] 
     }
   ];
+}
+
+// Validate all tags are present in every line (Universal Contract Rule 1)
+export function validateAllTagsPresent(lines: string[], tags: string[]): {
+  valid: boolean;
+  issues: string[];
+  missingTags: string[][];
+} {
+  if (!tags || tags.length === 0) {
+    return { valid: true, issues: [], missingTags: [] };
+  }
+  
+  const issues: string[] = [];
+  const missingTags: string[][] = [];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].toLowerCase();
+    const lineMissing: string[] = [];
+    
+    for (const tag of tags) {
+      if (!line.includes(tag.toLowerCase())) {
+        lineMissing.push(tag);
+      }
+    }
+    
+    missingTags.push(lineMissing);
+    if (lineMissing.length > 0) {
+      issues.push(`Line ${i + 1}: Missing tags: ${lineMissing.join(', ')}`);
+    }
+  }
+  
+  return {
+    valid: issues.length === 0,
+    issues,
+    missingTags
+  };
 }
 
 // Check for tag placement variety across 4 options
@@ -178,9 +214,9 @@ export function validateTagPlacement(lines: string[], tags: string[]): {
       const tagPos = line.toLowerCase().indexOf(tag.toLowerCase());
       if (tagPos !== -1) {
         const lineLength = line.length;
-        if (tagPos < lineLength * 0.2) {
+        if (tagPos < lineLength * 0.3) {
           placement = 'leading';
-        } else if (tagPos > lineLength * 0.8) {
+        } else if (tagPos > lineLength * 0.7) {
           placement = 'closing';
         } else {
           placement = 'middle';
@@ -196,16 +232,64 @@ export function validateTagPlacement(lines: string[], tags: string[]): {
     }
   }
   
-  // Check for variety in placements
-  const uniquePlacements = new Set(placements.filter(p => p !== 'none'));
-  if (uniquePlacements.size < 2 && lines.length >= 3) {
-    issues.push('Insufficient tag placement variety (need at least 2 different positions)');
+  // Stronger variety check - no two lines should use same placement pattern
+  const placementCounts = placements.reduce((acc, p) => {
+    acc[p] = (acc[p] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  
+  const duplicatePlacements = Object.entries(placementCounts)
+    .filter(([placement, count]) => placement !== 'none' && count > 1)
+    .map(([placement]) => placement);
+  
+  if (duplicatePlacements.length > 0) {
+    issues.push(`Duplicate tag placements: ${duplicatePlacements.join(', ')} (need varied placement patterns)`);
   }
   
   return {
     valid: issues.length === 0,
     issues,
     placements
+  };
+}
+
+// Validate punctuation whitelist (Universal Contract Rule 6)
+export function validatePunctuationWhitelist(lines: string[]): {
+  valid: boolean;
+  issues: string[];
+  violations: string[];
+} {
+  const allowedPunctuation = /^[a-zA-Z0-9\s,.:'()!?-]+$/;
+  const bannedPatterns = [
+    /—/g, // em-dash
+    /--/g, // double dash
+    /"/g, // quotes
+    /'/g, // fancy quotes
+    /'/g, // fancy quotes
+    /"/g, // fancy quotes
+    /"/g  // fancy quotes
+  ];
+  
+  const issues: string[] = [];
+  const violations: string[] = [];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    
+    for (const pattern of bannedPatterns) {
+      if (pattern.test(line)) {
+        const matches = line.match(pattern) || [];
+        issues.push(`Line ${i + 1}: Contains banned punctuation: ${matches.join(', ')}`);
+        violations.push(line);
+        break;
+      }
+    }
+  }
+  
+  return {
+    valid: issues.length === 0,
+    issues,
+    violations
   };
 }
 
@@ -279,7 +363,7 @@ export function validateOpeningWordVariety(lines: string[]): {
   };
 }
 
-// Comprehensive quality check for 4-lane generation
+// Comprehensive quality check for 4-lane generation (Universal Contract)
 export function validateFourLaneOutput(
   lines: string[], 
   tags: string[], 
@@ -290,19 +374,25 @@ export function validateFourLaneOutput(
   valid: boolean;
   issues: string[];
   details: {
+    allTagsPresent: ReturnType<typeof validateAllTagsPresent>;
     tagPlacement: ReturnType<typeof validateTagPlacement>;
     lengthDiversity: ReturnType<typeof validateLengthDiversity>;
     openingVariety: ReturnType<typeof validateOpeningWordVariety>;
+    punctuationWhitelist: ReturnType<typeof validatePunctuationWhitelist>;
   };
 } {
+  const allTagsPresent = validateAllTagsPresent(lines, tags);
   const tagPlacement = validateTagPlacement(lines, tags);
   const lengthDiversity = validateLengthDiversity(lines);
   const openingVariety = validateOpeningWordVariety(lines);
+  const punctuationWhitelist = validatePunctuationWhitelist(lines);
   
   const allIssues = [
+    ...allTagsPresent.issues,
     ...tagPlacement.issues,
     ...lengthDiversity.issues,
-    ...openingVariety.issues
+    ...openingVariety.issues,
+    ...punctuationWhitelist.issues
   ];
   
   // Additional tone consistency check
@@ -322,9 +412,11 @@ export function validateFourLaneOutput(
     valid: allIssues.length === 0,
     issues: allIssues,
     details: {
+      allTagsPresent,
       tagPlacement,
       lengthDiversity,
-      openingVariety
+      openingVariety,
+      punctuationWhitelist
     }
   };
 }
