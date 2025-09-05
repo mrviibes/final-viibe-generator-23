@@ -1127,8 +1127,70 @@ export function getStyleTypeForIdeogram(visualStyle: string): 'AUTO' | 'GENERAL'
 }
 
 // Typography helper functions for compact prompt building with enhanced variety
+// Layout block mapper for explicit positioning directives
+export function getLayoutBlock(layout: string, aspectRatio: string = "square"): string {
+  const L = layout.toLowerCase();
+  
+  if (L.includes("side bar") || L.includes("side-bar")) {
+    return `TEXT ZONE: LEFT PANEL
+CANVAS: ${aspectRatio}
+REGION: x=0% y=0% w=28% h=100%
+TEXT: align=left, valign=center, line-wrap=balanced, max-lines=5
+STYLE: high-contrast, white text on subtle dark overlay (opacity 35–45%)
+SAFE: 24px padding inside region, no subject/props inside region
+RULES: DO NOT center text. DO NOT place text outside REGION. Reserve REGION as solid panel.`;
+  }
+
+  if (L.includes("negative")) {
+    return `TEXT ZONE: NEGATIVE SPACE
+PLACEMENT: find largest empty area away from main subject
+BOUNDS: margin 6% from edges, keep 8% from subject mask
+TEXT: align=left, max 3 lines, weight=bold
+SAFE: subtle drop shadow
+RULES: DO NOT overlap primary subject; shrink text if needed.`;
+  }
+
+  if (L.includes("meme")) {
+    return `TEXT ZONE: MEME
+TOP: x=0% y=0% w=100% h=18%, align=center, all caps, stroke=2px black
+BOTTOM: x=0% y=82% w=100% h=18%, align=center, all caps, stroke=2px black
+RULES: keep faces visible (6% margin).`;
+  }
+
+  if (L.includes("lower third") || L.includes("lower-third")) {
+    return `TEXT ZONE: LOWER THIRD
+REGION: x=0% y=72% w=100% h=28%
+BANNER: solid/blur 70–80% opacity
+TEXT: align=left, padding=24px`;
+  }
+
+  if (L.includes("badge") || L.includes("sticker")) {
+    return `TEXT ZONE: BADGE
+REGION: x=72% y=6% w=24% h=24%
+STYLE: circular, high-contrast, drop shadow
+TEXT: center, max 4 lines
+RULES: move to safe corner if overlap.`;
+  }
+
+  if (L.includes("subtle") || L.includes("caption")) {
+    return `TEXT ZONE: CAPTION
+REGION: x=6% y=86% w=88% h=12%
+TEXT: align=left, small, on soft strip
+RULES: never cover faces; reduce size if needed.`;
+  }
+
+  return "";
+}
+
 export function getTypographyStyleZone(typography: string): string {
-  // Add random variation to prevent duplicate outputs
+  // Use explicit layout blocks for consistent positioning
+  const layoutBlock = getLayoutBlock(typography);
+  if (layoutBlock) {
+    console.log(`Using explicit layout block for ${typography}`);
+    return layoutBlock;
+  }
+  
+  // Fallback to original random options for backwards compatibility
   const randomSeed = Math.floor(Math.random() * 3) + 1;
   
   switch (typography) {
@@ -1139,32 +1201,6 @@ export function getTypographyStyleZone(typography: string): string {
         'TEXT ZONE: find natural text areas in composition'
       ];
       return nsOptions[randomSeed - 1];
-    case 'meme-style':
-      return 'TEXT ZONE: TOP and BOTTOM bands, classic impact font style';
-    case 'lower-third':
-      const ltOptions = [
-        'TEXT ZONE: bottom 20% banner area only',
-        'TEXT ZONE: lower third band, news-style placement',
-        'TEXT ZONE: bottom overlay bar'
-      ];
-      return ltOptions[randomSeed - 1];
-    case 'side-bar':
-      const sbOptions = [
-        'TEXT ZONE: left 25% vertical panel',
-        'TEXT ZONE: right side panel, clear separation',
-        'TEXT ZONE: side column layout'
-      ];
-      return sbOptions[randomSeed - 1];
-    case 'badge-sticker':
-      return 'TEXT ZONE: small badge/sticker, corner or edge placement';
-    case 'subtle-caption':
-      // FIXED: Much more specific constraints for subtle caption
-      const scOptions = [
-        'TEXT ZONE: tiny bottom-right corner, maximum 8% image area',
-        'TEXT ZONE: small top-left corner, very unobtrusive, max 6% area',
-        'TEXT ZONE: minimal bottom-left corner caption, under 8% area'
-      ];
-      return scOptions[randomSeed - 1];
     case 'poster':
       return 'TEXT ZONE: centered or balanced poster overlay with clear separation';
     default:

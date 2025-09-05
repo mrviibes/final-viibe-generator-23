@@ -505,17 +505,45 @@ function normalizePromptForIdeogram(prompt: string): string {
 function enhancePromptForV3ExactText(prompt: string, isExactText: boolean): string {
   if (!isExactText) return prompt;
   
-  // Remove bracketed tags, colon labels, and microtext-inducing fragments
+  // List of layout directives to preserve (case-insensitive)
+  const preservedLayoutLabels = [
+    'TEXT ZONE', 'REGION', 'CANVAS', 'TEXT:', 'STYLE:', 'SAFE:', 'RULES:', 
+    'TOP:', 'BOTTOM:', 'BANNER:', 'PLACEMENT:', 'BOUNDS:'
+  ];
+  
+  // Remove bracketed tags but preserve layout directives
   let enhanced = prompt
     .replace(/\[[^\]]*\]/g, '')                    // Remove all bracketed tags
-    .replace(/\b[A-Z_]+:\s*/g, '')                 // Remove colon-labeled headings
     .replace(/\s+Render ONLY this text[^.]*\./gi, '')
     .replace(/\s+Do NOT add any other words[^.]*\./gi, '')
     .replace(/\s+ID:\d+_\d+/gi, '')               // Remove ID tags
     .replace(/\s+PERFECT_SPELLING/gi, '')          // Remove quality tags
     .replace(/\s+CRISP_FONT/gi, '')
-    .trim()
-    .replace(/\s+/g, ' ');                        // Normalize spacing
+    .trim();
+    
+  // Remove non-layout colon labels (preserve layout ones)
+  const lines = enhanced.split('\n');
+  const cleanedLines = lines.filter(line => {
+    const trimmed = line.trim();
+    if (!trimmed.includes(':')) return true;
+    
+    // Check if this line contains any preserved layout labels
+    const hasLayoutLabel = preservedLayoutLabels.some(label => 
+      trimmed.toUpperCase().includes(label.toUpperCase())
+    );
+    
+    // If it has a layout label, keep it; otherwise check if it's a generic colon label to remove
+    if (hasLayoutLabel) {
+      console.log(`Preserving layout directive: ${trimmed}`);
+      return true;
+    }
+    
+    // Remove generic colon-labeled headings that aren't layout directives
+    const isGenericColonLabel = /^\b[A-Z_]+:\s*/.test(trimmed);
+    return !isGenericColonLabel;
+  });
+  
+  enhanced = cleanedLines.join('\n').replace(/\s+/g, ' ').trim();
     
   // Re-append the safety directive
   enhanced += ' Render exactly the specified text with no additions.';
