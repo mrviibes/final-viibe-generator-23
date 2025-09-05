@@ -400,6 +400,8 @@ function applyVarietyGuard(candidates: string[], inputs: VibeInputs): string[] {
     }
   });
   
+  return result;
+}
 
 export async function generateCandidates(inputs: VibeInputs, n: number = 4): Promise<VibeResult> {
   const candidateResults = await generateMultipleCandidates(inputs);
