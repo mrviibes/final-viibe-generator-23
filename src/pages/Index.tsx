@@ -7,8 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Search, Loader2, AlertCircle, ArrowLeft, ArrowRight, X, Download, Settings, ChevronDown, Copy } from "lucide-react";
-import { isAdmin } from "@/lib/adminGate";
+import { Search, Loader2, AlertCircle, ArrowLeft, ArrowRight, X, Download, ChevronDown, Copy } from "lucide-react";
 import { openAIService, OpenAISearchResult } from "@/lib/openai";
 import { ApiKeyDialog } from "@/components/ApiKeyDialog";
 import { IdeogramKeyDialog } from "@/components/IdeogramKeyDialog";
@@ -4938,9 +4937,8 @@ const Index = () => {
       const prompt = buildIdeogramPrompt(ideogramPayload);
       const aspectForIdeogram = getAspectRatioForIdeogram(aspectRatio);
       const styleForIdeogram = getStyleTypeForIdeogram(visualStyle);
-      // Get model from runtime overrides - force V3 for customers, admin can override
-      const runtimeOverrides = getRuntimeOverrides();
-      let chosenModel = isAdmin() ? (runtimeOverrides.ideogramModel || 'V_3') : 'V_3';
+      // Always use V3 - hard-locked for customers
+      let chosenModel: 'V_1' | 'V_1_TURBO' | 'V_2' | 'V_2_TURBO' | 'V_2A' | 'V_2A_TURBO' | 'V_3' = 'V_3';
       
       // Force V_3 for EXACT TEXT prompts to improve text rendering
       const isExactTextPrompt = prompt.includes('EXACT TEXT TOP:') || prompt.includes('EXACT TEXT:');
@@ -4948,9 +4946,8 @@ const Index = () => {
         chosenModel = 'V_3';
         console.log('🎯 EXACT TEXT detected - forcing V_3 model for better text rendering');
       }
-      // Force magic prompt OFF for exact text prompts
-      // Note: isExactTextPrompt already defined above for model selection
-      const magicPromptEnabled = isExactTextPrompt ? false : (runtimeOverrides.magicPromptEnabled ?? true);
+      // Force magic prompt OFF for exact text prompts - always enabled for customers
+      const magicPromptEnabled = true;
       console.log('=== Ideogram Generation Debug ===');
       
       console.log('Direct prompt provided:', !!directPrompt.trim());
@@ -5168,17 +5165,6 @@ const Index = () => {
           <div></div>
           <StepProgress currentStep={currentStep} />
           <div className="flex items-center gap-2">
-            {isAdmin() && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate("/ai-settings")}
-                className="gap-2"
-              >
-                <Settings className="h-4 w-4" />
-                Admin Settings
-              </Button>
-            )}
           </div>
         </div>
         
@@ -6559,14 +6545,7 @@ const Index = () => {
                   {isGeneratingImage ? <div className="flex flex-col items-center gap-4">
                       <Loader2 className="h-8 w-8 animate-spin text-primary" />
                       <p className="text-muted-foreground text-lg">Generating image...</p>
-                      {(() => {
-                      const runtimeOverrides = getRuntimeOverrides();
-                        const chosenModel = isAdmin() ? (runtimeOverrides.ideogramModel || 'V_3') : 'V_3';
-                        if (chosenModel === 'V_3') {
-                          return <p className="text-muted-foreground text-sm">We'll try Ideogram V3 first and automatically use Turbo if V3 is unavailable.</p>;
-                        }
-                        return null;
-                      })()}
+                      <p className="text-muted-foreground text-sm">We'll try Ideogram V3 first and automatically use Turbo if V3 is unavailable.</p>
                     </div> : generatedImages.length > 0 ? <div className="max-w-full max-h-full">
                       <div className="mb-4">
                         <img src={generatedImages[selectedImageIndex]} alt={`Generated Vibe ${selectedImageIndex + 1}`} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
@@ -6831,10 +6810,7 @@ const Index = () => {
                       })()}
                     </div>
                     <div>
-                      <span className="font-medium">Model:</span> {(() => {
-                        const runtimeOverrides = getRuntimeOverrides();
-                        return runtimeOverrides.ideogramModel || 'V_2A_TURBO';
-                      })()}
+                      <span className="font-medium">Model:</span> V_3
                     </div>
                   </div>
                   <div className="mt-3">
@@ -7097,9 +7073,8 @@ const Index = () => {
                 let styleType = getStyleTypeForIdeogram(visualStyle);
                 let model: 'V_1' | 'V_1_TURBO' | 'V_2' | 'V_2_TURBO' | 'V_2A' | 'V_2A_TURBO' | 'V_3' = 'V_2_TURBO';
 
-                // Get model from AI settings - force V3 for customers, admin can override
-                const runtimeOverrides = getRuntimeOverrides();
-                let chosenModel = isAdmin() ? (runtimeOverrides.ideogramModel || 'V_3') : 'V_3';
+                // Always use V3 - hard-locked for customers
+                let chosenModel: 'V_1' | 'V_1_TURBO' | 'V_2' | 'V_2_TURBO' | 'V_2A' | 'V_2A_TURBO' | 'V_3' = 'V_3';
                 
                 // Force V_3 for EXACT TEXT prompts to improve text rendering
                 const isExactTextPrompt = promptText.includes('EXACT TEXT TOP:') || promptText.includes('EXACT TEXT:');
@@ -7162,7 +7137,7 @@ const Index = () => {
                   let fallbackNote = '';
                   
                   if (result._fallback_note) {
-                    actualModelUsed = 'V_2A_TURBO';
+                    actualModelUsed = 'V_3';
                     fallbackNote = ' (fallback)';
                   }
                   

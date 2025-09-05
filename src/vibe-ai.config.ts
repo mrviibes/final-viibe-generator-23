@@ -60,15 +60,12 @@ export function getRuntimeOverrides(): AIRuntimeOverrides {
   }
 }
 
-// Set runtime overrides in localStorage
+// Set runtime overrides in localStorage - ADMIN ONLY VIA CODE
+// Customer UI cannot modify these settings
 export function setRuntimeOverrides(overrides: Partial<AIRuntimeOverrides>): void {
-  try {
-    const current = getRuntimeOverrides();
-    const updated = { ...current, ...overrides };
-    localStorage.setItem('ai-runtime-overrides', JSON.stringify(updated));
-  } catch (error) {
-    console.warn('Failed to save AI runtime overrides:', error);
-  }
+  // No-op for customers - settings are hard-locked
+  // To change defaults, modify the values in getRuntimeOverrides() function above
+  console.log('setRuntimeOverrides called - settings are locked. To change defaults, modify code in vibe-ai.config.ts');
 }
 
 // Clear all runtime overrides
@@ -303,7 +300,7 @@ export function getEffectiveConfig() {
     ...AI_CONFIG,
     spellcheck: {
       ...AI_CONFIG.spellcheck,
-      enabled: overrides.spellcheckEnabled ?? AI_CONFIG.spellcheck.enabled
+      enabled: true // Always enabled for customers
     },
     visual_defaults: {
       ...AI_CONFIG.visual_defaults,
