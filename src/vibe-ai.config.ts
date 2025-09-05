@@ -1502,8 +1502,17 @@ export function getStyleKeywords(visualStyle?: string): string {
   return styles[visualStyle || '3d-animated'] || 'modern visual style';
 }
 
+interface PopCultureContext {
+  subject: string;
+  bullets: string[];
+  trend_mode?: string;
+}
+
 // Builder for vibe generator chat messages
-export function buildVibeGeneratorMessages(inputs: VibeInputs): Array<{role: string; content: string}> {
+export function buildVibeGeneratorMessages(
+  inputs: VibeInputs, 
+  popCulture?: PopCultureContext
+): Array<{role: string; content: string}> {
   // Check for knock-knock jokes
   const isKnockKnock = inputs.subcategory?.toLowerCase().includes("knock");
   
@@ -1586,7 +1595,16 @@ Return only: {"lines":["joke1\\nwith\\nnewlines","joke2\\nwith\\nnewlines","joke
 
   const lanes = getUniversalLanes(inputs.subcategory || inputs.category);
 
-  const corePrompt = `${universalContractLanes}
+  // Inject Pop Culture Context if available
+  const popCultureBlock = popCulture && popCulture.bullets.length > 0 ? `
+Pop Culture Context:
+${popCulture.bullets.map(bullet => `- ${bullet}`).join('\n')}
+
+Use the context as joke fuel. Do not invent facts. Use "reported/viral" framing for sensitive topics. No defamation.
+
+` : '';
+
+  const corePrompt = `${popCultureBlock}${universalContractLanes}
 
 Generate exactly 4 distinct options for ${inputs.category} > ${inputs.subcategory} in ${inputs.tone} tone.
 

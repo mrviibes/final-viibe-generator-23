@@ -13,6 +13,7 @@ import {
   type VibeCandidate,
   type VibeResult
 } from '../vibe-ai.config';
+import { getPopCultureContext, extractSubjectFromInputs } from './popCultureContext';
 import { 
   validateFourLaneOutput,
   getLanesForCategory,
@@ -43,6 +44,44 @@ function getFallbackVariants(tone: string, category: string, subcategory: string
 // Post-processing now handled by centralized config
 
 async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: string): Promise<VibeCandidate[]> {
+  console.log("🎯 generateMultipleCandidates called with:", JSON.stringify(inputs, null, 2));
+
+  // Pop Culture Context Fetch
+  let popCultureContext = null;
+  if (inputs.category === 'Pop Culture' && 
+      inputs.subcategory && 
+      (inputs.subcategory.toLowerCase().includes('celebr') || 
+       inputs.subcategory.toLowerCase().includes('influencer'))) {
+    
+    const subject = extractSubjectFromInputs({
+      search_term: inputs.search_term,
+      tags: inputs.tags,
+      subcategory: inputs.subcategory
+    });
+
+    if (subject) {
+      // Determine trend mode from tags
+      const trendMode = inputs.tags?.includes('recent') ? 'recent' : 'evergreen';
+      
+      try {
+        popCultureContext = await getPopCultureContext(subject, trendMode, {
+          category: inputs.category,
+          subcategory: inputs.subcategory,
+          tone: inputs.tone,
+          tags: inputs.tags
+        });
+        
+        if (popCultureContext) {
+          console.log(`🎭 Pop culture context fetched: ${popCultureContext.bullets.length} bullets for ${subject}`);
+        } else {
+          console.log(`🎭 No pop culture context found for ${subject}`);
+        }
+      } catch (error) {
+        console.error('Pop culture context fetch error:', error);
+      }
+    }
+  }
+
   try {
     // Use effective config with runtime overrides
     const config = getEffectiveConfig();
@@ -51,7 +90,7 @@ async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: st
     console.log(`🚀 Text generation starting with user-selected model: ${targetModel}`);
     
     // Use centralized message builder
-    const messages = buildVibeGeneratorMessages(inputs);
+    const messages = buildVibeGeneratorMessages(inputs, popCultureContext);
     
     // Increase token budget for 4-lane generation with quality controls
     const maxTokens = 200;
