@@ -968,11 +968,20 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
       subject = visualParts.length >= 2 ? visualParts[0].trim() : handoff.chosen_visual;
     }
     
-    // Use chosen_visual as primary scene description, fallback to generic
+    // Use chosen_visual as primary scene description with action reinforcement
     if (handoff.chosen_visual) {
-      parts.push(handoff.chosen_visual);
+      let enhancedVisual = handoff.chosen_visual;
+      
+      // Action reinforcement for birthday scenes
+      if (isBirthday && enhancedVisual.includes('blowing out candles')) {
+        enhancedVisual = enhancedVisual.replace(/single person blowing out candles/gi, 
+          'portrait of one person with cheeks puffed, leaning toward cake, candles mid-blow, flame smoke visible');
+      }
+      
+      // Add scene directive for better action rendering
+      parts.push(`SCENE: ${enhancedVisual}`);
     } else {
-      parts.push(`Clean ${handoff.visual_style || 'realistic'} ${subject || handoff.category} environment scene with ${background}.`);
+      parts.push(`SCENE: Clean ${handoff.visual_style || 'realistic'} ${subject || handoff.category} environment scene with ${background}.`);
     }
     
     // STRENGTHEN anti-giant-text constraints for caption mode
@@ -1075,8 +1084,21 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     }
   }
   
-  // GLOBAL NEGATIVE PROMPT ENFORCEMENT - now used by Ideogram API
-  // Remove "Avoid:" injection from main prompt since it goes to negative_prompt field
+  // GLOBAL NEGATIVE PROMPT ENFORCEMENT - Add anti-text artifacts
+  const negativePrompts = [
+    'no background lettering', 'no banners with words', 'no wall decorations with text',
+    'no text on props', 'no signage', 'no writing on objects', 'no idle person'
+  ];
+  
+  // Add action-specific negative prompts for birthday scenes
+  const isBirthdayScene = handoff.category?.toLowerCase() === 'celebrations' && 
+                         handoff.subcategory_primary?.toLowerCase().includes('birthday');
+  if (isBirthdayScene && handoff.chosen_visual?.includes('blowing out candles')) {
+    negativePrompts.push('no static idle person', 'must show blowing candles action');
+  }
+  
+  // Inject negative prompt directive
+  parts.push(`NEGATIVE PROMPT: ${negativePrompts.join(', ')}`);
   
   const finalPrompt = parts.join(' ');
   
@@ -1138,7 +1160,8 @@ REGION: x=0% y=0% w=28% h=100%
 TEXT: align=left, valign=center, line-wrap=balanced, max-lines=5
 STYLE: high-contrast, white text on subtle dark overlay (opacity 35–45%)
 SAFE: 24px padding inside region, no subject/props inside region
-RULES: DO NOT center text. DO NOT place text outside REGION. Reserve REGION as solid panel.`;
+RULES: Overlay text must render exactly as provided, no substitutions, no injected characters. DO NOT center text. DO NOT place text outside REGION. Reserve REGION as solid panel.
+NEGATIVE PROMPT: no background lettering, no banners with words, no wall decorations with text`;
   }
 
   if (L.includes("negative")) {
@@ -1147,21 +1170,25 @@ PLACEMENT: find largest empty area away from main subject
 BOUNDS: margin 6% from edges, keep 8% from subject mask
 TEXT: align=left, max 3 lines, weight=bold
 SAFE: subtle drop shadow
-RULES: DO NOT overlap primary subject; shrink text if needed.`;
+RULES: Overlay text must render exactly as provided, no substitutions, no injected characters. DO NOT overlap primary subject; shrink text if needed.
+NEGATIVE PROMPT: no background lettering, no banners with words, no wall decorations with text`;
   }
 
   if (L.includes("meme")) {
     return `TEXT ZONE: MEME
 TOP: x=0% y=0% w=100% h=18%, align=center, all caps, stroke=2px black
 BOTTOM: x=0% y=82% w=100% h=18%, align=center, all caps, stroke=2px black
-RULES: keep faces visible (6% margin).`;
+RULES: Overlay text must render exactly as provided, no substitutions, no injected characters. Keep faces visible (6% margin).
+NEGATIVE PROMPT: no background lettering, no banners with words, no wall decorations with text`;
   }
 
   if (L.includes("lower third") || L.includes("lower-third")) {
     return `TEXT ZONE: LOWER THIRD
 REGION: x=0% y=72% w=100% h=28%
 BANNER: solid/blur 70–80% opacity
-TEXT: align=left, padding=24px`;
+TEXT: align=left, padding=24px
+RULES: Overlay text must render exactly as provided, no substitutions, no injected characters
+NEGATIVE PROMPT: no background lettering, no banners with words, no wall decorations with text`;
   }
 
   if (L.includes("badge") || L.includes("sticker")) {
@@ -1169,14 +1196,16 @@ TEXT: align=left, padding=24px`;
 REGION: x=72% y=6% w=24% h=24%
 STYLE: circular, high-contrast, drop shadow
 TEXT: center, max 4 lines
-RULES: move to safe corner if overlap.`;
+RULES: Overlay text must render exactly as provided, no substitutions, no injected characters. Move to safe corner if overlap.
+NEGATIVE PROMPT: no background lettering, no banners with words, no wall decorations with text`;
   }
 
   if (L.includes("subtle") || L.includes("caption")) {
     return `TEXT ZONE: CAPTION
 REGION: x=6% y=86% w=88% h=12%
 TEXT: align=left, small, on soft strip
-RULES: never cover faces; reduce size if needed.`;
+RULES: Overlay text must render exactly as provided, no substitutions, no injected characters. Never cover faces; reduce size if needed.
+NEGATIVE PROMPT: no background lettering, no banners with words, no wall decorations with text`;
   }
 
   return "";

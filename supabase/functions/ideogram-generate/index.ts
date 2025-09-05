@@ -465,6 +465,8 @@ function normalizePromptForIdeogram(prompt: string): string {
     .replace(/[—–]/g, '-')
     // Normalize ellipsis
     .replace(/…/g, '...')
+    // Remove risky characters that cause text corruption
+    .replace(/[%#&\/\\]/g, '')
     // Fix common spacing issues around punctuation
     .replace(/\s+([,.!?;:])/g, '$1')
     .replace(/([.!?])\s*([A-Z])/g, '$1 $2')
@@ -508,7 +510,7 @@ function enhancePromptForV3ExactText(prompt: string, isExactText: boolean): stri
   // List of layout directives to preserve (case-insensitive)
   const preservedLayoutLabels = [
     'TEXT ZONE', 'REGION', 'CANVAS', 'TEXT:', 'STYLE:', 'SAFE:', 'RULES:', 
-    'TOP:', 'BOTTOM:', 'BANNER:', 'PLACEMENT:', 'BOUNDS:'
+    'TOP:', 'BOTTOM:', 'BANNER:', 'PLACEMENT:', 'BOUNDS:', 'NEGATIVE PROMPT:', 'SCENE:'
   ];
   
   // Remove bracketed tags but preserve layout directives
