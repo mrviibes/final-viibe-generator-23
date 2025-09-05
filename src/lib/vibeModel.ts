@@ -715,8 +715,6 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
   };
 }
 
-}
-
 export async function generateFinalLine(inputs: VibeInputs): Promise<string> {
   const result = await generateCandidates(inputs, 4);
   return result.picked;
