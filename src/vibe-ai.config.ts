@@ -609,7 +609,7 @@ export function postProcessLine(
   line: string, 
   tone: string, 
   tags?: string[], 
-  options?: { allowNewlines?: boolean; format?: 'knockknock'; enforceNameGuard?: boolean }
+  options?: { allowNewlines?: boolean; format?: 'knockknock'; enforceNameGuard?: boolean; enforceTagPlacement?: boolean }
 ): VibeCandidate {
   // Clean up the line
   let cleaned = line.trim()
@@ -625,6 +625,8 @@ export function postProcessLine(
       // Otherwise replace with regular hyphen
       return '-';
     })
+    // Remove forbidden symbols that cause text corruption
+    .replace(/[%#&\/\\]/g, '')
     .trim();
 
   // Handle knock-knock format preservation
@@ -716,7 +718,7 @@ export function postProcessLine(
     };
   }
 
-  // Keyword coverage check - enforce exact inclusion (relaxed for proper names)
+  // Enhanced tag validation with placement checks
   if (tags && tags.length > 0) {
     // Filter out proper names from tag requirements (capitalized single words)
     const contentTags = tags.filter(tag => 
@@ -724,24 +726,42 @@ export function postProcessLine(
     );
     
     if (contentTags.length > 0) {
-      // For short keyword lists (<=4), require ALL keywords to be included
-      // For longer lists (>4), require at least 2 keywords
-      const requiredMatches = contentTags.length <= 4 ? contentTags.length : Math.min(2, contentTags.length);
+      // Require ALL tags to be present (exact casing match)
+      const missingTags = contentTags.filter(tag => {
+        const lowerTag = tag.toLowerCase();
+        const lowerCleaned = cleaned.toLowerCase();
+        return !lowerCleaned.includes(lowerTag) && 
+               // Allow partial matches for longer tags
+               !(tag.length > 4 && lowerCleaned.includes(lowerTag.slice(0, -2)));
+      });
       
-      const matchedKeywords = contentTags.filter(tag => 
-        cleaned.toLowerCase().includes(tag.toLowerCase()) ||
-        // Allow partial word matches for longer keywords
-        (tag.length > 4 && cleaned.toLowerCase().includes(tag.toLowerCase().slice(0, -2)))
-      );
-      
-      if (matchedKeywords.length < requiredMatches) {
+      if (missingTags.length > 0) {
         return {
           line: cleaned,
           blocked: true,
-          reason: `Must include ${requiredMatches} of ${contentTags.length} content keywords. Found: ${matchedKeywords.join(', ')}`
+          reason: `Missing required tags: ${missingTags.join(', ')}`
         };
       }
     }
+  }
+
+  // Length validation (hard limit 100 characters)
+  if (cleaned.length > 100) {
+    return {
+      line: cleaned,
+      blocked: true,
+      reason: `Exceeds 100 character limit (${cleaned.length} chars)`
+    };
+  }
+
+  // Forbidden punctuation check
+  const forbiddenPunctuation = /[—–""'']/;
+  if (forbiddenPunctuation.test(cleaned)) {
+    return {
+      line: cleaned,
+      blocked: true,
+      reason: 'Contains forbidden punctuation (em-dashes, smart quotes)'
+    };
   }
 
   return {
@@ -1567,31 +1587,53 @@ Return only: {"lines":["joke1\\nwith\\nnewlines","joke2\\nwith\\nnewlines","joke
   const isBirthday = inputs.subcategory?.toLowerCase().includes('birthday');
   const lanes = isBirthday ? getBirthdayLanes(inputs.tone) : getGenericLanes(inputs.subcategory || inputs.category, inputs.tone);
 
-  const corePrompt = `Generate exactly 4 concise options for ${inputs.category} > ${inputs.subcategory} in ${inputs.tone} tone.
+  const corePrompt = `Generate exactly 4 distinct options for ${inputs.category} > ${inputs.subcategory} in ${inputs.tone} tone.
 
-CRITICAL ANCHORING REQUIREMENTS:
+CRITICAL TEXT GENERATION RULES:
+• Each option must be ≤100 characters (hard limit)
+• Each option must be a complete, standalone line with clear subject and verb
+• Each option must match ${inputs.tone} tone consistently
 • Each option must be clearly about ${inputs.subcategory || inputs.category}
-• Each option must match ${inputs.tone} tone consistently  
-• Each option must be ≤100 characters including spaces
-• Each option must be a complete, standalone line
 
-LANE DISTRIBUTION (generate exactly one option for each):
+TAG PLACEMENT REQUIREMENTS:
+${tagRequirement ? `• ALL tags must appear in EVERY option: ${inputs.tags?.join(', ')}
+• Vary tag placement: at least one leading, one mid-sentence, one closing across the 4 options
+• Tags must be exact casing; no extra symbols added` : ''}
+
+LANE DISTRIBUTION (generate exactly one option for each angle):
 Lane 1: ${lanes[0]}
 Lane 2: ${lanes[1]} 
 Lane 3: ${lanes[2]}
 Lane 4: ${lanes[3]}
 
-${tagRequirement}${specialInstructions}
+LENGTH DIVERSITY REQUIREMENTS:
+• Option 1: Short (55-65 characters)
+• Option 2: Medium (70-85 characters) 
+• Option 3: Medium (70-85 characters)
+• Option 4: Long (95-100 characters)
+
+PUNCTUATION WHITELIST:
+• Allowed: commas, periods, colons, exclamation marks
+• FORBIDDEN: em-dashes (—), double dashes (--), quotes, hashtags, emojis, newlines
+• FORBIDDEN symbols: %, /, #, &, \
+
+VARIETY ENFORCEMENT:
+• No repeated opening words across the 4 options
+• Each option must have different sentence structure and rhythm
+• Wording and phrasing must differ significantly between options
 
 STRICT QUALITY CONTROLS:
-• NO emojis, hashtags, quotes, or newlines
-• NO generic phrases like "energy", "vibes", "mode activated"
+• NO generic phrases like "energy", "vibes", "mode activated"  
 • NO proper names unless specifically provided in tags (avoid random names like "Amy", "Steve", etc.)
 • NO meta commentary or instructions
-• Each option must have clear subject and verb
-• Vary sentence structures across the 4 options
+• NO emojis, hashtags, quotes, or newlines
+• NO stray symbols (%, /, #, &, \)
+
+${specialInstructions}
 
 ${inputs.recipient_name && inputs.recipient_name !== "-" ? `Target: ${inputs.recipient_name}` : ''}
+
+If any option fails these requirements, regenerate just that option and return a compliant set of 4.
 
 Return exactly: {"lines":["lane1_option","lane2_option","lane3_option","lane4_option"]}`;
 

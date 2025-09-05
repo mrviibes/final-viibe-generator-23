@@ -13,6 +13,13 @@ import {
   type VibeCandidate,
   type VibeResult
 } from '../vibe-ai.config';
+import { 
+  validateFourLaneOutput,
+  getLanesForCategory,
+  validateTagPlacement,
+  validateLengthDiversity,
+  validateOpeningWordVariety
+} from './textGenerationGuards';
 
 // Re-export types for backward compatibility
 export type { VibeCandidate, VibeResult } from '../vibe-ai.config';
@@ -46,8 +53,8 @@ async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: st
     // Use centralized message builder
     const messages = buildVibeGeneratorMessages(inputs);
     
-    // Use fast token budget (120) for all models in fast mode
-    const maxTokens = 120;
+    // Increase token budget for 4-lane generation with quality controls
+    const maxTokens = 200;
     
     const result = await openAIService.chatJSON(messages, {
       max_completion_tokens: maxTokens,
@@ -58,42 +65,77 @@ async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: st
     // Store the API metadata for later use
     const apiMeta = result._apiMeta;
     
-    // Extract lines from JSON response - be tolerant of different formats
+    // Extract lines from JSON response - enforce exactly 4 lines
     const lines = result.lines || result.options || result.candidates || result.texts || [];
-    if (!Array.isArray(lines) || lines.length === 0) {
-      console.error('API format mismatch - no valid lines array found in:', result);
+    if (!Array.isArray(lines)) {
+      console.error('API format mismatch - expected array, got:', typeof lines);
       throw new Error('Local placeholder (API format mismatch)');
+    }
+    
+    // Enforce exactly 4 lines requirement
+    if (lines.length !== 4) {
+      console.warn(`Expected exactly 4 lines, got ${lines.length}. Adjusting...`);
+      // Pad with fallbacks if too few, or trim if too many
+      if (lines.length < 4) {
+        const fallbacks = getFallbackVariants(inputs.tone, inputs.category, inputs.subcategory);
+        while (lines.length < 4) {
+          lines.push(fallbacks[lines.length % fallbacks.length]);
+        }
+      } else if (lines.length > 4) {
+        lines.splice(4); // Keep only first 4
+      }
     }
     
     // Check if this is knock-knock format
     const isKnockKnock = inputs.subcategory?.toLowerCase().includes("knock");
     const postProcessOptions = isKnockKnock ? { allowNewlines: true, format: 'knockknock' as const } : undefined;
     
-    // Post-process each line with tag validation and name guard
-    const enhancedOptions = { ...postProcessOptions, enforceNameGuard: true };
+    // Post-process each line with enhanced tag validation and variety checks
+    const enhancedOptions = { 
+      ...postProcessOptions, 
+      enforceNameGuard: true,
+      enforceTagPlacement: true
+    };
     const candidates = lines.map((line: string) => postProcessLine(line, inputs.tone, inputs.tags, enhancedOptions));
     
+    // Add variety guard enforcement
+    const candidateLines = candidates.map(c => c.line);
+    const varietyCheckedLines = applyVarietyGuard(candidateLines, inputs);
+    
+    // Update candidates with variety-checked lines
+    const finalCandidates = candidates.map((candidate, index) => ({
+      ...candidate,
+      line: varietyCheckedLines[index]
+    }));
+    
     // Add API metadata to candidates for later extraction
-    if (apiMeta && candidates.length > 0) {
-      (candidates as any)._apiMeta = apiMeta;
+    if (apiMeta && finalCandidates.length > 0) {
+      (finalCandidates as any)._apiMeta = apiMeta;
     }
     
-    return candidates;
+    return finalCandidates;
   } catch (error) {
     console.error('Failed to generate multiple candidates:', error);
-    // Blend first tag into fallback variants if available
+    // Generate exactly 4 fallback variants with proper tag integration
     const fallbackVariants = getFallbackVariants(inputs.tone, inputs.category, inputs.subcategory);
-    const firstTag = inputs.tags && inputs.tags.length > 0 ? inputs.tags[0] : null;
     
-    return fallbackVariants.map((line, index) => {
-      // Validate fallback through postProcessLine to ensure no banned patterns
-      const processedFallback = postProcessLine(line, inputs.tone, inputs.tags || []);
-      const finalLine = processedFallback.blocked ? 
-        phraseCandidates(inputs.tone, inputs.tags)[index % 4] : 
-        processedFallback.line;
+    return fallbackVariants.slice(0, 4).map((line, index) => {
+      // Integrate first tag if available
+      let finalLine = line;
+      if (inputs.tags && inputs.tags.length > 0) {
+        const firstTag = inputs.tags[0];
+        // Simple tag integration for fallbacks
+        if (index === 0) finalLine = `${firstTag}. ${line}`;
+        else if (index === 1) finalLine = `${line} ${firstTag}.`;
+        else if (index === 2) finalLine = line.replace('.', `, ${firstTag}.`);
+        else finalLine = `${line} (${firstTag})`;
+      }
+      
+      // Validate fallback through postProcessLine
+      const processedFallback = postProcessLine(finalLine, inputs.tone, inputs.tags || []);
       
       return {
-        line: finalLine,
+        line: processedFallback.blocked ? line : processedFallback.line,
         blocked: true,
         reason: index === 0 ? `Local placeholder (${error instanceof Error ? error.message : 'API failure'})` : 'Local fallback variant'
       };
@@ -358,14 +400,31 @@ function applyVarietyGuard(candidates: string[], inputs: VibeInputs): string[] {
     }
   });
   
-  return result;
-}
 
 export async function generateCandidates(inputs: VibeInputs, n: number = 4): Promise<VibeResult> {
   const candidateResults = await generateMultipleCandidates(inputs);
   
   // Extract API metadata if available
   const apiMeta = (candidateResults as any)._apiMeta || null;
+  
+  // Enhanced 4-lane validation
+  const allLines = candidateResults.map(c => c.line);
+  const qualityCheck = validateFourLaneOutput(
+    allLines, 
+    inputs.tags || [], 
+    inputs.tone,
+    inputs.category,
+    inputs.subcategory
+  );
+  
+  // Log quality issues for debugging
+  if (!qualityCheck.valid && getRuntimeOverrides().showAdvancedPromptDetails) {
+    console.log('🔍 4-LANE QUALITY ISSUES:');
+    qualityCheck.issues.forEach(issue => console.log(`  - ${issue}`));
+    console.log('Tag placements:', qualityCheck.details.tagPlacement.placements);
+    console.log('Lengths:', qualityCheck.details.lengthDiversity.lengths);
+    console.log('Opening words:', qualityCheck.details.openingVariety.openingWords);
+  }
   
   // Filter out blocked candidates and remove duplicates
   const validCandidates = candidateResults.filter(c => !c.blocked);
@@ -627,6 +686,15 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
       localStorage.setItem('last_text_model', modelUsed);
     }
     
+    // Final 4-lane compliance check
+    const finalQualityCheck = validateFourLaneOutput(
+      finalCandidates, 
+      inputs.tags || [], 
+      inputs.tone,
+      inputs.category,
+      inputs.subcategory
+    );
+
     return {
     candidates: finalCandidates,
     picked,
@@ -645,6 +713,8 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
       topUpUsed
     }
   };
+}
+
 }
 
 export async function generateFinalLine(inputs: VibeInputs): Promise<string> {
