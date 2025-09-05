@@ -609,7 +609,7 @@ export function postProcessLine(
   line: string, 
   tone: string, 
   tags?: string[], 
-  options?: { allowNewlines?: boolean; format?: 'knockknock' }
+  options?: { allowNewlines?: boolean; format?: 'knockknock'; enforceNameGuard?: boolean }
 ): VibeCandidate {
   // Clean up the line
   let cleaned = line.trim()
@@ -667,6 +667,25 @@ export function postProcessLine(
       blocked: true,
       reason: 'Content contains banned words (meta or instructional language)'
     };
+  }
+
+  // Name guard: block random proper names unless approved in tags
+  if (options?.enforceNameGuard) {
+    const approvedNames = tags?.map(tag => tag.toLowerCase()) || [];
+    const commonNames = ['amy', 'steve', 'john', 'sarah', 'mike', 'lisa', 'david', 'karen', 'bob', 'jenny'];
+    
+    const hasRandomName = commonNames.some(name => {
+      const namePattern = new RegExp(`\\b${name}\\b`, 'i');
+      return namePattern.test(cleaned) && !approvedNames.some(approved => approved.includes(name));
+    });
+    
+    if (hasRandomName) {
+      return {
+        line: cleaned,
+        blocked: true,
+        reason: 'Contains unapproved proper name'
+      };
+    }
   }
 
   // Spelling and quality checks
@@ -1437,28 +1456,79 @@ Return only: {"lines":["joke1\\nwith\\nnewlines","joke2\\nwith\\nnewlines","joke
         : `\n• CRITICAL: Each option must include at least TWO of these words/phrases: ${inputs.tags.join(', ')}.`)
     : '';
 
-  const corePrompt = `Generate 6 concise options under 100 chars each for:
-Category: ${inputs.category} > ${inputs.subcategory}
-Tone: ${inputs.tone}
-Tags: ${inputs.tags?.join(', ') || 'none'}
-${inputs.recipient_name && inputs.recipient_name !== "-" ? `Target: ${inputs.recipient_name}` : ''}
+  // Define 4-lane system for variety enforcement
+  const getBirthdayLanes = (tone: string) => {
+    const toneMap: Record<string, string[]> = {
+      'Humorous': [
+        'food/cake themed humor',
+        'age/years themed humor', 
+        'party/celebration themed humor',
+        'surprise/roast themed humor'
+      ],
+      'Savage': [
+        'age-related roasts',
+        'getting older burns',
+        'party failure roasts', 
+        'birthday reality checks'
+      ],
+      'Sentimental': [
+        'cake and wishes sentiments',
+        'another year of growth',
+        'celebration of life moments',
+        'gratitude and reflection'
+      ],
+      'Inspirational': [
+        'new year, new possibilities',
+        'age brings wisdom',
+        'celebrating achievements',
+        'future dreams and goals'
+      ]
+    };
+    return toneMap[tone] || [
+      'celebration themed content',
+      'age/milestone themed content',
+      'party/festive themed content', 
+      'personal growth themed content'
+    ];
+  };
+
+  const getGenericLanes = (subcategory: string, tone: string) => [
+    `${subcategory} experience focus`,
+    `${subcategory} emotion focus`,
+    `${subcategory} action focus`,
+    `${subcategory} outcome focus`
+  ];
+
+  const isBirthday = inputs.subcategory?.toLowerCase().includes('birthday');
+  const lanes = isBirthday ? getBirthdayLanes(inputs.tone) : getGenericLanes(inputs.subcategory || inputs.category, inputs.tone);
+
+  const corePrompt = `Generate exactly 4 concise options for ${inputs.category} > ${inputs.subcategory} in ${inputs.tone} tone.
+
+CRITICAL ANCHORING REQUIREMENTS:
+• Each option must be clearly about ${inputs.subcategory || inputs.category}
+• Each option must match ${inputs.tone} tone consistently  
+• Each option must be ≤100 characters including spaces
+• Each option must be a complete, standalone line
+
+LANE DISTRIBUTION (generate exactly one option for each):
+Lane 1: ${lanes[0]}
+Lane 2: ${lanes[1]} 
+Lane 3: ${lanes[2]}
+Lane 4: ${lanes[3]}
 
 ${tagRequirement}${specialInstructions}
 
-VARIETY REQUIREMENTS:
-• CRITICAL: Maximum 2 of 6 options can use proper names (like ${inputs.recipient_name || 'names'})
-• CRITICAL: No two options can start with the same word or phrase
-• CRITICAL: Vary sentence structures - mix statements, questions, commands
-• Use different opening patterns: pronouns, actions, descriptives, etc.
+STRICT QUALITY CONTROLS:
+• NO emojis, hashtags, quotes, or newlines
+• NO generic phrases like "energy", "vibes", "mode activated"
+• NO proper names unless specifically provided in tags (avoid random names like "Amy", "Steve", etc.)
+• NO meta commentary or instructions
+• Each option must have clear subject and verb
+• Vary sentence structures across the 4 options
 
-QUALITY REQUIREMENTS:
-• Each option must be a complete sentence with a subject and verb, using natural punctuation
-• Avoid generic slogans like 'X energy', 'Y vibes', 'mode activated', or 'Boss energy'
-• No hashtags or quotation marks
-• Never generate meta phrases like "Short and witty like you asked", "As requested", "Here you go", or any commentary about the request
-• Only generate direct, usable content lines
+${inputs.recipient_name && inputs.recipient_name !== "-" ? `Target: ${inputs.recipient_name}` : ''}
 
-Return only: {"lines":["option1","option2","option3","option4","option5","option6"]}`;
+Return exactly: {"lines":["lane1_option","lane2_option","lane3_option","lane4_option"]}`;
 
   const systemMessage = inputs.tone === 'Savage' 
     ? 'Generate short, savage roasts/burns. Make them cutting and direct, NOT joke-like. JSON array only. Never include meta commentary.'
