@@ -8,11 +8,13 @@ import {
   MODEL_DISPLAY_NAMES,
   SYSTEM_PROMPTS,
   buildVibeGeneratorMessages,
+  buildCompactVibeMessages,
   getRuntimeOverrides,
   type VibeInputs,
   type VibeCandidate,
   type VibeResult
 } from '../vibe-ai.config';
+import { TextContract, buildUniversalContract } from './contracts';
 import { getPopCultureContext, extractSubjectFromInputs } from './popCultureContext';
 import { 
   validateFourLaneOutput,
@@ -43,7 +45,7 @@ function getFallbackVariants(tone: string, category: string, subcategory: string
 
 // Post-processing now handled by centralized config
 
-async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: string): Promise<VibeCandidate[]> {
+async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: string, useCompact: boolean = false): Promise<VibeCandidate[]> {
   console.log("🎯 generateMultipleCandidates called with:", JSON.stringify(inputs, null, 2));
 
   // Pop Culture Context Fetch
@@ -87,10 +89,10 @@ async function generateMultipleCandidates(inputs: VibeInputs, overrideModel?: st
     const config = getEffectiveConfig();
     const targetModel = overrideModel || config.generation.model;
     
-    console.log(`🚀 Text generation starting with user-selected model: ${targetModel}`);
+    console.log(`🚀 Text generation starting with user-selected model: ${targetModel}${useCompact ? ' (compact mode)' : ''}`);
     
-    // Use centralized message builder
-    const messages = buildVibeGeneratorMessages(inputs, popCultureContext);
+    // Use centralized message builder (compact for retries)
+    const messages = useCompact ? buildCompactVibeMessages(inputs) : buildVibeGeneratorMessages(inputs, popCultureContext);
     
     // Increase token budget for 4-lane generation with quality controls
     const maxTokens = 200;
@@ -443,7 +445,21 @@ function applyVarietyGuard(candidates: string[], inputs: VibeInputs): string[] {
 }
 
 export async function generateCandidates(inputs: VibeInputs, n: number = 4): Promise<VibeResult> {
-  const candidateResults = await generateMultipleCandidates(inputs);
+  let candidateResults = await generateMultipleCandidates(inputs);
+  let retryCount = 0;
+  let usedCompact = false;
+  
+  // If truncated or failed, try compact mode once
+  if (candidateResults.length < 4 || candidateResults.some(c => c.blocked)) {
+    try {
+      console.log('🔄 Retrying with compact prompt builder...');
+      candidateResults = await generateMultipleCandidates(inputs, undefined, true);
+      retryCount = 1;
+      usedCompact = true;
+    } catch (retryError) {
+      console.log('🚨 Compact retry also failed, proceeding with fallbacks');
+    }
+  }
   
   // Extract API metadata if available
   const apiMeta = (candidateResults as any)._apiMeta || null;

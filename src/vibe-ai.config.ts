@@ -289,6 +289,27 @@ export function getSmartFallbackChain(userModel: string, type: 'text' | 'visual'
   return [userModel, ...baseChain];
 }
 
+// Compact message builders for retry scenarios
+export function buildCompactVibeMessages(inputs: VibeInputs): any[] {
+  const toneGuidance = `${inputs.tone} tone required. 4-lane variety: Platform/Prop, Audience/Reaction, Skill/Ability, Absurdity/Lifestyle.`;
+  const tagHint = inputs.tags?.length ? ` Include tags: ${inputs.tags.join(', ')}.` : '';
+  
+  return [
+    { role: 'system', content: SYSTEM_PROMPTS.vibe_generator_compact },
+    { role: 'user', content: `${toneGuidance}${tagHint} Category: ${inputs.category}, Subcategory: ${inputs.subcategory || 'general'}.` }
+  ];
+}
+
+export function buildCompactVisualMessages(inputs: any): any[] {
+  const contextHint = `${inputs.category}/${inputs.subcategory || 'general'} context. ${inputs.tone} tone.`;
+  const tagHint = inputs.tags?.length ? ` Tags: ${inputs.tags.join(', ')}.` : '';
+  
+  return [
+    { role: 'system', content: SYSTEM_PROMPTS.visual_generator_compact },
+    { role: 'user', content: `${contextHint}${tagHint}` }
+  ];
+}
+
 // Get effective configuration with runtime overrides applied
 export function getEffectiveConfig() {
   const overrides = getRuntimeOverrides();
@@ -335,11 +356,13 @@ export function injectPromptVariation(basePrompt: string): string {
 export const SYSTEM_PROMPTS = {
   vibe_maker: `Create a single line under 100 characters. Match the tone. Use tags as hints. Be witty or sincere, never cruel. Write complete, natural phrases - avoid filler words and awkward endings. JSON only: {"line":"..."}`,
   
-  vibe_generator: `Write 6 distinct short-form options in the specified tone. Vary structure, theme, and wording. No repetition. Write complete, natural phrases that flow well - avoid filler words like "just" and awkward incomplete endings. JSON only.`,
+  vibe_generator: `Write 4 distinct lines in the specified tone. Each line must be ≤100 chars. Enforce 4-lane variety: Platform/Prop, Audience/Reaction, Skill/Ability, Absurdity/Lifestyle. Vary structure and wording. No repetition. JSON: {"lines":["...","...","...","..."]}`,
 
-  visual_generator: `Generate 4 unique visual concepts for image generation. Each 30-50 words with tags: [TAGS: keywords], [TEXT_SAFE_ZONE: zone], [CONTRAST_PLAN: strategy], [TEXT_HINT: color]. Match user context exactly. Vary compositions dramatically. High contrast text zones. Write complete, natural descriptions that flow well - avoid filler words and awkward endings. JSON: {"concepts": ["...", "...", "...", "..."]}`,
+  vibe_generator_compact: `4 lines, ≤100 chars each. Tone: specified. 4-lane variety required. JSON: {"lines":[...4]}`,
 
-  visual_generator_fast: `Generate 4 distinct visual concepts. Each 20-40 words with: [TAGS: keywords], [TEXT_SAFE_ZONE: zone], [CONTRAST_PLAN: strategy], [TEXT_HINT: color]. Match context. Vary compositions significantly. Write complete, natural descriptions - avoid filler words and incomplete phrases. JSON: {"concepts": ["...", "...", "...", "..."]}`,
+  visual_generator: `Generate 4 unique visual concepts, each ≤130 chars. No bracket tags in output. Vary compositions: Objects (no people), Group (people visible), Solo (person + action), Creative (symbolic). Simple English descriptions. JSON: {"options":["...","...","...","..."]}`,
+
+  visual_generator_compact: `4 concepts, ≤130 chars each, no bracket tags, simple English. Lane variety: Objects, Group, Solo, Creative. JSON: {"options":[...4]}`,
 };
 
 // =========================

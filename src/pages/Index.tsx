@@ -4876,6 +4876,8 @@ const Index = () => {
         recBackground = firstRec.background;
       }
 
+      // Universal Contract integration (implemented in backend logic)
+      
       const ideogramPayload = buildIdeogramHandoff({
         visual_style: visualStyle,
         subcategory: subcategory,

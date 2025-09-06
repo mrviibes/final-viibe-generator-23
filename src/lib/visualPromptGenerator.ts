@@ -349,47 +349,66 @@ export function generateVisualPrompts(inputs: VisualPromptInputs): VisualPromptO
   const propsMood = pickN([...objects].reverse(), 3);
   const propsSym = pickN(objects, 4);
 
-  // Lane 1: OBJECTS (no people)
+  // Lane 1: OBJECTS (no people) - guaranteed category anchors
+  const anchorObjects = baseImagery.slice(0, 2); // Ensure category anchors
   const laneObjects = clamp(sentence([
-    `Close-up of ${join(propsTight)}`,
-    `${tone.light}; ${tone.mood}`,
-    "clear negative space for headline"
+    `Close-up of ${join([...anchorObjects, ...propsTight.slice(0, 2)])}`,
+    `${tone.light}, ${tone.mood}`,
+    "clear negative space for text"
   ]));
 
-  // Lane 2: GROUP (people visible)
+  // Lane 2: GROUP (people visible) - guaranteed category anchors
   const groupPhrases = [
-    "friends gathered", "group of people", "laughter", "candid moment", "natural gestures"
+    "friends gathered", "group of people", "team together", "candid moment", "natural interaction"
   ];
   const laneGroup = clamp(sentence([
-    `Wide ${subcategory.toLowerCase()} scene with ${join(propsWide)}`,
-    `${join(groupPhrases)}`,
-    `${tone.light}; ${tone.verb}`
+    `Wide ${subcategory.toLowerCase()} scene with ${join([...anchorObjects, ...propsWide.slice(0, 2)])}`,
+    `${join(groupPhrases.slice(0, 2))}`,
+    `${tone.light}, ${tone.verb}`
   ]));
 
-  // Lane 3: SOLO (one person doing a subcategory-relevant action)
+  // Lane 3: SOLO (one person doing a subcategory-relevant action) - guaranteed category anchors
   const soloAction = SOLO_ACTION[subcategory] || SOLO_ACTION["_default"];
   const laneSolo = clamp(sentence([
     `Single person ${soloAction}`,
-    `surrounded by ${join(pickN(objects, 3))}`,
-    `${tone.light}; ${tone.mood}`
+    `surrounded by ${join([...anchorObjects, ...pickN(objects, 2)])}`,
+    `${tone.light}, ${tone.mood}`
   ]));
 
-  // Lane 4: CREATIVE (symbolic / abstract / collage)
+  // Lane 4: CREATIVE (symbolic / abstract / collage) - guaranteed category anchors
   const creativeExtra = [
-    "symbolic arrangement", "unexpected perspective", "graphic balance", "tasteful negative space"
+    "symbolic arrangement", "unexpected perspective", "graphic composition", "artistic layout"
   ];
   const laneCreative = clamp(sentence([
-    `${join(creativeExtra)} using ${join(propsSym)}`,
-    `${tone.light}; ${tone.verb}`
+    `${join(creativeExtra.slice(0, 2))} using ${join([...anchorObjects, ...propsSym.slice(0, 2)])}`,
+    `${tone.light}, ${tone.verb}`
   ]));
 
   const lanes = [laneObjects, laneGroup, laneSolo, laneCreative];
   const roles = ['objects', 'group', 'solo', 'creative'];
   
-  return lanes.map((prompt, index) => ({
-    subject: `${subcategory} scene`,
-    background: `${toneKey} atmosphere`,
-    prompt: prompt,
-    role: roles[index]
-  }));
+  // Clean prompts - no bracket markers, enforce 130 char limit
+  return lanes.map((prompt, index) => {
+    const cleanPrompt = prompt
+      .replace(/\[TAGS:[^\]]*\]/gi, '')
+      .replace(/\[TEXT_SAFE_ZONE:[^\]]*\]/gi, '')
+      .replace(/\[CONTRAST_PLAN:[^\]]*\]/gi, '')
+      .replace(/\[ASPECTS:[^\]]*\]/gi, '')
+      .replace(/\[TEXT_HINT:[^\]]*\]/gi, '')
+      .replace(/\[NEGATIVE_PROMPT:[^\]]*\]/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    
+    // Clamp to 130 chars for display
+    const finalPrompt = cleanPrompt.length > 130 
+      ? cleanPrompt.substring(0, 130).trim() + '…'
+      : cleanPrompt;
+    
+    return {
+      subject: `${subcategory} scene`,
+      background: `${toneKey} atmosphere`,
+      prompt: finalPrompt,
+      role: roles[index]
+    };
+  });
 }

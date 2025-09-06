@@ -1,5 +1,7 @@
 import { openAIService } from './openai';
-import { SYSTEM_PROMPTS, buildVisualGeneratorMessages, getStyleKeywords, getEffectiveConfig, isTemperatureSupported, getSmartFallbackChain, MODEL_DISPLAY_NAMES, BACKGROUND_PRESETS, getRuntimeOverrides, getContextualBans } from '../vibe-ai.config';
+import { SYSTEM_PROMPTS, buildVisualGeneratorMessages, buildCompactVisualMessages, getStyleKeywords, getEffectiveConfig, isTemperatureSupported, getSmartFallbackChain, MODEL_DISPLAY_NAMES, BACKGROUND_PRESETS, getRuntimeOverrides, getContextualBans } from '../vibe-ai.config';
+import { validateVisualOption } from './visualValidators';
+import { VisualContract, UniversalContract } from './contracts';
 import { generateHeuristicVisuals } from './visualHeuristics';
 import { generateVisualPrompts } from './visualPromptGenerator';
 
@@ -981,7 +983,7 @@ export async function generateVisualRecommendations(
       // Ultra-compact prompt for fast mode
       const fastPrompt = `${category}>${subcategory}, ${tone}. 4 visual JSON.`;
       const fastMessages = [
-        { role: 'system', content: SYSTEM_PROMPTS.visual_generator_fast },
+        { role: 'system', content: SYSTEM_PROMPTS.visual_generator_compact },
         { role: 'user', content: fastPrompt }
       ];
       
