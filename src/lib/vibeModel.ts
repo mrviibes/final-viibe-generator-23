@@ -80,22 +80,34 @@ export function buildTagInjectedFallbacks(inputs: VibeInputs): VibeCandidate[] {
   }));
 }
 
+// Timeout wrapper for 12-second limit with one retry
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => 
+      setTimeout(() => reject(new Error('timeout')), ms)
+    )
+  ]);
+}
+
 // Generate 4-lane strict candidates with manual retry
 export async function generateLaneStrictCandidates(inputs: VibeInputs): Promise<VibeCandidate[]> {
-  const config = getEffectiveConfig();
-  const targetModel = 'gpt-5-mini-2025-08-07'; // Force GPT-5 Mini
+  const targetModel = 'gpt-4.1-mini-2025-04-14'; // Pin to GPT-4.1 Mini
   
   console.log(`🎯 Strict lane generation with model: ${targetModel}`);
   
   // Build strict lane messages
   const messages = buildStrictLaneMessages(inputs);
   
-  // First attempt
+  // First attempt with 12s timeout
   try {
-    const result = await openAIService.chatJSON(messages, {
-      max_completion_tokens: 200,
-      model: targetModel
-    });
+    const result = await withTimeout(
+      openAIService.chatJSON(messages, {
+        max_completion_tokens: 220,
+        model: targetModel
+      }),
+      12000
+    );
     
     // Parse strict lane JSON
     const lines = result.lines || [];
@@ -121,12 +133,15 @@ export async function generateLaneStrictCandidates(inputs: VibeInputs): Promise<
   } catch (error) {
     console.warn(`🔄 First attempt failed, retrying: ${error}`);
     
-    // Manual retry (second attempt)
+    // Manual retry (second attempt) with same 12s timeout
     try {
-      const retryResult = await openAIService.chatJSON(messages, {
-        max_completion_tokens: 200,
-        model: targetModel
-      });
+      const retryResult = await withTimeout(
+        openAIService.chatJSON(messages, {
+          max_completion_tokens: 220,
+          model: targetModel
+        }),
+        12000
+      );
       
       const retryLines = retryResult.lines || [];
       if (Array.isArray(retryLines) && retryLines.length === 4) {

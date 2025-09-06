@@ -330,9 +330,6 @@ export function buildStrictLaneMessages(inputs: VibeInputs): any[] {
 export function getEffectiveConfig() {
   const overrides = getRuntimeOverrides();
   
-// Force GPT-5 Mini for consistent fast performance  
-  const forcedModel = 'gpt-5-mini-2025-08-07';
-  
   return {
     ...AI_CONFIG,
     spellcheck: {
@@ -345,12 +342,12 @@ export function getEffectiveConfig() {
     },
     generation: {
       ...AI_CONFIG.generation,
-      model: forcedModel, // Always use GPT-5 flagship
+      model: 'gpt-4.1-mini-2025-04-14', // Pin to GPT-4.1 Mini for reliability
       temperature: overrides.temperature ?? AI_CONFIG.generation.temperature
     },
     visual_generation: {
       ...AI_CONFIG.visual_generation,
-      model: forcedModel, // Always use GPT-5 flagship
+      model: 'gpt-4o-mini', // Keep visuals on fast mini model
       max_tokens: overrides.fastVisualsEnabled ? AI_CONFIG.visual_generation.fast_max_tokens : AI_CONFIG.visual_generation.max_tokens
     }
   };
