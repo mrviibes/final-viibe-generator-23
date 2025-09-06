@@ -25,6 +25,27 @@ import {
   validateOpeningWordVariety
 } from './textGenerationGuards';
 
+const LANE_RX = /^\s*(platform|audience|skill|skillability|absurdity)\s*:\s*/i;
+
+export function fixAndValidate(lines: any[], tags: string[]) {
+  if (!Array.isArray(lines) || lines.length !== 4) return null;
+  const req = (tags||[]).map(t=>t.toLowerCase());
+  const ok = lines.map((L, i) => {
+    let txt = (L?.text||"").replace(LANE_RX,"").trim();          // strip lane leaks
+    if (!txt) return null;
+    // enforce tags
+    for (const t of req) if (!txt.toLowerCase().includes(t)) {
+      // append tag smartly
+      txt = txt.endsWith(".") ? `${txt.slice(0,-1)} — ${t}.` : `${txt} — ${t}`;
+      txt = txt.replace(/—/g, ":");                               // no em-dash
+    }
+    // length & punctuation
+    txt = txt.replace(/—|--/g, ":").slice(0, 100).trim();
+    return { lane: ["platform","audience","skill","absurdity"][i], text: txt };
+  });
+  return ok.every(Boolean) ? ok : null;
+}
+
 // Re-export types for backward compatibility
 export type { VibeCandidate, VibeResult } from '../vibe-ai.config';
 
@@ -92,7 +113,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 
 // Generate 4-lane strict candidates with manual retry
 export async function generateLaneStrictCandidates(inputs: VibeInputs): Promise<VibeCandidate[]> {
-  const targetModel = 'gpt-4.1-mini-2025-04-14'; // Pin to GPT-4.1 Mini
+  const targetModel = 'gpt-4.1-mini-2025-04-14';
   
   console.log(`🎯 Strict lane generation with model: ${targetModel}`);
   
@@ -104,61 +125,49 @@ export async function generateLaneStrictCandidates(inputs: VibeInputs): Promise<
     const result = await withTimeout(
       openAIService.chatJSON(messages, {
         max_completion_tokens: 220,
-        model: targetModel
+        model: targetModel,
+        temperature: 0.8
       }),
       12000
     );
     
-    // Parse strict lane JSON
-    const lines = result.lines || [];
-    if (!Array.isArray(lines) || lines.length !== 4) {
-      throw new Error('Invalid lane structure returned');
-    }
-    
-    // Validate lane structure
-    const expectedLanes = ['platform', 'audience', 'skill', 'absurdity'];
-    for (let i = 0; i < 4; i++) {
-      const line = lines[i];
-      if (!line.lane || !line.text || line.lane !== expectedLanes[i]) {
-        throw new Error(`Invalid lane ${i}: expected ${expectedLanes[i]}, got ${line.lane}`);
+    // Use the new validator
+    const fixedLines = fixAndValidate(result.lines, inputs.tags || []);
+    if (!fixedLines) {
+      console.warn('fixAndValidate failed, retrying once...');
+      
+      // Retry once
+      const retryResult = await withTimeout(
+        openAIService.chatJSON(messages, {
+          max_completion_tokens: 220,
+          model: targetModel,
+          temperature: 0.8
+        }),
+        12000
+      );
+      
+      if (retryResult.lines) {
+        const retryFixed = fixAndValidate(retryResult.lines, inputs.tags || []);
+        if (retryFixed) {
+          return retryFixed.map((line: any) => ({
+            line: line.text,
+            blocked: false
+          }));
+        }
       }
+      
+      console.warn('Retry also failed, using tag-injected fallback');
+      return buildTagInjectedFallbacks(inputs);
     }
-    
-    // Convert to VibeCandidate format - use only text, ignore lane metadata
-    return lines.map((line: any) => ({
+
+    return fixedLines.map((line: any) => ({
       line: line.text,
       blocked: false
     }));
     
   } catch (error) {
-    console.warn(`🔄 First attempt failed, retrying: ${error}`);
-    
-    // Manual retry (second attempt) with same 12s timeout
-    try {
-      const retryResult = await withTimeout(
-        openAIService.chatJSON(messages, {
-          max_completion_tokens: 220,
-          model: targetModel
-        }),
-        12000
-      );
-      
-      const retryLines = retryResult.lines || [];
-      if (Array.isArray(retryLines) && retryLines.length === 4) {
-        // Successful retry - return only text content
-        return retryLines.map((line: any) => ({
-          line: line.text || line,
-          blocked: false
-        }));
-      } else {
-        throw new Error('Retry also failed');
-      }
-    } catch (retryError) {
-      console.error(`🚨 Both attempts failed, using tag-injected fallback`);
-      
-      // Use tag-injected fallback that guarantees all tags in every line
-      return buildTagInjectedFallbacks(inputs);
-    }
+    console.error(`🚨 Lane generation failed, using tag-injected fallback: ${error}`);
+    return buildTagInjectedFallbacks(inputs);
   }
 }
 
