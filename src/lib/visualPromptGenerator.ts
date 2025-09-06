@@ -305,7 +305,7 @@ function inferOccasion(text: string, tags: string[]): { category: string, subcat
   return { category: "", subcategory: "" };
 }
 
-export function generateVisualPrompts(inputs: VisualPromptInputs): VisualPromptOption[] {
+export function generateVisualPrompts(inputs: VisualPromptInputs): { options: VisualPromptOption[]; negativePrompt: string } {
   const text = norm(inputs.finalLine || "").slice(0, 100);
   const style = norm(inputs.visualStyle) || "Realistic";
   const tags = Array.isArray(inputs.visualTags) ? inputs.visualTags.map(norm).filter(Boolean) : [];
@@ -387,29 +387,19 @@ export function generateVisualPrompts(inputs: VisualPromptInputs): VisualPromptO
   const lanes = [laneObjects, laneGroup, laneSolo, laneCreative];
   const roles = ['objects', 'group', 'solo', 'creative'];
   
-  // UNIVERSAL CONTRACT: Clean prompts - remove ALL bracket markers, enforce 130 char limit
-  return lanes.map((prompt, index) => {
-    const cleanPrompt = prompt
-      .replace(/\[TAGS:[^\]]*\]/gi, '')
-      .replace(/\[TEXT_SAFE_ZONE:[^\]]*\]/gi, '')
-      .replace(/\[CONTRAST_PLAN:[^\]]*\]/gi, '')
-      .replace(/\[ASPECTS:[^\]]*\]/gi, '')
-      .replace(/\[TEXT_HINT:[^\]]*\]/gi, '')
-      .replace(/\[NEGATIVE_PROMPT:[^\]]*\]/gi, '')
-      .replace(/\[[^\]]*\]/gi, '') // Remove ANY remaining brackets
-      .replace(/\s+/g, ' ')
-      .trim();
-    
-    // Clamp to 130 chars for display
-    const finalPrompt = cleanPrompt.length > 130 
-      ? cleanPrompt.substring(0, 130).trim() + '…'
-      : cleanPrompt;
-    
-    return {
-      subject: `${subcategory} scene`,
-      background: `${toneKey} atmosphere`,
-      prompt: finalPrompt,
-      role: roles[index]
-    };
-  });
+  // Build options with role assignments
+  const options = lanes.map((lane, i) => ({
+    subject: lane.includes("person") || lane.includes("people") ? lane : "",
+    background: lane.includes("background") || lane.includes("scene") ? lane : "",
+    prompt: sentence([lane, ...style]),
+    role: roles[i]
+  }));
+  
+  // Generate negative prompt for the category/style
+  const negativePrompt = negativeFor(inputs.visualStyle, category);
+  
+  return {
+    options,
+    negativePrompt
+  };
 }

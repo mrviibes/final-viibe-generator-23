@@ -30,6 +30,17 @@ function safeParseArray(content: string): OpenAISearchResult[] {
   }
 }
 
+// Model name normalization - map aliases to actual model names
+function normalizeModelName(model: string): string {
+  const modelMappings: Record<string, string> = {
+    'chat-2.5-mini': 'gpt-5-mini-2025-08-07',
+    'gpt-5-mini': 'gpt-5-mini-2025-08-07',
+    'gpt-5': 'gpt-5-2025-08-07'
+  };
+  
+  return modelMappings[model] || model;
+}
+
 export class OpenAIService {
   private apiKey: string | null = null;
   private useBackendAPI: boolean = true; // Use Supabase backend by default
@@ -87,8 +98,11 @@ export class OpenAIService {
       max_completion_tokens,
       model = 'gpt-5-mini-2025-08-07'
     } = options;
+    
+    // Normalize model name (map aliases like chat-2.5-mini)
+    const normalizedModel = normalizeModelName(model);
 
-    console.log(`Calling OpenAI backend API - Model: ${model}, Messages: ${messages.length}`);
+    console.log(`Calling OpenAI backend API - Model: ${normalizedModel}, Messages: ${messages.length}`);
     const startTime = Date.now();
 
     try {
@@ -103,7 +117,7 @@ export class OpenAIService {
             temperature,
             max_tokens,
             max_completion_tokens,
-            model,
+            model: normalizedModel,
             response_format: { type: "json_object" } // Always use JSON format
           }
         }
@@ -121,7 +135,7 @@ export class OpenAIService {
 
       clearTimeout(timeoutId);
       const elapsed = Date.now() - startTime;
-      console.log(`Backend API completed - Model: ${model}, Elapsed: ${elapsed}ms`);
+      console.log(`Backend API completed - Model: ${normalizedModel}, Elapsed: ${elapsed}ms`);
 
       if (error) {
         console.error('Backend API error:', error);
@@ -135,7 +149,7 @@ export class OpenAIService {
       const content = data.choices?.[0]?.message?.content;
       const finishReason = data.choices?.[0]?.finish_reason;
       
-      console.log(`Backend API Response - Model: ${model}, Finish Reason: ${finishReason}, Content Length: ${content?.length || 0}`);
+      console.log(`Backend API Response - Model: ${normalizedModel}, Finish Reason: ${finishReason}, Content Length: ${content?.length || 0}`);
       
       if (!content || content.trim() === '') {
         if (finishReason === 'length') {
@@ -152,7 +166,7 @@ export class OpenAIService {
         // Add metadata about the API call for proper audit tracking
         if (parsed && typeof parsed === 'object') {
           parsed._apiMeta = {
-            modelUsed: model,
+            modelUsed: normalizedModel,
             retryAttempt: 0,
             originalModel: model,
             textSpeed: 'fast',
@@ -179,7 +193,7 @@ export class OpenAIService {
           // Add metadata for cleaned parse
           if (parsed && typeof parsed === 'object') {
             parsed._apiMeta = {
-              modelUsed: model,
+              modelUsed: normalizedModel,
               retryAttempt: 0,
               originalModel: model,
               textSpeed: 'fast',
@@ -199,7 +213,7 @@ export class OpenAIService {
               // Add metadata for extracted parse
               if (extracted && typeof extracted === 'object') {
                 extracted._apiMeta = {
-                  modelUsed: model,
+                  modelUsed: normalizedModel,
                   retryAttempt: 0,
                   originalModel: model,
                   textSpeed: 'fast',
@@ -214,7 +228,7 @@ export class OpenAIService {
           }
         }
         
-        throw new Error(`Invalid JSON response from backend API (model: ${model})`);
+        throw new Error(`Invalid JSON response from backend API (model: ${normalizedModel})`);
       }
 
     } catch (error) {
@@ -254,18 +268,21 @@ export class OpenAIService {
       max_completion_tokens,
       model = 'gpt-5-mini-2025-08-07'
     } = options;
+    
+    // Normalize model name
+    const normalizedModel = normalizeModelName(model);
 
     // Check if strict mode is enabled - only use the user's selected model
     const { strictModelEnabled } = getRuntimeOverrides();
     
     if (strictModelEnabled) {
-      console.log(`🔒 Strict mode enabled - using only selected model: ${MODEL_DISPLAY_NAMES[model] || model}`);
-      const result = await this.attemptChatJSON(messages, options);
+      console.log(`🔒 Strict mode enabled - using only selected model: ${MODEL_DISPLAY_NAMES[normalizedModel] || normalizedModel}`);
+      const result = await this.attemptChatJSON(messages, { ...options, model: normalizedModel });
       
       // Add metadata about the API call
       if (result && typeof result === 'object') {
         result._apiMeta = {
-          modelUsed: model,
+          modelUsed: normalizedModel,
           retryAttempt: 0,
           originalModel: model,
           textSpeed: this.textSpeed,
@@ -276,8 +293,8 @@ export class OpenAIService {
       return result;
     }
 
-    // Use smart fallback chain based on the requested model
-    const retryModels = getSmartFallbackChain(model, 'text');
+    // Use smart fallback chain based on the normalized model
+    const retryModels = getSmartFallbackChain(normalizedModel, 'text');
     console.log(`📋 Text generation retry chain: ${retryModels.map(m => MODEL_DISPLAY_NAMES[m] || m).join(' → ')}`);
 
     let lastError: Error | null = null;
@@ -289,13 +306,13 @@ export class OpenAIService {
           temperature,
           max_tokens,
           max_completion_tokens,
-          model: tryModel
+          model: normalizeModelName(tryModel)
         });
         
         // Add metadata about the API call
         if (result && typeof result === 'object') {
           result._apiMeta = {
-            modelUsed: tryModel,
+            modelUsed: normalizeModelName(tryModel),
             retryAttempt,
             originalModel: model,
             textSpeed: this.textSpeed
@@ -330,11 +347,14 @@ export class OpenAIService {
       max_completion_tokens,
       model = 'gpt-5-mini-2025-08-07'
     } = options;
+    
+    // Normalize model name
+    const normalizedModel = normalizeModelName(model);
 
-    const isGPT5Model = model?.startsWith('gpt-5');
-    const isO3Model = model?.startsWith('o3');
-    const isGPT41OrO4 = model?.startsWith('gpt-4.1') || model?.startsWith('o4');
-    const isOlderGPT4 = model?.includes('gpt-4o') && !model?.includes('gpt-4.1');
+    const isGPT5Model = normalizedModel?.startsWith('gpt-5');
+    const isO3Model = normalizedModel?.startsWith('o3');
+    const isGPT41OrO4 = normalizedModel?.startsWith('gpt-4.1') || normalizedModel?.startsWith('o4');
+    const isOlderGPT4 = normalizedModel?.includes('gpt-4o') && !normalizedModel?.includes('gpt-4.1');
     
     const tokenLimit = max_completion_tokens || max_tokens;
     
@@ -346,7 +366,7 @@ export class OpenAIService {
 
     // Build request body
     const requestBody: any = {
-      model,
+      model: normalizedModel,
       messages,
       [tokenParameter]: tokenLimit
     };
@@ -360,7 +380,7 @@ export class OpenAIService {
       requestBody.temperature = temperature;
     }
 
-    console.log(`Attempting API call with model: ${model}, tokens: ${tokenLimit}`);
+    console.log(`Attempting API call with model: ${normalizedModel}, tokens: ${tokenLimit}`);
 
     const response = await fetch(OPENAI_API_URL, {
       method: 'POST',
@@ -380,7 +400,7 @@ export class OpenAIService {
     const content = data.choices?.[0]?.message?.content;
     const finishReason = data.choices?.[0]?.finish_reason;
     
-    console.log(`API Response Debug - Model: ${model}, Finish Reason: ${finishReason}, Content Length: ${content?.length || 0}`);
+    console.log(`API Response Debug - Model: ${normalizedModel}, Finish Reason: ${finishReason}, Content Length: ${content?.length || 0}`);
     console.log(`Raw content preview: ${content?.substring(0, 200) || 'NO CONTENT'}`);
     
     if (!content || content.trim() === '') {
@@ -425,7 +445,7 @@ export class OpenAIService {
         }
       }
       
-      throw new Error(`Invalid JSON response from OpenAI (model: ${model})`);
+      throw new Error(`Invalid JSON response from OpenAI (model: ${normalizedModel})`);
     }
   }
 

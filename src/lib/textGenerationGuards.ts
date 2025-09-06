@@ -375,6 +375,51 @@ export function validateOpeningWordVariety(lines: string[]): {
   };
 }
 
+// Strict tag coverage validator
+export function validateStrictTagCoverage(lines: string[], tags: string[]): { 
+  valid: boolean; 
+  coverage: number; 
+  details: string[];
+} {
+  if (!tags || tags.length === 0) {
+    return { valid: true, coverage: 100, details: ['No tags to validate'] };
+  }
+
+  let totalPossible = lines.length * tags.length; // Every tag in every line
+  let actualMatches = 0;
+  const details: string[] = [];
+
+  lines.forEach((line, lineIndex) => {
+    const lineLower = line.toLowerCase();
+    const lineMatches: string[] = [];
+    const lineMisses: string[] = [];
+    
+    tags.forEach(tag => {
+      const tagLower = tag.toLowerCase();
+      if (lineLower.includes(tagLower)) {
+        actualMatches++;
+        lineMatches.push(tag);
+      } else {
+        lineMisses.push(tag);
+      }
+    });
+    
+    details.push(`Line ${lineIndex + 1}: Has [${lineMatches.join(', ')}] Missing [${lineMisses.join(', ')}]`);
+  });
+
+  const coverage = Math.round((actualMatches / totalPossible) * 100);
+  const valid = coverage === 100; // Strict: must be 100%
+
+  return {
+    valid,
+    coverage,
+    details: [
+      `Coverage: ${actualMatches}/${totalPossible} (${coverage}%)`,
+      ...details
+    ]
+  };
+}
+
 // Comprehensive quality check for 4-lane generation (Universal Contract)
 export function validateFourLaneOutput(
   lines: string[], 

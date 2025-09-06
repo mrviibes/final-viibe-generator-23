@@ -4,6 +4,7 @@ import { validateVisualOption } from './visualValidators';
 import { VisualContract, UniversalContract, buildLayoutSpec, buildUniversalContract } from './contracts';
 import { generateHeuristicVisuals } from './visualHeuristics';
 import { generateVisualPrompts } from './visualPromptGenerator';
+import { validateStrictTagCoverage } from './textGenerationGuards';
 
 export interface VisualInputs {
   category: string;
@@ -1019,7 +1020,7 @@ export async function generateVisualRecommendations(
           if (validatedOptions.length < n) {
             // Use four-angle prompt generator as primary fallback
             try {
-              const promptOptions = generateVisualPrompts({
+              const promptResult = generateVisualPrompts({
                 category: enrichedInputs.category,
                 subcategory: enrichedInputs.subcategory,
                 tone: enrichedInputs.tone,
@@ -1029,7 +1030,7 @@ export async function generateVisualRecommendations(
               });
               
               const neededCount = n - validatedOptions.length;
-              const convertedOptions = promptOptions.slice(0, neededCount).map(opt => ({
+              const convertedOptions = promptResult.options.slice(0, neededCount).map(opt => ({
                 subject: opt.subject,
                 background: opt.background,
                 prompt: opt.prompt,
@@ -1131,7 +1132,7 @@ export async function generateVisualRecommendations(
             
             let fallbacks = [];
             try {
-              const promptOptions = generateVisualPrompts({
+              const promptResult = generateVisualPrompts({
                 category: enrichedInputs.category,
                 subcategory: enrichedInputs.subcategory,
                 tone: enrichedInputs.tone,
@@ -1140,7 +1141,7 @@ export async function generateVisualRecommendations(
                 visualTags: inputs.tags || [] // Use raw user tags
               });
               
-              fallbacks = promptOptions.slice(0, n).map(opt => ({
+              fallbacks = promptResult.options.slice(0, n).map(opt => ({
                 subject: opt.subject,
                 background: opt.background,
                 prompt: opt.prompt,
@@ -1162,7 +1163,7 @@ export async function generateVisualRecommendations(
           
           let fallbacks = [];
           try {
-            const promptOptions = generateVisualPrompts({
+            const promptResult = generateVisualPrompts({
               category: enrichedInputs.category,
               subcategory: enrichedInputs.subcategory,
               tone: enrichedInputs.tone,
@@ -1171,7 +1172,7 @@ export async function generateVisualRecommendations(
               visualTags: inputs.tags || [] // Use raw user tags
             });
             
-            fallbacks = promptOptions.slice(0, n).map(opt => ({
+            fallbacks = promptResult.options.slice(0, n).map(opt => ({
               subject: opt.subject,
               background: opt.background,
               prompt: opt.prompt,
@@ -1448,7 +1449,7 @@ export async function generateVisualRecommendations(
     } else {
       // Use four-angle prompt generator for all other contexts
       try {
-        const promptOptions = generateVisualPrompts({
+        const promptResult = generateVisualPrompts({
           category: enrichedInputs.category,
           subcategory: enrichedInputs.subcategory,
           tone: enrichedInputs.tone,
@@ -1457,7 +1458,7 @@ export async function generateVisualRecommendations(
           visualTags: inputs.tags || [] // Use raw user tags
         });
         
-        fallbackOptions = promptOptions.map(opt => ({
+        fallbackOptions = promptResult.options.map(opt => ({
           subject: opt.subject,
           background: opt.background,
           prompt: opt.prompt,
