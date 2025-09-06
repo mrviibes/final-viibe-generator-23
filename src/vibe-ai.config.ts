@@ -198,8 +198,8 @@ export interface IdeogramHandoff {
 // 2) Feature Flags and Constants  
 // =========================
 
-// Shortened negative prompt for more focused generation
-export const DEFAULT_NEGATIVE_PROMPT = "misspellings, blurry text, watermarks, logos, extra text, microtext, low contrast";
+// Empty negative prompt - simplified approach
+export const DEFAULT_NEGATIVE_PROMPT = "";
 // Model fallback chains for retry strategy
 export const MODEL_FALLBACK_CHAINS = {
   text: [
@@ -1130,21 +1130,21 @@ export function buildIdeogramPrompt(handoff: IdeogramHandoff, cleanBackground: b
     }
   }
   
-  // GLOBAL NEGATIVE PROMPT ENFORCEMENT - Add anti-text artifacts
-  const negativePrompts = [
-    'no background lettering', 'no banners with words', 'no wall decorations with text',
-    'no text on props', 'no signage', 'no writing on objects', 'no idle person'
+  // Enhanced quality enforcement without negative prompts
+  const qualityEnhancement = [
+    'clean composition', 'professional quality', 'high clarity',
+    'well-lit scene', 'sharp details', 'good contrast'
   ];
   
-  // Add action-specific negative prompts for birthday scenes
+  // Add action-specific enhancement for birthday scenes
   const isBirthdayScene = handoff.category?.toLowerCase() === 'celebrations' && 
                          handoff.subcategory_primary?.toLowerCase().includes('birthday');
   if (isBirthdayScene && handoff.chosen_visual?.includes('blowing out candles')) {
-    negativePrompts.push('no static idle person', 'must show blowing candles action');
+    qualityEnhancement.push('dynamic action', 'clear facial expression');
   }
   
-  // Inject negative prompt directive
-  parts.push(`NEGATIVE PROMPT: ${negativePrompts.join(', ')}`);
+  // Add quality enhancement instead of negative prompt
+  parts.push(`QUALITY: ${qualityEnhancement.join(', ')}`);
   
   const finalPrompt = parts.join(' ');
   
@@ -1207,7 +1207,7 @@ TEXT: align=left, valign=center, line-wrap=balanced, max-lines=5
 STYLE: high-contrast, white text on subtle dark overlay (opacity 35–45%)
 SAFE: 24px padding inside region, no subject/props inside region
 RULES: Overlay text must render exactly as provided, no substitutions, no injected characters. DO NOT center text. DO NOT place text outside REGION. Reserve REGION as solid panel.
-NEGATIVE PROMPT: no background lettering, no banners with words, no wall decorations with text`;
+QUALITY: clean text zones, clear visual hierarchy, professional layout`;
   }
 
   if (L.includes("negative")) {
@@ -1217,7 +1217,7 @@ BOUNDS: margin 6% from edges, keep 8% from subject mask
 TEXT: align=left, max 3 lines, weight=bold
 SAFE: subtle drop shadow
 RULES: Overlay text must render exactly as provided, no substitutions, no injected characters. DO NOT overlap primary subject; shrink text if needed.
-NEGATIVE PROMPT: no background lettering, no banners with words, no wall decorations with text`;
+QUALITY: clean negative space, clear text zones, professional composition`;
   }
 
   if (L.includes("meme")) {
@@ -1225,7 +1225,7 @@ NEGATIVE PROMPT: no background lettering, no banners with words, no wall decorat
 TOP: x=0% y=0% w=100% h=18%, align=center, all caps, stroke=2px black
 BOTTOM: x=0% y=82% w=100% h=18%, align=center, all caps, stroke=2px black
 RULES: Overlay text must render exactly as provided, no substitutions, no injected characters. Keep faces visible (6% margin).
-NEGATIVE PROMPT: no background lettering, no banners with words, no wall decorations with text`;
+QUALITY: clean meme format, bold text zones, high contrast`;
   }
 
   if (L.includes("lower third") || L.includes("lower-third")) {
@@ -1234,7 +1234,7 @@ REGION: x=0% y=72% w=100% h=28%
 BANNER: solid/blur 70–80% opacity
 TEXT: align=left, padding=24px
 RULES: Overlay text must render exactly as provided, no substitutions, no injected characters
-NEGATIVE PROMPT: no background lettering, no banners with words, no wall decorations with text`;
+QUALITY: clean banner zones, professional text overlay, high readability`;
   }
 
   if (L.includes("badge") || L.includes("sticker")) {
@@ -1243,7 +1243,7 @@ REGION: x=72% y=6% w=24% h=24%
 STYLE: circular, high-contrast, drop shadow
 TEXT: center, max 4 lines
 RULES: Overlay text must render exactly as provided, no substitutions, no injected characters. Move to safe corner if overlap.
-NEGATIVE PROMPT: no background lettering, no banners with words, no wall decorations with text`;
+QUALITY: clean badge design, high contrast, clear visibility`;
   }
 
   if (L.includes("subtle") || L.includes("caption")) {
@@ -1251,7 +1251,7 @@ NEGATIVE PROMPT: no background lettering, no banners with words, no wall decorat
 REGION: x=6% y=86% w=88% h=12%
 TEXT: align=left, small, on soft strip
 RULES: Overlay text must render exactly as provided, no substitutions, no injected characters. Never cover faces; reduce size if needed.
-NEGATIVE PROMPT: no background lettering, no banners with words, no wall decorations with text`;
+QUALITY: subtle caption styling, unobtrusive placement, clear readability`;
   }
 
   return "";

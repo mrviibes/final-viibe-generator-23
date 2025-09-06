@@ -371,8 +371,7 @@ export function generateVisualPrompts(inputs: VisualPromptInputs): VisualPromptO
   const laneSolo = clamp(sentence([
     `Single person ${soloAction}`,
     `surrounded by ${join(pickN(objects, 3))}`,
-    `${tone.light}; ${tone.mood}`,
-    `[NEGATIVE_PROMPT: ${negativeFor(style, category)}, no idle posed subject]`
+    `${tone.light}; ${tone.mood}`
   ]));
 
   // Lane 4: CREATIVE (symbolic / abstract / collage)

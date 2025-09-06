@@ -176,7 +176,7 @@ export function generateHeuristicVisuals(inputs: VisualInputs): VisualOption[] {
   prompts.push({
     subject: literalSubject,
     background: "simple background",
-    prompt: `[TEXT_SAFE_ZONE: center] ${literalPrompt} [NEGATIVE_PROMPT: text, watermark, logo, blurry, low quality]`,
+    prompt: literalPrompt,
     textAligned: true,
     subcategoryAligned: true
   });
@@ -187,7 +187,7 @@ export function generateHeuristicVisuals(inputs: VisualInputs): VisualOption[] {
   prompts.push({
     subject: `${subcategory} scene`,
     background: contextElements,
-    prompt: `[TEXT_SAFE_ZONE: bottom] ${contextPrompt} [NEGATIVE_PROMPT: text, watermark, logo, blurry, low quality]`,
+    prompt: contextPrompt,
     textAligned: false,
     subcategoryAligned: true
   });
@@ -197,7 +197,7 @@ export function generateHeuristicVisuals(inputs: VisualInputs): VisualOption[] {
   prompts.push({
     subject: `${subcategory} atmosphere`,
     background: "atmospheric background",
-    prompt: `[TEXT_SAFE_ZONE: top] ${moodPrompt} [NEGATIVE_PROMPT: text, watermark, logo, blurry, low quality]`,
+    prompt: moodPrompt,
     textAligned: false,
     subcategoryAligned: true
   });
@@ -208,7 +208,7 @@ export function generateHeuristicVisuals(inputs: VisualInputs): VisualOption[] {
   prompts.push({
     subject: "creative composition",
     background: creativeElements,
-    prompt: `[TEXT_SAFE_ZONE: corner] ${creativePrompt} [NEGATIVE_PROMPT: text, watermark, logo, blurry, low quality]`,
+    prompt: creativePrompt,
     textAligned: textKeywords.length > 0,
     subcategoryAligned: true
   });
