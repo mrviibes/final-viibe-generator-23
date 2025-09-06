@@ -387,7 +387,7 @@ export function generateVisualPrompts(inputs: VisualPromptInputs): VisualPromptO
   const lanes = [laneObjects, laneGroup, laneSolo, laneCreative];
   const roles = ['objects', 'group', 'solo', 'creative'];
   
-  // Clean prompts - no bracket markers, enforce 130 char limit
+  // UNIVERSAL CONTRACT: Clean prompts - remove ALL bracket markers, enforce 130 char limit
   return lanes.map((prompt, index) => {
     const cleanPrompt = prompt
       .replace(/\[TAGS:[^\]]*\]/gi, '')
@@ -396,6 +396,7 @@ export function generateVisualPrompts(inputs: VisualPromptInputs): VisualPromptO
       .replace(/\[ASPECTS:[^\]]*\]/gi, '')
       .replace(/\[TEXT_HINT:[^\]]*\]/gi, '')
       .replace(/\[NEGATIVE_PROMPT:[^\]]*\]/gi, '')
+      .replace(/\[[^\]]*\]/gi, '') // Remove ANY remaining brackets
       .replace(/\s+/g, ' ')
       .trim();
     

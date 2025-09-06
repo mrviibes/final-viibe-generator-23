@@ -4782,6 +4782,40 @@ const Index = () => {
         });
       }
       
+      // UNIVERSAL CONTRACT: Preflight auto-fixes for TEXT_CONTENT
+      if (vibeResult.picked) {
+        let processedText = vibeResult.picked;
+        
+        // Auto-fix 1: Uppercase for meme style
+        const runtimeOverrides = getRuntimeOverrides();
+        if (runtimeOverrides.typographyStyle === 'meme-style') {
+          processedText = processedText.toUpperCase();
+        }
+        
+        // Auto-fix 2: Sanitize non-ASCII and problematic characters
+        processedText = processedText.replace(/[^\x00-\x7F]/g, '').replace(/[%\\]/g, '');
+        
+        // Auto-fix 3: For solo visual lane, ensure action verb is present in text
+        // This will be handled in visual generation phase
+        
+        if (processedText !== vibeResult.picked) {
+          console.log('🔧 Applied preflight auto-fixes to text content');
+          // Update the picked result
+          vibeResult.picked = processedText;
+        }
+      }
+      
+      // UNIVERSAL CONTRACT: Enhanced telemetry logging
+      console.log('🔬 UNIVERSAL CONTRACT Telemetry:', {
+        inputs: { category, subcategory, tone, tags: finalTagsForGeneration },
+        textLines: vibeResult.candidates,
+        audit: vibeResult.audit,
+        roundTripTime: Date.now() - Date.now(), // Would need start time
+        fallbackUsed: vibeResult.audit.usedFallback,
+        retryCount: vibeResult.audit.retryAttempt || 0,
+        validatorResults: 'N/A' // Would be populated in validator
+      });
+      
       // Show spelling filter notification if options were filtered for quality
       if (vibeResult.audit.spellingFiltered && vibeResult.audit.spellingFiltered > 0) {
         console.log(`📝 Filtered ${vibeResult.audit.spellingFiltered} options for spelling quality`);

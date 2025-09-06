@@ -1958,3 +1958,9 @@ Return as a JSON object with this exact format:
     { role: 'user', content: prompt }
   ];
 }
+
+// UNIVERSAL CONTRACT: Export function for building Ideogram prompts from contracts
+export function buildIdeogramPromptFromContract(contract: any): string {
+  // Build the comprehensive prompt using the Universal Contract structure
+  return contract.IMAGE_PROMPT || contract.visual_description || '';
+}

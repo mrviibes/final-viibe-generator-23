@@ -1,7 +1,7 @@
 import { openAIService } from './openai';
 import { SYSTEM_PROMPTS, buildVisualGeneratorMessages, buildCompactVisualMessages, getStyleKeywords, getEffectiveConfig, isTemperatureSupported, getSmartFallbackChain, MODEL_DISPLAY_NAMES, BACKGROUND_PRESETS, getRuntimeOverrides, getContextualBans } from '../vibe-ai.config';
 import { validateVisualOption } from './visualValidators';
-import { VisualContract, UniversalContract } from './contracts';
+import { VisualContract, UniversalContract, buildLayoutSpec, buildUniversalContract } from './contracts';
 import { generateHeuristicVisuals } from './visualHeuristics';
 import { generateVisualPrompts } from './visualPromptGenerator';
 
