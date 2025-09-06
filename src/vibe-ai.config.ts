@@ -317,11 +317,11 @@ export function buildStrictLaneMessages(inputs: VibeInputs): any[] {
   return [
     {
       role: 'system', 
-      content: 'Return ONLY JSON: {"lines":[{"lane":"platform","text":"..."},{"lane":"audience","text":"..."},{"lane":"skill","text":"..."},{"lane":"absurdity","text":"..."}]}. Do not write lane names, prefixes, or labels inside `text`. `text` must contain only the user-facing sentence.'
+      content: 'Return ONLY JSON: {"lines":[{"lane":"platform","text":"..."},{"lane":"audience","text":"..."},{"lane":"skill","text":"..."},{"lane":"absurdity","text":"..."}]}. `text` must be a user-facing one-liner (no lane words, no prefixes). Rules: 4 lines in order platform,audience,skill,absurdity; ≤100 chars; all TAGS must appear in EVERY line; punctuation , . : only; match Tone. Sensitive traits (e.g., gay) must be used neutrally or positively; roasts must target behavior/performance, not identity.'
     },
     {
       role: 'user',
-      content: `Category: ${inputs.category}\nSubcategory: ${inputs.subcategory || 'general'}\nTone: ${inputs.tone}\nTags (must appear in EVERY line): ${tagsCSV}\nRules:\n- 4 one-liners, lanes in order: platform, audience, skill, absurdity\n- Length mix ≈50, ≈70, ≈90, ≤100 chars\n- Punctuation: commas/periods/colons only (no em-dash or --)\n- Match Tone\n- Do not include lane words or any prefixes inside \`text\``
+      content: `Category: ${inputs.category}\nSubcategory: ${inputs.subcategory || 'general'}\nTone: ${inputs.tone}\nTAGS (must appear in every line): ${tagsCSV}`
     }
   ];
 }

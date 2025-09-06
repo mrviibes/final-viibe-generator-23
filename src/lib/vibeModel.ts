@@ -25,25 +25,21 @@ import {
   validateOpeningWordVariety
 } from './textGenerationGuards';
 
-const LANE_RX = /^\s*(platform|audience|skill|skillability|absurdity)\s*:\s*/i;
+const LANE_RX = /^\s*(platform|audience|skill|absurdity|skillability)\s*:\s*/i;
 
-export function fixAndValidate(lines: any[], tags: string[]) {
+export function fixAndValidate(lines: any[], tags: string[], max: number = 100) {
   if (!Array.isArray(lines) || lines.length !== 4) return null;
-  const req = (tags||[]).map(t=>t.toLowerCase());
-  const ok = lines.map((L, i) => {
-    let txt = (L?.text||"").replace(LANE_RX,"").trim();          // strip lane leaks
+  const need = (tags || []).map(t => t.toLowerCase());
+  const lanes = ["platform", "audience", "skill", "absurdity"];
+  const out = lines.map((L, i) => {
+    let txt = (L?.text || "").replace(LANE_RX, "").trim();
     if (!txt) return null;
-    // enforce tags
-    for (const t of req) if (!txt.toLowerCase().includes(t)) {
-      // append tag smartly
-      txt = txt.endsWith(".") ? `${txt.slice(0,-1)} — ${t}.` : `${txt} — ${t}`;
-      txt = txt.replace(/—/g, ":");                               // no em-dash
-    }
-    // length & punctuation
-    txt = txt.replace(/—|--/g, ":").slice(0, 100).trim();
-    return { lane: ["platform","audience","skill","absurdity"][i], text: txt };
+    // enforce tags (case-insensitive, no em-dash)
+    for (const t of need) if (!txt.toLowerCase().includes(t)) txt = `${txt.replace(/[—–]|--/g, ":")}, ${t}`;
+    txt = txt.replace(/[—–]|--/g, ":").slice(0, max).trim();
+    return { lane: lanes[i], text: txt };
   });
-  return ok.every(Boolean) ? ok : null;
+  return out.every(Boolean) ? out : null;
 }
 
 // Re-export types for backward compatibility
