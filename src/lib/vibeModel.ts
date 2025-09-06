@@ -15,7 +15,11 @@ import {
   type VibeCandidate,
   type VibeResult
 } from '../vibe-ai.config';
-import type { ChatMessage } from '../ai/prompts';
+// Define ChatMessage type locally to remove AI dependency
+type ChatMessage = {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+};
 
 // Build text hotfix messages for stricter lane generation
 function buildTextHotfixMessages(inputs: VibeInputs): ChatMessage[] {
