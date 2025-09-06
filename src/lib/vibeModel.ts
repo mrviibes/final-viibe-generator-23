@@ -15,49 +15,6 @@ import {
   type VibeCandidate,
   type VibeResult
 } from '../vibe-ai.config';
-// Define ChatMessage type locally to remove AI dependency
-type ChatMessage = {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-};
-
-// Build text hotfix messages for stricter lane generation
-function buildTextHotfixMessages(inputs: VibeInputs): ChatMessage[] {
-  const tagsCSV = (inputs.tags || []).join(', ');
-  const anchors = getTextAnchors(inputs.category, inputs.subcategory || '');
-  const banlist = TEXT_CLICHES;
-  
-  return [
-    {
-      role: 'system',
-      content: `Return ONLY JSON:
-{"lines":[
- {"lane":"platform","text":"..."},
- {"lane":"audience","text":"..."},
- {"lane":"skill","text":"..."},
- {"lane":"absurdity","text":"..."}
-]}
-Rules:
-- 4 one-liners, lanes in that order; user-facing text only (no lane labels/prefixes).
-- ≤100 chars each; use commas/periods/colons only (no em-dash or --).
-- ALL tags must appear in EVERY line (case-insensitive).
-- Avoid clichés, vague platitudes, and generic advice.
-- Each line must include at least ONE concrete noun from the provided anchor list.
-- Tone must guide word choice (Humorous/Playful=light, Savage=roast behavior not identity, Sentimental/Serious=respectful, etc.).
-- No invented names/occasions beyond inputs.`
-    },
-    {
-      role: 'user',
-      content: `Category: ${inputs.category}
-Subcategory: ${inputs.subcategory || 'general'}
-Tone: ${inputs.tone}
-TAGS (must appear in every line): ${tagsCSV}
-Anchors (use at least one per line): ${anchors.join(', ')}
-Never use these phrases: ${banlist.join(' | ')}
-Generate 4 one-liners in JSON per the schema and rules.`
-    }
-  ];
-}
 import { TextContract, buildUniversalContract } from './contracts';
 import { getPopCultureContext, extractSubjectFromInputs } from './popCultureContext';
 import { 
@@ -67,83 +24,6 @@ import {
   validateLengthDiversity,
   validateOpeningWordVariety
 } from './textGenerationGuards';
-
-// Subcategory anchors (require at least 1 per line)
-const TEXT_ANCHORS: Record<string, string[]> = {
-  "celebrations.birthday": ["cake","candles","balloons","confetti","party hats","gifts"],
-  "dailylife.work commute": ["train","bus","subway","traffic","stoplight","headphones","coffee","windshield","platform","carpool"],
-  "sports.hockey": ["ice rink","stick","puck","helmet","skates","goal net","locker room"],
-  "dailylife.grocery shopping": ["cart","checkout","aisle","produce","cashier","receipt","bag"],
-  "celebrations.wedding": ["dress","ring","bouquet","vows","altar","reception","cake"],
-  "sports.football": ["field","touchdown","quarterback","helmet","stadium","end zone"],
-  "dailylife.morning routine": ["coffee","shower","alarm","toothbrush","mirror","breakfast"],
-  "work.meeting": ["conference room","presentation","laptop","whiteboard","agenda","deadline"],
-};
-
-// Phrases to ban (kills generic, fortune-cookie lines)
-const TEXT_CLICHES = [
-  "laughter is the best medicine",
-  "timing is everything", 
-  "memories shape our future",
-  "finds you when you least expect it",
-  "run deeper than logic",
-  "change everything",
-  "truth hurts",
-  "life is a journey",
-  "everything happens for a reason",
-  "follow your dreams",
-  "live laugh love",
-  "be yourself",
-];
-
-const LANE_RX = /^\s*(platform|audience|skill|absurdity|skillability)\s*:\s*/i;
-const PUNCT_RX = /[—–]|--/g;
-
-// Helper functions
-function keyMatch(category: string, subcategory: string): string {
-  return `${category.toLowerCase()}.${subcategory.toLowerCase()}`;
-}
-
-function getTextAnchors(category: string, subcategory: string): string[] {
-  const key = keyMatch(category, subcategory);
-  return TEXT_ANCHORS[key] || [];
-}
-
-function includesAny(hay: string, list: string[]): boolean {
-  const lower = hay.toLowerCase();
-  return list.some(x => lower.includes(x.toLowerCase()));
-}
-
-export function fixAndValidate(lines: any[], tags: string[], anchors: string[] = [], max: number = 100) {
-  if (!Array.isArray(lines) || lines.length !== 4) return null;
-  const reqTags = (tags || []).map(t => t.toLowerCase());
-  const lanes = ["platform", "audience", "skill", "absurdity"];
-  const out = lines.map((L, i) => {
-    let txt = (L?.text || "").replace(LANE_RX, "").replace(PUNCT_RX, ":").trim();
-    if (!txt) return null;
-    
-    // Check for clichés
-    if (TEXT_CLICHES.some(cliche => txt.toLowerCase().includes(cliche.toLowerCase()))) {
-      return null;
-    }
-    
-    // enforce tags
-    for (const t of reqTags) {
-      if (!txt.toLowerCase().includes(t)) {
-        txt = `${txt}, ${t}`;
-      }
-    }
-    
-    // anchor must appear (if anchors provided)
-    if (anchors.length > 0 && !includesAny(txt, anchors)) {
-      return null;
-    }
-    
-    if (txt.length > max) txt = txt.slice(0, max).trim();
-    return { lane: lanes[i], text: txt };
-  });
-  return out.every(Boolean) ? out : null;
-}
 
 // Re-export types for backward compatibility
 export type { VibeCandidate, VibeResult } from '../vibe-ai.config';
@@ -211,82 +91,74 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 }
 
 // Generate 4-lane strict candidates with manual retry
-// Build local hotfix fallback (never generic, always tagged & anchored)
-function buildLocalHotfixFallback(inputs: VibeInputs): VibeCandidate[] {
-  const { tone, tags, category, subcategory } = inputs;
-  const anchors = getTextAnchors(category, subcategory || '');
-  const t0 = anchors[0] || "coffee";
-  const t1 = anchors[1] || "train";
-  const tagStr = (tags || []).join(", ");
-  
-  return [
-    { line: `${tagStr} ${t0} becomes the metronome of this moment.`.slice(0, 100), blocked: false },
-    { line: `${tagStr} strangers share a nod at the ${t1}; it feels like belonging.`.slice(0, 100), blocked: false },
-    { line: `${tagStr} carrying hope through ${t0} stops is today's quiet talent.`.slice(0, 100), blocked: false },
-    { line: `${tagStr} the ${t1} sighs; the city answers back like an old friend.`.slice(0, 100), blocked: false }
-  ];
-}
-
 export async function generateLaneStrictCandidates(inputs: VibeInputs): Promise<VibeCandidate[]> {
-  const targetModel = 'gpt-4.1-mini-2025-04-14';
+  const targetModel = 'gpt-4.1-mini-2025-04-14'; // Pin to GPT-4.1 Mini
   
   console.log(`🎯 Strict lane generation with model: ${targetModel}`);
   
-  // Build text hotfix messages with anchors and cliché bans
-  const messages = buildTextHotfixMessages(inputs);
-  const anchors = getTextAnchors(inputs.category, inputs.subcategory || '');
+  // Build strict lane messages
+  const messages = buildStrictLaneMessages(inputs);
   
   // First attempt with 12s timeout
   try {
     const result = await withTimeout(
       openAIService.chatJSON(messages, {
         max_completion_tokens: 220,
-        model: targetModel,
-        temperature: 0.9
+        model: targetModel
       }),
       12000
     );
     
-    // Use the stricter validator with anchors
-    const fixedLines = fixAndValidate(result.lines, inputs.tags || [], anchors);
-    if (!fixedLines) {
-      console.warn('fixAndValidate failed, retrying once...');
-      
-      // Retry once with higher temperature and additional guidance
-      const retryMessages = [...messages];
-      retryMessages[1].content += `\nAvoid clichés strictly. Ensure at least one anchor word in EVERY line.`;
-      
-      const retryResult = await withTimeout(
-        openAIService.chatJSON(retryMessages, {
-          max_completion_tokens: 220,
-          model: targetModel,
-          temperature: 0.95
-        }),
-        12000
-      );
-      
-      if (retryResult.lines) {
-        const retryFixed = fixAndValidate(retryResult.lines, inputs.tags || [], anchors);
-        if (retryFixed) {
-          return retryFixed.map((line: any) => ({
-            line: line.text,
-            blocked: false
-          }));
-        }
-      }
-      
-      console.warn('Retry also failed, using local hotfix fallback');
-      return buildLocalHotfixFallback(inputs);
+    // Parse strict lane JSON
+    const lines = result.lines || [];
+    if (!Array.isArray(lines) || lines.length !== 4) {
+      throw new Error('Invalid lane structure returned');
     }
-
-    return fixedLines.map((line: any) => ({
+    
+    // Validate lane structure
+    const expectedLanes = ['platform', 'audience', 'skill', 'absurdity'];
+    for (let i = 0; i < 4; i++) {
+      const line = lines[i];
+      if (!line.lane || !line.text || line.lane !== expectedLanes[i]) {
+        throw new Error(`Invalid lane ${i}: expected ${expectedLanes[i]}, got ${line.lane}`);
+      }
+    }
+    
+    // Convert to VibeCandidate format - use only text, ignore lane metadata
+    return lines.map((line: any) => ({
       line: line.text,
       blocked: false
     }));
     
   } catch (error) {
-    console.error(`🚨 Lane generation failed, using local hotfix fallback: ${error}`);
-    return buildLocalHotfixFallback(inputs);
+    console.warn(`🔄 First attempt failed, retrying: ${error}`);
+    
+    // Manual retry (second attempt) with same 12s timeout
+    try {
+      const retryResult = await withTimeout(
+        openAIService.chatJSON(messages, {
+          max_completion_tokens: 220,
+          model: targetModel
+        }),
+        12000
+      );
+      
+      const retryLines = retryResult.lines || [];
+      if (Array.isArray(retryLines) && retryLines.length === 4) {
+        // Successful retry - return only text content
+        return retryLines.map((line: any) => ({
+          line: line.text || line,
+          blocked: false
+        }));
+      } else {
+        throw new Error('Retry also failed');
+      }
+    } catch (retryError) {
+      console.error(`🚨 Both attempts failed, using tag-injected fallback`);
+      
+      // Use tag-injected fallback that guarantees all tags in every line
+      return buildTagInjectedFallbacks(inputs);
+    }
   }
 }
 

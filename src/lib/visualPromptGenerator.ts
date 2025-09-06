@@ -353,7 +353,8 @@ export function generateVisualPrompts(inputs: VisualPromptInputs): { options: Vi
   const anchorObjects = baseImagery.slice(0, 2); // Ensure category anchors
   const laneObjects = clamp(sentence([
     `Close-up of ${join([...anchorObjects, ...propsTight.slice(0, 2)])}`,
-    `${tone.light}, ${tone.mood}`
+    `${tone.light}, ${tone.mood}`,
+    "clear negative space for text"
   ]));
 
   // Lane 2: GROUP (people visible) - guaranteed category anchors
@@ -386,16 +387,13 @@ export function generateVisualPrompts(inputs: VisualPromptInputs): { options: Vi
   const lanes = [laneObjects, laneGroup, laneSolo, laneCreative];
   const roles = ['objects', 'group', 'solo', 'creative'];
   
-  // Clean prompt assembly - no style words injected, remove any stray brackets
-  const options = lanes.map((lane, i) => {
-    const cleanLane = lane.replace(/[\[\]]/g, '').trim();
-    return {
-      subject: cleanLane.includes("person") || cleanLane.includes("people") ? cleanLane : "",
-      background: cleanLane.includes("background") || cleanLane.includes("scene") ? cleanLane : "",
-      prompt: cleanLane,
-      role: roles[i]
-    };
-  });
+  // Build options with role assignments
+  const options = lanes.map((lane, i) => ({
+    subject: lane.includes("person") || lane.includes("people") ? lane : "",
+    background: lane.includes("background") || lane.includes("scene") ? lane : "",
+    prompt: sentence([lane, ...style]),
+    role: roles[i]
+  }));
   
   // Generate negative prompt for the category/style
   const negativePrompt = negativeFor(inputs.visualStyle, category);

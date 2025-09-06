@@ -265,9 +265,9 @@ export const AI_CONFIG = {
   },
   generation: {
     max_candidates: 6,
-    temperature: 0.8,
-    max_tokens: 220,
-    model: 'gpt-4.1-mini-2025-04-14' // GPT-4.1 Mini for lane generation
+    temperature: 0.7,
+    max_tokens: 80, // Further reduced for speed
+    model: 'gpt-4.1-2025-04-14' // GPT-4.1 only
   },
   visual_generation: {
     max_tokens: 350, // Reduced for faster concepts 
@@ -310,18 +310,18 @@ export function buildCompactVisualMessages(inputs: any): any[] {
   ];
 }
 
-// Build strict lane messages with forced JSON schema  
+// Build strict lane messages with forced JSON schema
 export function buildStrictLaneMessages(inputs: VibeInputs): any[] {
   const tagsCSV = inputs.tags?.join(', ') || '';
   
   return [
     {
       role: 'system', 
-      content: 'Return ONLY JSON: {"lines":[{"lane":"platform","text":"..."},{"lane":"audience","text":"..."},{"lane":"skill","text":"..."},{"lane":"absurdity","text":"..."}]}. `text` must be a user-facing one-liner (no lane words, no prefixes). Rules: 4 lines in order platform,audience,skill,absurdity; ≤100 chars; all TAGS must appear in EVERY line; punctuation , . : only; match Tone. Sensitive traits (e.g., gay) must be used neutrally or positively; roasts must target behavior/performance, not identity.'
+      content: 'You must output ONLY valid JSON: {"lines":[{"lane":"platform","text":"..."},{"lane":"audience","text":"..."},{"lane":"skill","text":"..."},{"lane":"absurdity","text":"..."}]} . No prose. Rules: all tags must appear in EVERY line; vary tag placement; lanes must be platform,audience,skill,absurdity (one each, in that order); tone must match; lengths ~50, ~70, ~90, <=100; punctuation only commas/periods/colons (no em-dash or --); do not invent occasions/names not in tags/category.'
     },
     {
       role: 'user',
-      content: `Category: ${inputs.category}\nSubcategory: ${inputs.subcategory || 'general'}\nTone: ${inputs.tone}\nTAGS (must appear in every line): ${tagsCSV}`
+      content: `Category: ${inputs.category}\nSubcategory: ${inputs.subcategory || 'general'}\nTone: ${inputs.tone}\nTags (must appear in every line): ${tagsCSV}\nGenerate 4 short one-liners per the rules.`
     }
   ];
 }
