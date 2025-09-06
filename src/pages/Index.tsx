@@ -28,6 +28,14 @@ import { normalizeTypography, suggestContractions, isTextMisspelled } from "@/li
 import { BACKGROUND_PRESETS, getRuntimeOverrides, setRuntimeOverrides, TONES, VISUAL_STYLES, DEFAULT_NEGATIVE_PROMPT } from "../vibe-ai.config";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
+// Import viibe_ai_engine with feature flag
+import { openaiCompat } from "@/lib/openaiCompat";
+// @ts-ignore
+import { generateTextOptions, generateVisualOptions } from "../lib/engines/viibe_ai_engine.mjs";
+
+// Feature flag for using the new engine
+const USE_VIIBE_ENGINE = true;
+
 // Helper function to clean and truncate visual prompts
 function cleanAndTruncatePrompt(visualPrompt: string): string {
   if (!visualPrompt) return '';
@@ -4628,22 +4636,52 @@ const Index = () => {
 
       // Get final line from Step 2 if available
       const finalLine = selectedGeneratedOption || (isCustomTextConfirmed ? stepTwoText : undefined);
-      const visualResult = await generateVisualRecommendations({
-        category,
-        subcategory,
-        tone: tone.toLowerCase(),
-        tags: finalTags,
-        visualStyle: selectedVisualStyle || undefined,
-        finalLine,
-        subjectOption: selectedSubjectOption || undefined,
-        subjectDescription: subjectDescription || undefined,
-        dimensions: selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || undefined,
-        targetSlot: targetSlot || undefined,
-        backgroundPreset: backgroundPreset || undefined
-      }, 4);
+      let visualResult;
+      let engineNegativePrompt = "";
+      
+      if (USE_VIIBE_ENGINE) {
+        // Use new viibe_ai_engine  
+        const { visualOptions, negativePrompt: engineNeg } = await generateVisualOptions(openaiCompat, {
+          category,
+          subcategory,
+          tone: tone.toLowerCase(),
+          tags: finalTags
+        });
+        
+        engineNegativePrompt = engineNeg;
+        
+        // Convert engine output to legacy format
+        visualResult = {
+          options: visualOptions.map((option, index) => ({
+            id: `engine-${index}`,
+            subject: option.lane,
+            background: option.lane,
+            prompt: option.prompt,
+            negativePrompt: engineNeg,
+            slot: option.lane
+          })),
+          model: "viibe-engine"
+        };
+      } else {
+        // Legacy generation
+        visualResult = await generateVisualRecommendations({
+          category,
+          subcategory,
+          tone: tone.toLowerCase(),
+          tags: finalTags,
+          visualStyle: selectedVisualStyle || undefined,
+          finalLine,
+          subjectOption: selectedSubjectOption || undefined,
+          subjectDescription: subjectDescription || undefined,
+          dimensions: selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || undefined,
+          targetSlot: targetSlot || undefined,
+          backgroundPreset: backgroundPreset || undefined
+        }, 4);
+      }
+      
       console.log('🎨 Visual generation completed with result:', {
-        optionsCount: visualResult.options.length,
-        model: visualResult.model,
+        optionsCount: visualResult.options?.length || 0,
+        model: visualResult.model || "unknown",
         tags: finalTags
       });
 
@@ -4760,13 +4798,40 @@ const Index = () => {
         console.warn('⚠️ finalTagsForGeneration is empty but original tags exist, using original tags');
         finalTagsForGeneration = [...tags];
       }
-      const vibeResult: VibeResult = await generateCandidates({
-        category: category as any,
-        subcategory,
-        tone: tone as any,
-        tags: finalTagsForGeneration,
-        recipient_name: selectedPick || "-"
-      }, 4);
+      let vibeResult: VibeResult;
+      
+      if (USE_VIIBE_ENGINE) {
+        // Use new viibe_ai_engine
+        const lines = await generateTextOptions(openaiCompat, {
+          category,
+          subcategory,
+          tone: tone as any,
+          tags: finalTagsForGeneration
+        });
+        
+        // Convert engine output to legacy format
+        vibeResult = {
+          candidates: lines.map(line => line.text),
+          picked: lines.map(line => line.text)[0] || "",
+          audit: {
+            model: "viibe-engine",
+            reason: "Generated with viibe_ai_engine",
+            usedFallback: false,
+            blockedCount: 0,
+            candidateCount: lines.length,
+            spellingFiltered: 0
+          }
+        };
+      } else {
+        // Legacy generation
+        vibeResult = await generateCandidates({
+          category: category as any,
+          subcategory,
+          tone: tone as any,
+          tags: finalTagsForGeneration,
+          recipient_name: selectedPick || "-"
+        }, 4);
+      }
 
       // Check for partial tag coverage and show notification
       if (vibeResult.audit.reason?.includes('tag coverage') || vibeResult.audit.reason?.includes('partial tag coverage')) {
@@ -6965,16 +7030,45 @@ const Index = () => {
                  const tone = selectedTextStyleObj?.name || 'Humorous';
                  const finalLine = selectedGeneratedOption || (isCustomTextConfirmed ? stepTwoText : undefined);
                  
-                   const visualResult = await generateVisualRecommendations({
-                     category,
-                     subcategory,
-                     tone: tone.toLowerCase(),
-                     tags: finalTags,
-                     visualStyle: selectedVisualStyle || undefined,
-                     finalLine,
-                     subjectOption: selectedSubjectOption || undefined,
-                     subjectDescription: subjectDescription || undefined,
-                     dimensions: selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || undefined,
+                    let visualResult;
+                    
+                    if (USE_VIIBE_ENGINE) {
+                      // Use new viibe_ai_engine  
+                      const { visualOptions, negativePrompt: engineNeg } = await generateVisualOptions(openaiCompat, {
+                        category,
+                        subcategory,
+                        tone: tone.toLowerCase(),
+                        tags: finalTags
+                      });
+                      
+                      // Convert engine output to legacy format
+                      visualResult = {
+                        options: visualOptions.map((option, index) => ({
+                          id: `engine-${index}`,
+                          subject: option.lane,
+                          background: option.lane,
+                          prompt: option.prompt,
+                          negativePrompt: engineNeg,
+                          slot: option.lane
+                        })),
+                        model: "viibe-engine"
+                      };
+                    } else {
+                      // Legacy generation
+                      visualResult = await generateVisualRecommendations({
+                        category,
+                        subcategory,
+                        tone: tone.toLowerCase(),
+                        tags: finalTags,
+                        visualStyle: selectedVisualStyle || undefined,
+                        finalLine,
+                        subjectOption: selectedSubjectOption || undefined,
+                        subjectDescription: subjectDescription || undefined,
+                        dimensions: selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || undefined,
+                        targetSlot: targetSlot || undefined,
+                        backgroundPreset: backgroundPreset || undefined
+                      }, 4);
+                    }
                      targetSlot: targetSlot || undefined,
                      backgroundPreset: backgroundPreset || undefined
                   }, 4);
