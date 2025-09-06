@@ -18,29 +18,26 @@ export interface ChatMessage {
  * Build messages for generating text lines/phrases
  */
 export function buildTextLinesMessages(inputs: AiInputs): ChatMessage[] {
-  const systemPrompt = `You are a witty content generator that creates 4 distinct one-liners following specific lanes.
+  const systemPrompt = `You must return ONLY valid JSON: {"lines":[{"lane":"platform","text":"..."},{"lane":"audience","text":"..."},{"lane":"skill","text":"..."},{"lane":"absurdity","text":"..."}]}
 
-LANES STRUCTURE:
-- Platform (~50 chars): Reference the context/setting
-- Audience (~70 chars): Speak to who this resonates with  
-- Skill (~90 chars): Highlight abilities or actions
-- Absurdity (≤100 chars): Push boundaries with unexpected twists
+LANES (4 distinct approaches):
+- Platform (~50 chars): Reference context/setting
+- Audience (~70 chars): Who this resonates with  
+- Skill (~90 chars): Highlight abilities/actions
+- Absurdity (≤100 chars): Unexpected twist
 
 TONE: ${inputs.tone}
 ${getToneInstructions(inputs.tone)}
 
 RULES:
-- All tags must appear in EVERY line: ${inputs.tags?.join(', ') || 'none'}
-- Use only commas, periods, colons (NO em-dash or --)
-- Each lane must be unique in approach
-- Return array of 4 strings: [platform, audience, skill, absurdity]`;
+- ALL tags MUST appear in EVERY line: ${inputs.tags?.join(', ') || 'none'}
+- Only commas, periods, colons (NO em-dash or --)
+- Output strictly valid JSON only`;
 
-  const userPrompt = `Generate 4 one-liners for: ${inputs.category} → ${inputs.subcategory}
-
-Tags to include: ${inputs.tags?.join(', ') || 'none'}
+  const userPrompt = `Category: ${inputs.category}
+Subcategory: ${inputs.subcategory}
 Tone: ${inputs.tone}
-
-Return as JSON array of 4 strings following the lane structure.`;
+Tags: ${inputs.tags?.join(', ') || 'none'}`;
 
   return [
     { role: 'system', content: systemPrompt },
@@ -52,30 +49,27 @@ Return as JSON array of 4 strings following the lane structure.`;
  * Build messages for generating visual prompts
  */
 export function buildVisualMessages(inputs: AiInputs): ChatMessage[] {
-  const systemPrompt = `You are a visual prompt generator that creates 4 distinct image prompts following specific lanes.
+  const systemPrompt = `You must return ONLY valid JSON: {"prompts":[{"lane":"objects","text":"..."},{"lane":"group","text":"..."},{"lane":"solo","text":"..."},{"lane":"creative","text":"..."}]}
 
-LANES STRUCTURE:
+LANES (4 distinct visuals):
 - Objects: Props/environment only (NO people)
 - Group: Multiple people with candid gestures  
-- Solo: One person doing a specific action (verb required)
+- Solo: One person doing specific action (verb required)
 - Creative: Symbolic/abstract composition
 
 RULES:
-- All tags must appear in every lane: ${inputs.visualTags?.join(', ') || 'none'}
-- Objects lane: NO people words allowed
-- Group lane: Must mention multiple people
-- Solo lane: Must include one person + action verb
-- Creative lane: Must say "symbolic" or "abstract"
-- Keep prompts ≤300 chars each
-- Do NOT include style words (${inputs.visualStyle}, etc.)
-- Return array of 4 strings: [objects, group, solo, creative]`;
+- ALL tags in every lane: ${inputs.visualTags?.join(', ') || 'none'}
+- Objects: NO people words
+- Group: Multiple people mentioned
+- Solo: One person + action verb
+- Creative: Must say "symbolic" or "abstract"
+- ≤300 chars each
+- NO style words (${inputs.visualStyle})
+- Output strictly valid JSON only`;
 
-  const userPrompt = `Generate 4 visual prompts for: ${inputs.category} → ${inputs.subcategory}
-
-Visual tags: ${inputs.visualTags?.join(', ') || 'none'}
-Style: ${inputs.visualStyle} (don't include in prompts)
-
-Return as JSON array of 4 strings following the lane structure.`;
+  const userPrompt = `Category: ${inputs.category}
+Subcategory: ${inputs.subcategory}
+Visual tags: ${inputs.visualTags?.join(', ') || 'none'}`;
 
   return [
     { role: 'system', content: systemPrompt },

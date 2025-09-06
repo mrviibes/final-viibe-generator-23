@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { llmClient } from "@/ai/llm";
 import { buildTextLinesMessages, buildVisualMessages } from "@/ai/prompts";
+import { validateTextLines, validateVisualPrompts, buildTextFallback, buildVisualFallback, type TextLine, type VisualPrompt } from "@/ai/validators";
 import { 
   CATEGORIES, SUBCATEGORIES_BY_CATEGORY, TONE_OPTIONS, 
   LAYOUT_OPTIONS, VISUAL_STYLES, DIMENSION_OPTIONS,
@@ -48,36 +49,73 @@ export default function AiScratchpad() {
   const [finalPayload, setFinalPayload] = useState<FinalPayload | null>(null);
   
   // Results
-  const [textResults, setTextResults] = useState<string[]>([]);
-  const [visualResults, setVisualResults] = useState<string[]>([]);
+  const [textResults, setTextResults] = useState<TextLine[]>([]);
+  const [visualResults, setVisualResults] = useState<VisualPrompt[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
+  const [usedFallback, setUsedFallback] = useState<{ text: boolean; visual: boolean }>({ text: false, visual: false });
 
   const generateTextLines = async () => {
     setLoading(true);
     setError("");
+    setUsedFallback(prev => ({ ...prev, text: false }));
     
     try {
-      // Build AI input from current state
+      // Build lean AI input - only what's needed for text
       const aiInputs = {
         category: categoryContext.category,
         subcategory: categoryContext.subcategory,
         tone: textConfig.tone,
-        tags: textConfig.tags,
-        visualStyle: visualConfig.visualStyle,
-        visualTags: visualConfig.visualTags
+        tags: textConfig.tags
       };
       
+      console.log('Generating text with:', aiInputs);
+      
       const messages = buildTextLinesMessages(aiInputs);
-      const response = await llmClient.chatJSON<string[]>(messages);
+      const response = await llmClient.chatJSON<any>(messages);
       
       if (response.success && response.data) {
-        setTextResults(response.data);
+        // Validate the response
+        const validation = validateTextLines(response.data, textConfig.tags);
+        
+        if (validation.valid && validation.lines) {
+          setTextResults(validation.lines);
+          console.log('AI text generation successful');
+        } else {
+          console.warn('AI validation failed:', validation.error);
+          // Use fallback
+          const fallback = buildTextFallback(
+            categoryContext.category,
+            categoryContext.subcategory,
+            textConfig.tone,
+            textConfig.tags
+          );
+          setTextResults(fallback);
+          setUsedFallback(prev => ({ ...prev, text: true }));
+        }
       } else {
-        setError(response.error || "Failed to generate text lines");
+        console.error('AI call failed:', response.error);
+        // Use fallback
+        const fallback = buildTextFallback(
+          categoryContext.category,
+          categoryContext.subcategory,
+          textConfig.tone,
+          textConfig.tags
+        );
+        setTextResults(fallback);
+        setUsedFallback(prev => ({ ...prev, text: true }));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
+      console.error('Text generation error:', err);
+      // Use fallback
+      const fallback = buildTextFallback(
+        categoryContext.category,
+        categoryContext.subcategory,
+        textConfig.tone,
+        textConfig.tags
+      );
+      setTextResults(fallback);
+      setUsedFallback(prev => ({ ...prev, text: true }));
     } finally {
       setLoading(false);
     }
@@ -86,28 +124,62 @@ export default function AiScratchpad() {
   const generateVisualPrompts = async () => {
     setLoading(true);
     setError("");
+    setUsedFallback(prev => ({ ...prev, visual: false }));
     
     try {
-      // Build AI input from current state
+      // Build lean AI input - only what's needed for visuals
       const aiInputs = {
         category: categoryContext.category,
         subcategory: categoryContext.subcategory,
-        tone: textConfig.tone,
-        tags: textConfig.tags,
-        visualStyle: visualConfig.visualStyle,
-        visualTags: visualConfig.visualTags
+        tone: textConfig.tone, // Required by AiInputs interface
+        visualTags: visualConfig.visualTags,
+        visualStyle: visualConfig.visualStyle
       };
       
+      console.log('Generating visuals with:', aiInputs);
+      
       const messages = buildVisualMessages(aiInputs);
-      const response = await llmClient.chatJSON<string[]>(messages);
+      const response = await llmClient.chatJSON<any>(messages);
       
       if (response.success && response.data) {
-        setVisualResults(response.data);
+        // Validate the response
+        const validation = validateVisualPrompts(response.data, visualConfig.visualTags);
+        
+        if (validation.valid && validation.prompts) {
+          setVisualResults(validation.prompts);
+          console.log('AI visual generation successful');
+        } else {
+          console.warn('AI validation failed:', validation.error);
+          // Use fallback
+          const fallback = buildVisualFallback(
+            categoryContext.category,
+            categoryContext.subcategory,
+            visualConfig.visualTags
+          );
+          setVisualResults(fallback);
+          setUsedFallback(prev => ({ ...prev, visual: true }));
+        }
       } else {
-        setError(response.error || "Failed to generate visual prompts");
+        console.error('AI call failed:', response.error);
+        // Use fallback
+        const fallback = buildVisualFallback(
+          categoryContext.category,
+          categoryContext.subcategory,
+          visualConfig.visualTags
+        );
+        setVisualResults(fallback);
+        setUsedFallback(prev => ({ ...prev, visual: true }));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
+      console.error('Visual generation error:', err);
+      // Use fallback
+      const fallback = buildVisualFallback(
+        categoryContext.category,
+        categoryContext.subcategory,
+        visualConfig.visualTags
+      );
+      setVisualResults(fallback);
+      setUsedFallback(prev => ({ ...prev, visual: true }));
     } finally {
       setLoading(false);
     }
@@ -118,10 +190,10 @@ export default function AiScratchpad() {
     const layoutSpec = LAYOUT_SPECS[textConfig.layout];
     
     const payload: FinalPayload = {
-      textContent: textConfig.textOption === 'manual' ? textConfig.manualText : textResults[0],
+      textContent: textConfig.textOption === 'manual' ? textConfig.manualText : textResults[0]?.text || '',
       textLayoutSpec: layoutSpec,
       visualStyle: visualConfig.visualStyle,
-      visualPrompt: visualResults[0],
+      visualPrompt: visualResults[0]?.text || '',
       negativePrompt,
       dimensions: visualConfig.dimensions,
       contextId: categoryContext.contextId,
@@ -288,9 +360,14 @@ export default function AiScratchpad() {
                     </div>
                   )}
                   {textConfig.textOption === 'ai' && (
-                    <Button onClick={generateTextLines} disabled={loading}>
-                      {loading ? "Generating..." : "Generate Text Lines"}
-                    </Button>
+                    <div className="space-y-2">
+                      <Button onClick={generateTextLines} disabled={loading}>
+                        {loading ? "Generating..." : "Generate Text Lines"}
+                      </Button>
+                      {usedFallback.text && (
+                        <p className="text-sm text-amber-600">Used fallback (AI timeout/error)</p>
+                      )}
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -357,9 +434,14 @@ export default function AiScratchpad() {
                     />
                   </div>
                   {visualConfig.subjectOption === 'ai' && (
-                    <Button onClick={generateVisualPrompts} disabled={loading}>
-                      {loading ? "Generating..." : "Generate Visual Prompts"}
-                    </Button>
+                    <div className="space-y-2">
+                      <Button onClick={generateVisualPrompts} disabled={loading}>
+                        {loading ? "Generating..." : "Generate Visual Prompts"}
+                      </Button>
+                      {usedFallback.visual && (
+                        <p className="text-sm text-amber-600">Used fallback (AI timeout/error)</p>
+                      )}
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -412,10 +494,10 @@ export default function AiScratchpad() {
                   <div className="space-y-2">
                     {textResults.map((line, index) => (
                       <div key={index} className="p-3 bg-muted rounded-lg">
-                        <Badge variant="outline" className="mr-2">
-                          {index + 1}
+                        <Badge variant="outline" className="mr-2 mb-2">
+                          {line.lane}
                         </Badge>
-                        {line}
+                        <p className="text-sm">{line.text}</p>
                       </div>
                     ))}
                   </div>
@@ -434,9 +516,9 @@ export default function AiScratchpad() {
                     {visualResults.map((prompt, index) => (
                       <div key={index} className="p-3 bg-muted rounded-lg">
                         <Badge variant="outline" className="mr-2 mb-2">
-                          {index + 1}
+                          {prompt.lane}
                         </Badge>
-                        <p className="text-sm">{prompt}</p>
+                        <p className="text-sm">{prompt.text}</p>
                       </div>
                     ))}
                   </div>

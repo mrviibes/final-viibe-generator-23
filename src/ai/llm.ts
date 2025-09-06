@@ -6,6 +6,8 @@ export interface LLMOptions {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  timeout?: number;
+  responseFormat?: 'json' | 'text';
 }
 
 export interface LLMResponse<T = any> {
@@ -20,8 +22,10 @@ export interface LLMResponse<T = any> {
  */
 export class LLMClient {
   private defaultOptions: LLMOptions = {
-    model: 'gpt-5-2025-08-07',
-    maxTokens: 1000
+    model: 'gpt-4.1-mini-2025-04-14', // Fast, reliable model for JSON
+    maxTokens: 500,
+    timeout: 15000, // 15 second timeout
+    responseFormat: 'text'
   };
 
   /**
@@ -31,23 +35,33 @@ export class LLMClient {
     messages: ChatMessage[],
     options: LLMOptions = {}
   ): Promise<LLMResponse<string>> {
+    const controller = new AbortController();
+    const mergedOptions = { ...this.defaultOptions, ...options };
+    
+    // Set timeout
+    const timeoutId = setTimeout(() => controller.abort(), mergedOptions.timeout || 15000);
+    
     try {
-      const mergedOptions = { ...this.defaultOptions, ...options };
+      const requestBody: any = {
+        messages,
+        options: {
+          model: mergedOptions.model,
+          max_completion_tokens: mergedOptions.maxTokens,
+          // Add response format for JSON mode
+          ...(mergedOptions.responseFormat === 'json' ? { response_format: { type: 'json_object' } } : {}),
+          // Temperature support for GPT-4 models only
+          ...(mergedOptions.model?.includes('gpt-4') && mergedOptions.temperature !== undefined
+            ? { temperature: mergedOptions.temperature }
+            : {})
+        }
+      };
       
       const { data, error } = await supabase.functions.invoke('openai-chat', {
-        body: {
-          messages,
-          options: {
-            model: mergedOptions.model,
-            max_completion_tokens: mergedOptions.maxTokens,
-            // Note: temperature not supported for GPT-5 models
-            ...(mergedOptions.model?.includes('gpt-4') && mergedOptions.temperature !== undefined
-              ? { temperature: mergedOptions.temperature }
-              : {})
-          }
-        }
+        body: requestBody
       });
 
+      clearTimeout(timeoutId);
+      
       if (error) {
         console.error('LLM Error:', error);
         return { success: false, error: error.message || 'Unknown error' };
@@ -60,6 +74,12 @@ export class LLMClient {
 
       return { success: true, data: content, raw: content };
     } catch (error) {
+      clearTimeout(timeoutId);
+      
+      if (error.name === 'AbortError') {
+        return { success: false, error: 'Request timeout (15s limit)' };
+      }
+      
       console.error('LLM Client Error:', error);
       return { 
         success: false, 
@@ -75,7 +95,15 @@ export class LLMClient {
     messages: ChatMessage[],
     options: LLMOptions = {}
   ): Promise<LLMResponse<T>> {
-    const response = await this.chat(messages, options);
+    // Force JSON response format and appropriate model
+    const jsonOptions = {
+      ...options,
+      responseFormat: 'json' as const,
+      model: options.model || 'gpt-4.1-mini-2025-04-14',
+      temperature: 0.8 // Use temperature for consistent creative output
+    };
+    
+    const response = await this.chat(messages, jsonOptions);
     
     if (!response.success || !response.data) {
       return response as LLMResponse<T>;
