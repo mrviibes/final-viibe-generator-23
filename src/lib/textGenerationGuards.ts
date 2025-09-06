@@ -156,7 +156,7 @@ export function getLanesForCategory(category: string, subcategory: string): Lane
   ];
 }
 
-// Validate all tags are present in every line (Universal Contract Rule 1)
+// Validate tags appear at least once across all lines (flexible approach)
 export function validateAllTagsPresent(lines: string[], tags: string[]): {
   valid: boolean;
   issues: string[];
@@ -169,6 +169,17 @@ export function validateAllTagsPresent(lines: string[], tags: string[]): {
   const issues: string[] = [];
   const missingTags: string[][] = [];
   
+  // Check that each tag appears at least once across all lines
+  const allLinesText = lines.join(' ').toLowerCase();
+  const globallyMissingTags: string[] = [];
+  
+  for (const tag of tags) {
+    if (!allLinesText.includes(tag.toLowerCase())) {
+      globallyMissingTags.push(tag);
+    }
+  }
+  
+  // Track per-line missing tags for audit purposes
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].toLowerCase();
     const lineMissing: string[] = [];
@@ -178,15 +189,16 @@ export function validateAllTagsPresent(lines: string[], tags: string[]): {
         lineMissing.push(tag);
       }
     }
-    
     missingTags.push(lineMissing);
-    if (lineMissing.length > 0) {
-      issues.push(`Line ${i + 1}: Missing tags: ${lineMissing.join(', ')}`);
-    }
+  }
+  
+  // Only fail if tags are globally missing across all lines
+  if (globallyMissingTags.length > 0) {
+    issues.push(`Missing tags across all lines: ${globallyMissingTags.join(', ')}`);
   }
   
   return {
-    valid: issues.length === 0,
+    valid: globallyMissingTags.length === 0,
     issues,
     missingTags
   };

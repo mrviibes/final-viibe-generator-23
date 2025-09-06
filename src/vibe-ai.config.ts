@@ -664,16 +664,13 @@ export function postProcessLine(
     };
   }
 
-  // Universal Contract: Check all tags are present (case-insensitive)
+  // Tag check: Allow partial coverage (no longer blocking)
   if (tags && tags.length > 0) {
     const cleanedLower = cleaned.toLowerCase();
     const missingTags = tags.filter(tag => !cleanedLower.includes(tag.toLowerCase()));
     if (missingTags.length > 0) {
-      return {
-        line: cleaned,
-        blocked: true,
-        reason: `Universal Contract violation: Missing required tags: ${missingTags.join(', ')}`
-      };
+      // Log but don't block - allow partial tag coverage
+      console.log(`Tag coverage info: Missing tags in line "${cleaned}": ${missingTags.join(', ')}`);
     }
   }
 
@@ -1642,7 +1639,7 @@ Return only: {"lines":["joke1\\nwith\\nnewlines","joke2\\nwith\\nnewlines","joke
   }
 
   const tagRequirement = inputs.tags && inputs.tags.length > 0 
-    ? `\n• UNIVERSAL CONTRACT RULE: Every single line must include ALL of these words/phrases: ${inputs.tags.join(', ')}. No exceptions. Case-insensitive matching is fine.`
+    ? `\n• TAG GUIDANCE: Across the 4 options, cover all tags at least once: ${inputs.tags.join(', ')}. Each option may include one or more tags. If tags don't fit naturally, skip them. Case-insensitive matching is fine.`
     : '';
 
   // Universal Contract 4-lane system enforcement

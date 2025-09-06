@@ -719,7 +719,7 @@ export async function generateCandidates(inputs: VibeInputs, n: number = 4): Pro
       }
       picked = finalCandidates[0];
       usedFallback = false;
-      reason = 'Used model output with partial tag coverage';
+      reason = validCandidates.length < candidateResults.length ? 'Used model output with partial tag coverage' : 'Used model output';
     } else {
       // Genuine blocks (banned words, etc.) - use validated tone-specific phrases
       const phraseCandidatesList = phraseCandidates(inputs.tone, inputs.tags);

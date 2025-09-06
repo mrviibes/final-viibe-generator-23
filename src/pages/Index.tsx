@@ -4775,6 +4775,13 @@ const Index = () => {
         });
       }
       
+      // Check for smart fallback usage
+      if (vibeResult.audit.usedFallback && vibeResult.audit.reason) {
+        sonnerToast.info("Used smart fallback", {
+          description: vibeResult.audit.reason
+        });
+      }
+      
       // Show spelling filter notification if options were filtered for quality
       if (vibeResult.audit.spellingFiltered && vibeResult.audit.spellingFiltered > 0) {
         console.log(`📝 Filtered ${vibeResult.audit.spellingFiltered} options for spelling quality`);
