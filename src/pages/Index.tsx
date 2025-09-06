@@ -4756,6 +4756,12 @@ const Index = () => {
       // Filter out visual-only tags for text generation
       // Only use the original text tags, not subject tags or visual-only tags
       let finalTagsForGeneration = [...tags]; // Only use text tags, not subjectTags
+      
+      // FORCE SUBCATEGORY AS TAG: Ensure subcategory word appears in every line
+      const topicTag = (subcategory || "").toLowerCase();
+      if (topicTag && topicTag !== "general" && topicTag !== "") {
+        finalTagsForGeneration = Array.from(new Set([topicTag, ...finalTagsForGeneration]));
+      }
 
       console.log('📋 Final parameters for text generation:', {
         category,
