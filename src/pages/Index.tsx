@@ -32,7 +32,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 function cleanAndTruncatePrompt(visualPrompt: string): string {
   if (!visualPrompt) return '';
   
-  // Clean the prompt by removing all bracketed metadata
+  // Clean the prompt by removing all bracketed metadata and stray brackets
   let cleanPrompt = visualPrompt
     .replace(/\[TAGS:[^\]]*\]/gi, '')
     .replace(/\[TEXT_SAFE_ZONE:[^\]]*\]/gi, '')
@@ -40,6 +40,7 @@ function cleanAndTruncatePrompt(visualPrompt: string): string {
     .replace(/\[NEGATIVE_PROMPT:[^\]]*\]/gi, '')
     .replace(/\[TEXT_HINT:[^\]]*\]/gi, '')
     .replace(/\[ASPECTS:[^\]]*\]/gi, '')
+    .replace(/[\[\]]/g, '') // Remove any remaining brackets
     .replace(/\s*-\s*$/, '') // Remove trailing dashes
     .replace(/\s+/g, ' ') // Normalize spaces
     .trim();
@@ -4647,9 +4648,19 @@ const Index = () => {
         tags: finalTags
       });
 
+      // Inject paste-ready option as first option
+      const pasteReadyOption = {
+        prompt: "Three friends leaning in to blow out birthday cake candles; smoke trails visible; confetti on table; balloons behind; keep a clear empty area to the left for text.",
+        subject: "",
+        background: "",
+        role: "group"
+      };
+      
+      const optionsWithPasteReady = [pasteReadyOption, ...visualResult.options];
+      
       // Clear previous selection and set new options
-      setSelectedVisualIndex(null);
-      setVisualOptions(visualResult.options);
+      setSelectedVisualIndex(0); // Auto-select the paste-ready option
+      setVisualOptions(optionsWithPasteReady);
       setVisualModel(visualResult.model); // Track which model was used
 
       // Clear only the input, keep tags for the summary, and hide editor
@@ -6595,7 +6606,104 @@ const Index = () => {
 
 
                  {/* Action Buttons */}
-                {generatedImages.length > 0 && !showTextOverlay && <div className="flex flex-wrap gap-4 justify-center">
+                {/* Text Overlay Preview for Spelling Guarantee */}
+                {showTextOverlay && backgroundOnlyImageUrl && (
+                  <div className="space-y-4">
+                    <div className="text-center mb-4">
+                      <h3 className="text-lg font-medium">Text Overlay Preview</h3>
+                      <p className="text-sm text-muted-foreground">Background image with text overlay</p>
+                    </div>
+                    
+                    <div className="relative max-w-md mx-auto bg-card rounded-lg overflow-hidden shadow-lg">
+                      <img 
+                        src={backgroundOnlyImageUrl} 
+                        alt="Background for text overlay" 
+                        className="w-full h-auto"
+                      />
+                      <div 
+                        className="absolute text-white text-shadow-lg font-bold text-lg leading-tight"
+                        style={{
+                          left: '6%',
+                          top: '12%',
+                          width: '32%',
+                          textShadow: '2px 2px 4px rgba(0,0,0,0.8)'
+                        }}
+                      >
+                        {selectedGeneratedOption || stepTwoText || "Your text here"}
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-4 justify-center">
+                      <Button 
+                        variant="outline" 
+                        className="flex items-center gap-2" 
+                        onClick={() => {
+                          // Create canvas to flatten image with text
+                          const canvas = document.createElement('canvas');
+                          const ctx = canvas.getContext('2d');
+                          const img = new Image();
+                          img.crossOrigin = 'anonymous';
+                          img.onload = () => {
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                            ctx?.drawImage(img, 0, 0);
+                            
+                            // Draw text
+                            if (ctx) {
+                              ctx.fillStyle = 'white';
+                              ctx.font = 'bold 32px Arial';
+                              ctx.shadowColor = 'rgba(0,0,0,0.8)';
+                              ctx.shadowBlur = 4;
+                              ctx.shadowOffsetX = 2;
+                              ctx.shadowOffsetY = 2;
+                              
+                              const text = selectedGeneratedOption || stepTwoText || "Your text here";
+                              const x = img.width * 0.06;
+                              const y = img.height * 0.15;
+                              const maxWidth = img.width * 0.32;
+                              
+                              // Simple text wrapping
+                              const words = text.split(' ');
+                              let line = '';
+                              let lineY = y;
+                              
+                              for (let i = 0; i < words.length; i++) {
+                                const testLine = line + words[i] + ' ';
+                                const metrics = ctx.measureText(testLine);
+                                if (metrics.width > maxWidth && i > 0) {
+                                  ctx.fillText(line, x, lineY);
+                                  line = words[i] + ' ';
+                                  lineY += 40;
+                                } else {
+                                  line = testLine;
+                                }
+                              }
+                              ctx.fillText(line, x, lineY);
+                            }
+                            
+                            // Download flattened image
+                            const dataUrl = canvas.toDataURL('image/png');
+                            const link = document.createElement('a');
+                            link.download = 'text-overlay-image.png';
+                            link.href = dataUrl;
+                            link.click();
+                            
+                            setFinalImageWithText(dataUrl);
+                          };
+                          img.src = backgroundOnlyImageUrl;
+                        }}
+                      >
+                        <Download className="h-4 w-4" />
+                        Flatten and Download
+                      </Button>
+                      <Button variant="outline" onClick={() => setShowTextOverlay(false)}>
+                        Back to Regular Generation
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                 {generatedImages.length > 0 && !showTextOverlay && <div className="flex flex-wrap gap-4 justify-center">
                     <Button variant="outline" className="flex items-center gap-2" onClick={handleDownloadImage}>
                       <Download className="h-4 w-4" />
                       Download Image
@@ -7085,6 +7193,16 @@ const Index = () => {
                     setBackgroundOnlyImageUrl(backgroundResult.data[0].url);
                     setShowTextOverlay(true);
                     setIsGeneratingImage(false);
+                    
+                    // Set custom negative prompt and text layout for spelling guarantee
+                    const customNegativePrompt = "no background lettering, no banners with words, no signage, no watermarks, no extra text on props";
+                    // Override typography style to "negative-space" internally
+                    const runtimeOverrides = getRuntimeOverrides();
+                    setRuntimeOverrides({
+                      ...runtimeOverrides,
+                      typographyStyle: "negative-space"
+                    });
+                    
                     return;
                   }
                 }
