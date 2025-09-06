@@ -69,11 +69,11 @@ const IMAGERY: Record<string, Record<string, string[]>> = {
     "Celebration (Generic)": ["streamers","ribbons","festive lights","confetti","gift wrap","bows"]
   },
   "Sports": {
-    "Basketball": ["indoor court","hoop","net","sneakers","scoreboard"],
-    "Football (American)": ["stadium lights","goalposts","helmet","turf"],
-    "Soccer": ["pitch","goal net","cleats","crowd"],
-    "Baseball": ["diamond","bat and glove","scoreboard","bullpen"],
-    "Hockey": ["ice rink","sticks","goal crease","arena lights"],
+    "Basketball": ["basketball court","basketball hoop","basketball","sneakers","scoreboard","arena","players dribbling","team huddle","basketball practice","indoor gym"],
+    "Football (American)": ["football field","goalposts","football helmet","turf","stadium lights","players tackling","touchdown","football practice","sideline"],
+    "Soccer": ["soccer field","soccer goal","soccer ball","cleats","crowd","pitch","players kicking","soccer practice","penalty box"],
+    "Baseball": ["baseball diamond","baseball bat","baseball glove","scoreboard","bullpen","pitcher's mound","baseball practice","dugout","home plate"],
+    "Hockey": ["ice rink","hockey sticks","hockey puck","goal crease","arena lights","hockey helmet","skates","hockey practice","face-off circle","penalty box"],
     "Tennis": ["baseline","racket","net","fresh court"],
     "Golf": ["green","flagstick","fairway","sunrise mist"],
     "Volleyball": ["sand court","net","jump serve","waves"],
@@ -140,6 +140,16 @@ const SUBCATEGORY_KEYWORDS: Record<string, string[]> = {
   "Valentine's Day": ["valentine", "heart", "roses", "cupid", "romantic"],
   "Birthday": ["birthday", "cake", "candles", "balloons", "party", "bday"],
   "Anniversary": ["anniversary", "years together", "milestone"],
+  "Basketball": ["basketball", "court", "hoop", "dribble", "practice", "team", "arena"],
+  "Football (American)": ["football", "field", "helmet", "practice", "team", "stadium"],
+  "Soccer": ["soccer", "ball", "goal", "field", "practice", "team", "pitch"],
+  "Baseball": ["baseball", "bat", "glove", "practice", "team", "diamond"],
+  "Hockey": ["hockey", "ice", "rink", "stick", "puck", "practice", "team", "skating"],
+  "Tennis": ["tennis", "court", "racket", "practice", "serve"],
+  "Golf": ["golf", "course", "club", "practice", "tee"],
+  "Volleyball": ["volleyball", "net", "practice", "spike", "court"],
+  "Running / Track": ["running", "track", "practice", "sprint", "marathon"],
+  "Swimming": ["swimming", "pool", "practice", "stroke", "dive"],
   "Work / Office": ["work", "office", "job", "meeting", "desk"],
   "Gym / Fitness": ["gym", "workout", "fitness", "exercise", "training"]
 };
@@ -153,8 +163,16 @@ const SOLO_ACTION: Record<string, string> = {
   "Valentine's Day": "holding a heart-shaped box of chocolates",
   "Christmas": "tugging at loose tinsel on a sweater",
   "Halloween": "adjusting a costume mask",
-  "Basketball": "dribbling toward the hoop",
-  "Soccer": "tying cleats at the sideline",
+  "Basketball": "dribbling a basketball toward the hoop",
+  "Football (American)": "throwing a football in practice gear",
+  "Soccer": "kicking a soccer ball on the field",
+  "Baseball": "swinging a baseball bat at practice",
+  "Hockey": "skating with a hockey stick and helmet on ice",
+  "Tennis": "serving a tennis ball with racket",
+  "Golf": "teeing up a golf ball on the course",
+  "Volleyball": "spiking a volleyball at the net",
+  "Running / Track": "sprinting on the track wearing running gear",
+  "Swimming": "diving into the pool with goggles",
   "Work / Office": "typing on a laptop near a sunlit window",
   "_default": "interacting with the key props"
 };
@@ -189,13 +207,22 @@ function stylePhrases(style: string): string[] {
   return uniq([...s.phrases, ...s.camera]);
 }
 
-function negativeFor(style: string): string {
+function negativeFor(style: string, category?: string): string {
   const s = STYLE_DESCRIPTORS[style] || STYLE_DESCRIPTORS["Realistic"];
-  return [
+  const baseNegative = [
     ...s.negative,
     "background lettering",
     "banners with words"
-  ].join(", ");
+  ];
+  
+  // Add category-specific negatives to prevent cross-contamination
+  if (category === "Sports") {
+    baseNegative.push("laptop", "desk", "coffee mug", "office", "computer", "meeting room", "workplace", "cubicle");
+  } else if (category === "Daily Life" && style === "Work / Office") {
+    baseNegative.push("sports equipment", "hockey stick", "basketball", "football", "soccer ball");
+  }
+  
+  return baseNegative.join(", ");
 }
 
 function sentence(parts: string[]): string {
@@ -267,6 +294,8 @@ function inferOccasion(text: string, tags: string[]): { category: string, subcat
       // Determine appropriate category based on subcategory
       if (["Christmas", "Halloween", "Wedding", "Graduation", "Baby shower / New baby", "Valentine's Day", "Birthday", "Anniversary"].includes(subcategory)) {
         return { category: "Celebrations", subcategory };
+      } else if (["Basketball", "Football (American)", "Soccer", "Baseball", "Hockey", "Tennis", "Golf", "Volleyball", "Running / Track", "Swimming"].includes(subcategory)) {
+        return { category: "Sports", subcategory };
       } else if (["Work / Office", "Gym / Fitness"].includes(subcategory)) {
         return { category: "Daily Life", subcategory };
       }
@@ -343,7 +372,7 @@ export function generateVisualPrompts(inputs: VisualPromptInputs): VisualPromptO
     `Single person ${soloAction}`,
     `surrounded by ${join(pickN(objects, 3))}`,
     `${tone.light}; ${tone.mood}`,
-    `[NEGATIVE_PROMPT: ${negativeFor(style)}, no idle posed subject]`
+    `[NEGATIVE_PROMPT: ${negativeFor(style, category)}, no idle posed subject]`
   ]));
 
   // Lane 4: CREATIVE (symbolic / abstract / collage)

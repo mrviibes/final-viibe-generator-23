@@ -15,16 +15,16 @@ const IMAGERY_ELEMENTS: Record<string, Record<string, string[]>> = {
     "celebration (generic)": ["streamers", "ribbons", "festive lights", "confetti", "gift wrap", "bows"]
   },
   "sports": {
-    "basketball": ["basketball court", "basketball hoop", "player dribbling", "crowd cheering", "arena"],
-    "football": ["football field", "players", "stadium", "touchdown", "crowd"],
-    "soccer": ["soccer field", "goal", "players", "ball", "stadium"],
-    "baseball": ["baseball diamond", "bat", "glove", "stadium", "crowd"],
-    "hockey": ["ice rink", "hockey stick", "puck", "players", "arena"],
-    "tennis": ["tennis court", "racket", "ball", "net", "players"],
-    "golf": ["golf course", "golf club", "ball", "green", "flag"],
-    "volleyball": ["volleyball court", "net", "players", "beach", "sand"],
-    "running": ["track", "runner", "finish line", "stadium", "competition"],
-    "swimming": ["pool", "swimmer", "lanes", "water", "competition"]
+    "basketball": ["basketball court", "basketball hoop", "basketball", "player dribbling", "crowd cheering", "arena", "team huddle", "scoreboard", "sneakers", "practice"],
+    "football": ["football field", "football", "players", "stadium", "touchdown", "crowd", "helmet", "goalposts", "practice", "sideline"],
+    "soccer": ["soccer field", "soccer goal", "soccer ball", "players", "stadium", "cleats", "practice", "pitch", "penalty box"],
+    "baseball": ["baseball diamond", "baseball bat", "baseball glove", "stadium", "crowd", "pitcher's mound", "home plate", "practice", "dugout"],
+    "hockey": ["ice rink", "hockey stick", "hockey puck", "hockey players", "arena", "hockey helmet", "skates", "practice", "face-off", "goal crease"],
+    "tennis": ["tennis court", "tennis racket", "tennis ball", "net", "players", "practice", "serve", "baseline"],
+    "golf": ["golf course", "golf club", "golf ball", "green", "flag", "practice", "tee", "fairway"],
+    "volleyball": ["volleyball court", "volleyball net", "volleyball", "players", "beach", "sand", "practice", "spike"],
+    "running": ["track", "runner", "finish line", "stadium", "competition", "practice", "sprint", "marathon"],
+    "swimming": ["pool", "swimmer", "lanes", "water", "competition", "practice", "goggles", "stroke"]
   },
   "daily life": {
     "work": ["office", "desk", "computer", "meeting", "workplace"],

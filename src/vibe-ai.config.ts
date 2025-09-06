@@ -1494,7 +1494,7 @@ export const isTemperatureSupported = (modelId: string): boolean => {
 
 // Generate contextual negative prompts to prevent off-topic content
 export function getContextualBans(inputs: any): string[] {
-  const { finalLine, subcategory, tags = [] } = inputs;
+  const { finalLine, subcategory, tags = [], category } = inputs;
   const bans: string[] = [];
   
   // Core opposite/ambiguous bans
@@ -1522,13 +1522,20 @@ export function getContextualBans(inputs: any): string[] {
     }
   }
   
+  // Category-level bans to prevent cross-contamination
+  if (category === 'Sports' || category === 'sports') {
+    bans.push('laptop', 'desk', 'office', 'computer', 'meeting', 'workplace', 'cubicle', 'coffee mug', 'notebook', 'pen', 'paperwork', 'conference room', 'email', 'document');
+  }
+  
   // Subcategory-specific bans
   if (subcategory) {
     const lowerSub = subcategory.toLowerCase();
     if (lowerSub.includes('hockey')) {
-      bans.push('basketball', 'soccer ball', 'football');
+      bans.push('basketball', 'soccer ball', 'football', 'laptop', 'desk', 'office', 'computer', 'coffee', 'meeting', 'workplace', 'notebook', 'pen', 'paperwork');
     } else if (lowerSub.includes('basketball')) {
-      bans.push('hockey stick', 'puck', 'soccer ball', 'football');
+      bans.push('hockey stick', 'puck', 'soccer ball', 'football', 'laptop', 'desk', 'office', 'computer', 'coffee', 'meeting', 'workplace', 'notebook', 'pen', 'paperwork');
+    } else if (lowerSub.includes('work') || lowerSub.includes('office')) {
+      bans.push('basketball', 'football', 'hockey stick', 'soccer ball', 'sports equipment', 'arena', 'court', 'field', 'rink');
     }
   }
   
