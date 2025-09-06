@@ -293,8 +293,8 @@ export function getSmartFallbackChain(userModel: string, type: 'text' | 'visual'
 export function getEffectiveConfig() {
   const overrides = getRuntimeOverrides();
   
-  // Force GPT-4.1 for any saved override to ensure consistency
-  const forcedModel = 'gpt-4.1-2025-04-14';
+  // Force GPT-5 flagship for best performance
+  const forcedModel = 'gpt-5-2025-08-07';
   
   return {
     ...AI_CONFIG,
@@ -308,12 +308,12 @@ export function getEffectiveConfig() {
     },
     generation: {
       ...AI_CONFIG.generation,
-      model: forcedModel, // Always use GPT-4.1
+      model: forcedModel, // Always use GPT-5 flagship
       temperature: overrides.temperature ?? AI_CONFIG.generation.temperature
     },
     visual_generation: {
       ...AI_CONFIG.visual_generation,
-      model: forcedModel, // Always use GPT-4.1
+      model: forcedModel, // Always use GPT-5 flagship
       max_tokens: overrides.fastVisualsEnabled ? AI_CONFIG.visual_generation.fast_max_tokens : AI_CONFIG.visual_generation.max_tokens
     }
   };
