@@ -203,7 +203,6 @@ export async function generateLaneStrictCandidates(inputs: VibeInputs): Promise<
     reason: index === 0 ? 'Tag-injected fallback (validation failed)' : 'Fallback variant'
   }));
 }
-}
 
 // Interfaces now imported from centralized config
 
