@@ -10,44 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { llmClient } from "@/ai/llm";
 import { buildTextLinesMessages, buildVisualMessages } from "@/ai/prompts";
-
-// Step 1: Category Context
-interface CategoryContext {
-  category: string;
-  subcategory: string;
-  entity?: string;
-  contextId: string;
-}
-
-// Step 2: Text Configuration
-interface TextConfig {
-  tone: string;
-  layout: string;
-  textOption: 'ai' | 'manual' | 'none';
-  tags: string[];
-  manualText?: string;
-}
-
-// Step 3: Visual Configuration
-interface VisualConfig {
-  visualStyle: string;
-  subjectOption: 'ai' | 'upload' | 'none';
-  visualTags: string[];
-  dimensions: string;
-}
-
-// Step 4: Final Render
-interface FinalPayload {
-  textContent?: string;
-  textLayoutSpec?: any;
-  visualStyle: string;
-  visualPrompt?: string;
-  negativePrompt?: string;
-  dimensions: string;
-  contextId: string;
-  tone: string;
-  tags: string[];
-}
+import { 
+  CATEGORIES, SUBCATEGORIES_BY_CATEGORY, TONE_OPTIONS, 
+  LAYOUT_OPTIONS, VISUAL_STYLES, DIMENSION_OPTIONS,
+  updateContextId, LAYOUT_SPECS, getCategoryNegativePrompt,
+  type CategoryContext, type TextConfig, type VisualConfig, type FinalPayload 
+} from "@/ai/viibeSpec";
 
 export default function AiScratchpad() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -84,28 +52,6 @@ export default function AiScratchpad() {
   const [visualResults, setVisualResults] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
-
-  // Constants
-  const categories = ["Celebrations", "Sports", "Daily Life", "Vibes & Punchlines", "Pop Culture"];
-  const subcategoriesByCategory = {
-    "Celebrations": ["Birthday Party", "Wedding", "Graduation", "Anniversary"],
-    "Sports": ["Hockey", "Football", "Basketball", "Soccer"],
-    "Daily Life": ["Work", "Home", "Travel", "Food"],
-    "Vibes & Punchlines": ["Funny", "Motivational", "Sarcastic"],
-    "Pop Culture": ["Celebrities", "Movies", "Music", "TV Shows"]
-  };
-  
-  const toneOptions = ["Humorous", "Savage", "Sentimental", "Nostalgic", "Romantic", "Inspirational", "Playful", "Serious"];
-  const layoutOptions = ["negativeSpace", "memeTopBottom", "lowerThird", "sideBarLeft", "badgeSticker", "subtleCaption"];
-  const visualStyles = ["realistic", "caricature", "anime", "3dAnimated", "illustrated", "popArt"];
-  const dimensionOptions = ["square", "landscape", "portrait", "custom"];
-
-  // Update context ID when category/subcategory changes
-  const updateContextId = (category: string, subcategory: string, entity?: string) => {
-    const parts = [category.toLowerCase().replace(/\s+/g, ''), subcategory.toLowerCase().replace(/\s+/g, '')];
-    if (entity) parts.push(entity.toLowerCase().replace(/\s+/g, ''));
-    return parts.join('.');
-  };
 
   const generateTextLines = async () => {
     setLoading(true);
@@ -168,10 +114,15 @@ export default function AiScratchpad() {
   };
 
   const buildFinalPayload = () => {
+    const negativePrompt = getCategoryNegativePrompt(categoryContext.category);
+    const layoutSpec = LAYOUT_SPECS[textConfig.layout];
+    
     const payload: FinalPayload = {
       textContent: textConfig.textOption === 'manual' ? textConfig.manualText : textResults[0],
+      textLayoutSpec: layoutSpec,
       visualStyle: visualConfig.visualStyle,
       visualPrompt: visualResults[0],
+      negativePrompt,
       dimensions: visualConfig.dimensions,
       contextId: categoryContext.contextId,
       tone: textConfig.tone,
@@ -222,7 +173,7 @@ export default function AiScratchpad() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {categories.map(cat => (
+                          {CATEGORIES.map(cat => (
                             <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                           ))}
                         </SelectContent>
@@ -241,7 +192,7 @@ export default function AiScratchpad() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {subcategoriesByCategory[categoryContext.category]?.map(sub => (
+                          {SUBCATEGORIES_BY_CATEGORY[categoryContext.category]?.map(sub => (
                             <SelectItem key={sub} value={sub}>{sub}</SelectItem>
                           ))}
                         </SelectContent>
@@ -282,7 +233,7 @@ export default function AiScratchpad() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {toneOptions.map(tone => (
+                          {TONE_OPTIONS.map(tone => (
                             <SelectItem key={tone} value={tone}>{tone}</SelectItem>
                           ))}
                         </SelectContent>
@@ -295,7 +246,7 @@ export default function AiScratchpad() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {layoutOptions.map(layout => (
+                          {LAYOUT_OPTIONS.map(layout => (
                             <SelectItem key={layout} value={layout}>{layout}</SelectItem>
                           ))}
                         </SelectContent>
@@ -361,7 +312,7 @@ export default function AiScratchpad() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {visualStyles.map(style => (
+                          {VISUAL_STYLES.map(style => (
                             <SelectItem key={style} value={style}>{style}</SelectItem>
                           ))}
                         </SelectContent>
@@ -387,7 +338,7 @@ export default function AiScratchpad() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {dimensionOptions.map(dim => (
+                          {DIMENSION_OPTIONS.map(dim => (
                             <SelectItem key={dim} value={dim}>{dim}</SelectItem>
                           ))}
                         </SelectContent>

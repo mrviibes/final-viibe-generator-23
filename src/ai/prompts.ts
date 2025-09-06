@@ -18,25 +18,29 @@ export interface ChatMessage {
  * Build messages for generating text lines/phrases
  */
 export function buildTextLinesMessages(inputs: AiInputs): ChatMessage[] {
-  const { category, subcategory, tone, tags = [] } = inputs;
-  
-  const systemPrompt = `You are a creative text generator that creates short, catchy phrases for ${category} events.
-Focus on ${tone} tone and ${subcategory} context.
-Generate exactly 4 unique, creative lines that are:
-- Short and memorable (2-8 words)
-- Appropriate for ${tone} tone
-- Relevant to ${subcategory}
-- Engaging and fun
+  const systemPrompt = `You are a witty content generator that creates 4 distinct one-liners following specific lanes.
 
-Return ONLY a JSON array of 4 strings, nothing else.`;
+LANES STRUCTURE:
+- Platform (~50 chars): Reference the context/setting
+- Audience (~70 chars): Speak to who this resonates with  
+- Skill (~90 chars): Highlight abilities or actions
+- Absurdity (≤100 chars): Push boundaries with unexpected twists
 
-  const userPrompt = `Generate 4 creative text lines for:
-Category: ${category}
-Subcategory: ${subcategory}
-Tone: ${tone}
-${tags.length > 0 ? `Tags: ${tags.join(', ')}` : ''}
+TONE: ${inputs.tone}
+${getToneInstructions(inputs.tone)}
 
-Return as JSON array of strings.`;
+RULES:
+- All tags must appear in EVERY line: ${inputs.tags?.join(', ') || 'none'}
+- Use only commas, periods, colons (NO em-dash or --)
+- Each lane must be unique in approach
+- Return array of 4 strings: [platform, audience, skill, absurdity]`;
+
+  const userPrompt = `Generate 4 one-liners for: ${inputs.category} → ${inputs.subcategory}
+
+Tags to include: ${inputs.tags?.join(', ') || 'none'}
+Tone: ${inputs.tone}
+
+Return as JSON array of 4 strings following the lane structure.`;
 
   return [
     { role: 'system', content: systemPrompt },
@@ -48,28 +52,30 @@ Return as JSON array of strings.`;
  * Build messages for generating visual prompts
  */
 export function buildVisualMessages(inputs: AiInputs): ChatMessage[] {
-  const { category, subcategory, tone, visualStyle = 'Realistic', visualTags = [] } = inputs;
-  
-  const systemPrompt = `You are a visual prompt generator for image generation.
-Create detailed, specific prompts for ${visualStyle} style images.
-Focus on ${tone} mood and ${subcategory} themes.
+  const systemPrompt = `You are a visual prompt generator that creates 4 distinct image prompts following specific lanes.
 
-Generate exactly 4 unique visual prompts that are:
-- Detailed and specific
-- Appropriate for ${visualStyle} style
-- Capturing ${tone} mood
-- Relevant to ${subcategory}
+LANES STRUCTURE:
+- Objects: Props/environment only (NO people)
+- Group: Multiple people with candid gestures  
+- Solo: One person doing a specific action (verb required)
+- Creative: Symbolic/abstract composition
 
-Return ONLY a JSON array of 4 prompt strings, nothing else.`;
+RULES:
+- All tags must appear in every lane: ${inputs.visualTags?.join(', ') || 'none'}
+- Objects lane: NO people words allowed
+- Group lane: Must mention multiple people
+- Solo lane: Must include one person + action verb
+- Creative lane: Must say "symbolic" or "abstract"
+- Keep prompts ≤300 chars each
+- Do NOT include style words (${inputs.visualStyle}, etc.)
+- Return array of 4 strings: [objects, group, solo, creative]`;
 
-  const userPrompt = `Generate 4 visual prompts for:
-Category: ${category}
-Subcategory: ${subcategory}
-Tone: ${tone}
-Style: ${visualStyle}
-${visualTags.length > 0 ? `Visual Tags: ${visualTags.join(', ')}` : ''}
+  const userPrompt = `Generate 4 visual prompts for: ${inputs.category} → ${inputs.subcategory}
 
-Return as JSON array of prompt strings.`;
+Visual tags: ${inputs.visualTags?.join(', ') || 'none'}
+Style: ${inputs.visualStyle} (don't include in prompts)
+
+Return as JSON array of 4 strings following the lane structure.`;
 
   return [
     { role: 'system', content: systemPrompt },
@@ -88,4 +94,19 @@ export function buildGenericJSONMessages(
     { role: 'system', content: systemPrompt },
     { role: 'user', content: userPrompt }
   ];
+}
+
+// Helper function for tone instructions
+function getToneInstructions(tone: string): string {
+  const instructions = {
+    "Humorous": "Use light puns and exaggeration. Keep it fun and accessible.",
+    "Savage": "Bold wit and roasts. Push boundaries but stay clever.",
+    "Sentimental": "Heartfelt and warm. Focus on emotional connections.",
+    "Nostalgic": "Wistful, retro callbacks. Reference past eras fondly.",
+    "Romantic": "Affectionate and dreamy. Focus on love and connection.",
+    "Inspirational": "Uplifting and motivational. Encourage and empower.",
+    "Playful": "Cheeky and mischievous. Light teasing and fun.",
+    "Serious": "Factual and respectful. Maintain dignity and accuracy."
+  };
+  return instructions[tone] || "Maintain appropriate tone for the context.";
 }
