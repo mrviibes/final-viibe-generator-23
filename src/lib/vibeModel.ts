@@ -143,65 +143,8 @@ export async function generateLaneStrictCandidates(inputs: VibeInputs): Promise<
       
       // Use tag-injected fallback that guarantees all tags in every line
       return buildTagInjectedFallbacks(inputs);
-  }
-}
-
-
-  const { tone, category, subcategory, tags } = inputs;
-  const tagsText = tags?.join(', ') || '';
-  
-  console.log(`🔧 Building tag-injected fallbacks for ${category}/${subcategory} with tags: ${tagsText}`);
-  
-  // Target lengths: ~50, ~70, ~90, <=100
-  const templates = [
-    // Lane 1: Platform (~50 chars)
-    `${tagsText} brings the energy.`,
-    // Lane 2: Audience (~70 chars) 
-    `Everyone watching ${tagsText} knows what's coming next.`,
-    // Lane 3: Skill (~90 chars)
-    `The skill of handling ${tagsText} perfectly shows true ${tone} mastery every time.`,
-    // Lane 4: Absurdity (<=100 chars)
-    `When ${tagsText} gets chaotic, that's when the real ${tone} magic happens in ${category}.`
-  ];
-  
-  // Clean up templates and inject tags more naturally
-  const lines = templates.map((template, index) => {
-    let line = template;
-    
-    // Ensure all tags are present, vary their placement
-    tags?.forEach((tag, tagIndex) => {
-      if (!line.toLowerCase().includes(tag.toLowerCase())) {
-        // Inject tag at different positions per line
-        const position = (index + tagIndex) % 3;
-        if (position === 0) {
-          line = `${tag} ${line}`;
-        } else if (position === 1) {
-          const words = line.split(' ');
-          const midPoint = Math.floor(words.length / 2);
-          words.splice(midPoint, 0, tag);
-          line = words.join(' ');
-        } else {
-          line = `${line} ${tag}`;
-        }
-      }
-    });
-    
-    // Ensure punctuation compliance (commas, periods, colons only)
-    line = line.replace(/--+/g, ',').replace(/[—–]/g, ',').replace(/;/g, ',');
-    
-    // Ensure length limits
-    if (line.length > 100) {
-      line = line.substring(0, 97) + '...';
     }
-    
-    return line.trim();
-  });
-  
-  return lines.map((line, index) => ({
-    line,
-    blocked: true,
-    reason: index === 0 ? 'Tag-injected fallback (validation failed)' : 'Fallback variant'
-  }));
+  }
 }
 
 // Interfaces now imported from centralized config
