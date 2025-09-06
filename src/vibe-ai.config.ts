@@ -310,12 +310,28 @@ export function buildCompactVisualMessages(inputs: any): any[] {
   ];
 }
 
+// Build strict lane messages with forced JSON schema
+export function buildStrictLaneMessages(inputs: VibeInputs): any[] {
+  const tagsCSV = inputs.tags?.join(', ') || '';
+  
+  return [
+    {
+      role: 'system', 
+      content: 'You must output ONLY valid JSON: {"lines":[{"lane":"platform","text":"..."},{"lane":"audience","text":"..."},{"lane":"skill","text":"..."},{"lane":"absurdity","text":"..."}]} . No prose. Rules: all tags must appear in EVERY line; vary tag placement; lanes must be platform,audience,skill,absurdity (one each, in that order); tone must match; lengths ~50, ~70, ~90, <=100; punctuation only commas/periods/colons (no em-dash or --); do not invent occasions/names not in tags/category.'
+    },
+    {
+      role: 'user',
+      content: `Category: ${inputs.category}\nSubcategory: ${inputs.subcategory || 'general'}\nTone: ${inputs.tone}\nTags (must appear in every line): ${tagsCSV}\nGenerate 4 short one-liners per the rules.`
+    }
+  ];
+}
+
 // Get effective configuration with runtime overrides applied
 export function getEffectiveConfig() {
   const overrides = getRuntimeOverrides();
   
-  // Force GPT-5 flagship for best performance
-  const forcedModel = 'gpt-5-2025-08-07';
+// Force GPT-5 Mini for consistent fast performance  
+  const forcedModel = 'gpt-5-mini-2025-08-07';
   
   return {
     ...AI_CONFIG,

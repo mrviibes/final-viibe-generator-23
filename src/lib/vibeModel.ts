@@ -9,6 +9,7 @@ import {
   SYSTEM_PROMPTS,
   buildVibeGeneratorMessages,
   buildCompactVibeMessages,
+  buildStrictLaneMessages,
   getRuntimeOverrides,
   type VibeInputs,
   type VibeCandidate,
@@ -26,6 +27,77 @@ import {
 
 // Re-export types for backward compatibility
 export type { VibeCandidate, VibeResult } from '../vibe-ai.config';
+
+// Generate 4-lane strict candidates with manual retry
+export async function generateLaneStrictCandidates(inputs: VibeInputs): Promise<VibeCandidate[]> {
+  const config = getEffectiveConfig();
+  const targetModel = 'gpt-5-mini-2025-08-07'; // Force GPT-5 Mini
+  
+  console.log(`🎯 Strict lane generation with model: ${targetModel}`);
+  
+  // Build strict lane messages
+  const messages = buildStrictLaneMessages(inputs);
+  
+  // First attempt
+  try {
+    const result = await openAIService.chatJSON(messages, {
+      max_completion_tokens: 200,
+      model: targetModel
+    });
+    
+    // Parse strict lane JSON
+    const lines = result.lines || [];
+    if (!Array.isArray(lines) || lines.length !== 4) {
+      throw new Error('Invalid lane structure returned');
+    }
+    
+    // Validate lane structure
+    const expectedLanes = ['platform', 'audience', 'skill', 'absurdity'];
+    for (let i = 0; i < 4; i++) {
+      const line = lines[i];
+      if (!line.lane || !line.text || line.lane !== expectedLanes[i]) {
+        throw new Error(`Invalid lane ${i}: expected ${expectedLanes[i]}, got ${line.lane}`);
+      }
+    }
+    
+    // Convert to VibeCandidate format - use only text, ignore lane metadata
+    return lines.map((line: any) => ({
+      line: line.text,
+      blocked: false
+    }));
+    
+  } catch (error) {
+    console.warn(`🔄 First attempt failed, retrying: ${error}`);
+    
+    // Manual retry (second attempt)
+    try {
+      const retryResult = await openAIService.chatJSON(messages, {
+        max_completion_tokens: 200,
+        model: targetModel
+      });
+      
+      const retryLines = retryResult.lines || [];
+      if (Array.isArray(retryLines) && retryLines.length === 4) {
+        // Successful retry - return only text content
+        return retryLines.map((line: any) => ({
+          line: line.text || line,
+          blocked: false
+        }));
+      } else {
+        throw new Error('Retry also failed');
+      }
+    } catch (retryError) {
+      console.error(`🚨 Both attempts failed, using local fallback`);
+      
+      // Local fallback with category-aware templates
+      return getFallbackVariants(inputs.tone, inputs.category, inputs.subcategory).map((line, index) => ({
+        line,
+        blocked: true,
+        reason: index === 0 ? `Local fallback (API failed twice)` : 'Fallback variant'
+      }));
+    }
+  }
+}
 
 // Interfaces now imported from centralized config
 
@@ -445,7 +517,8 @@ function applyVarietyGuard(candidates: string[], inputs: VibeInputs): string[] {
 }
 
 export async function generateCandidates(inputs: VibeInputs, n: number = 4): Promise<VibeResult> {
-  let candidateResults = await generateMultipleCandidates(inputs);
+  // Use strict lane generation first
+  let candidateResults = await generateLaneStrictCandidates(inputs);
   let retryCount = 0;
   let usedCompact = false;
   
