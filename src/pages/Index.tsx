@@ -4793,7 +4793,7 @@ const Index = () => {
         picked: textLines[0]?.text || "",
         audit: {
           model: "gpt-4.1-mini-2025-04-14",
-          modelDisplayName: "GPT-4.1 Mini",
+          modelDisplayName: "GPT-4.1",
           textSpeed: "fast",
           usedFallback: false,
           blockedCount: 0,
