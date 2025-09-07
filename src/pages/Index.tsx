@@ -4125,6 +4125,35 @@ const Index = () => {
   const [proxySettings, setLocalProxySettings] = useState(() => getProxySettings());
   const [proxyApiKey, setProxyApiKey] = useState('');
   
+  // Reset app data function
+  const handleResetAppData = () => {
+    // Clear all localStorage data
+    const keys = [
+      'openai_api_key',
+      'ideogram_api_key', 
+      'ideogram_proxy_settings',
+      'remember_last_choices',
+      'last_selected_text_style',
+      'last_selected_text_layout', 
+      'last_selected_visual_style',
+      'last_text_model',
+      'last_visual_model',
+      'ai-runtime-overrides'
+    ];
+    
+    keys.forEach(key => localStorage.removeItem(key));
+    
+    // Clear pop culture cache (pattern based)
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('pop_culture_cache_')) {
+        localStorage.removeItem(key);
+      }
+    });
+    
+    // Note: User can manually sign out of Supabase if needed
+    
+    sonnerToast.success("All app data cleared! Refresh the page to see changes.");
+  };
 
   // Remember choices toggle and load saved choices
   const [rememberChoices, setRememberChoices] = useState<boolean>(() => {
@@ -4650,7 +4679,7 @@ const Index = () => {
           subcategoryAligned: true
         })),
         model: "gpt-4.1-mini-2025-04-14",
-        modelDisplayName: "GPT-4.1 Mini"
+        modelDisplayName: "GPT-4.1"
       };
       
       // Store negative prompt for later use in image generation
@@ -6077,12 +6106,12 @@ const Index = () => {
                           {isGenerating ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : "Regenerate"}
                         </Button>
                       </div>
-                       {generatedOptions.length > 0 && generationAudit && (
-                        <p className="text-xs text-muted-foreground">
-                           Using {generationAudit.model} • Generated in {((Date.now() - textGenerationStartTime) / 1000).toFixed(1)}s
-                           {generationAudit.usedFallback ? " • Used fallback" : ` • Received ${generationAudit.candidateCount} options`}
-                        </p>
-                      )}
+                        {generatedOptions.length > 0 && generationAudit && (
+                         <p className="text-xs text-muted-foreground">
+                            Using {generationAudit.modelDisplayName || generationAudit.model} • Generated {(Date.now() - textGenerationStartTime) < 100 ? 'instantly' : `in ${((Date.now() - textGenerationStartTime) / 1000).toFixed(1)}s`}
+                            {generationAudit.usedFallback ? " • Used fallback" : ` • Received ${generationAudit.candidateCount} options`}
+                         </p>
+                       )}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-6">
@@ -6319,12 +6348,12 @@ const Index = () => {
                                    {isGeneratingSubject ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : "Regenerate"}
                                  </Button>
                                </div>
-                              {visualOptions.length > 0 && visualModel && (
-                                <p className="text-xs text-muted-foreground mb-2">
-                                  Using {visualRecommendations?.modelDisplayName || visualModel} • Generated in {((Date.now() - visualGenerationStartTime) / 1000).toFixed(1)}s
-                                  {visualRecommendations?.errorCode && " • Used fallback"}
-                                </p>
-                              )}
+                               {visualOptions.length > 0 && visualModel && (
+                                 <p className="text-xs text-muted-foreground mb-2">
+                                   Using {visualRecommendations?.modelDisplayName || 'GPT-4.1'} • Generated {(Date.now() - visualGenerationStartTime) < 100 ? 'instantly' : `in ${((Date.now() - visualGenerationStartTime) / 1000).toFixed(1)}s`}
+                                   {visualRecommendations?.errorCode && " • Used fallback"}
+                                 </p>
+                               )}
                              {visualRecommendations?.errorCode && <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 text-xs p-2 rounded-lg mb-3 max-w-md mx-auto">
                                  {getErrorMessage(visualRecommendations?.errorCode)}
                                </div>}
@@ -6856,6 +6885,23 @@ const Index = () => {
                   </div>
                 </div>
 
+                {/* Reset App Data */}
+                <div className="mb-6 p-4 bg-destructive/5 border border-destructive/20 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-medium text-foreground mb-1">Reset App Data</h4>
+                      <p className="text-xs text-muted-foreground">Clear all stored data including API keys, preferences, and cache</p>
+                    </div>
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      onClick={handleResetAppData}
+                      className="ml-4"
+                    >
+                      Clear All Data
+                    </Button>
+                  </div>
+                </div>
 
                 {/* Generated Prompt - Compact */}
                 <div className="space-y-4">
