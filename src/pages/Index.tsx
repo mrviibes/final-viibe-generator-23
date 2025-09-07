@@ -20,6 +20,8 @@ import { useNavigate } from "react-router-dom";
 import { generateCandidates, VibeResult } from "@/lib/vibeModel";
 import { buildIdeogramHandoff } from "@/lib/ideogram";
 import { generateVisualRecommendations, VisualOption } from "@/lib/visualModel";
+import { generateTextOptions, generateVisualOptions } from "@/lib/engines/viibe_ai_engine.mjs";
+import { openaiCompat } from "@/lib/openaiCompat";
 import { generateIdeogramImage, setIdeogramApiKey, getIdeogramApiKey, hasIdeogramApiKey, isUsingBackend as ideogramIsUsingBackend, IdeogramAPIError, getProxySettings, setProxySettings, testProxyConnection, ProxySettings } from "@/lib/ideogramApi";
 import { buildIdeogramPrompt, getAspectRatioForIdeogram, getStyleTypeForIdeogram } from "@/lib/ideogramPrompt";
 import { useToast } from "@/hooks/use-toast";
@@ -4628,19 +4630,35 @@ const Index = () => {
 
       // Get final line from Step 2 if available
       const finalLine = selectedGeneratedOption || (isCustomTextConfirmed ? stepTwoText : undefined);
-      const visualResult = await generateVisualRecommendations({
+      // Use viibe AI engine for visual generation
+      const visualEngineResult = await generateVisualOptions(openaiCompat, {
         category,
         subcategory,
         tone: tone.toLowerCase(),
-        tags: finalTags,
-        visualStyle: selectedVisualStyle || undefined,
-        finalLine,
-        subjectOption: selectedSubjectOption || undefined,
-        subjectDescription: subjectDescription || undefined,
-        dimensions: selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || undefined,
-        targetSlot: targetSlot || undefined,
-        backgroundPreset: backgroundPreset || undefined
-      }, 4);
+        tags: finalTags
+      });
+      
+      // Convert to existing VisualResult format for compatibility
+      const visualResult = {
+        options: visualEngineResult.visualOptions.map(option => ({
+          subject: option.lane === 'solo' ? 'Single person' : option.lane === 'group' ? 'Multiple people' : 'No people',
+          background: option.prompt,
+          prompt: option.prompt,
+          slot: option.lane,
+          textAligned: true,
+          subcategoryAligned: true
+        })),
+        model: "gpt-4.1-mini-2025-04-14",
+        modelDisplayName: "GPT-4.1 Mini"
+      };
+      
+      // Store negative prompt for later use in image generation
+      if (visualEngineResult.negativePrompt) {
+        setGenerationAudit(prev => ({
+          ...prev,
+          negativePrompt: visualEngineResult.negativePrompt
+        }));
+      }
       console.log('🎨 Visual generation completed with result:', {
         optionsCount: visualResult.options.length,
         model: visualResult.model,
@@ -4760,13 +4778,29 @@ const Index = () => {
         console.warn('⚠️ finalTagsForGeneration is empty but original tags exist, using original tags');
         finalTagsForGeneration = [...tags];
       }
-      const vibeResult: VibeResult = await generateCandidates({
-        category: category as any,
+      // Use viibe AI engine for text generation
+      const textLines = await generateTextOptions(openaiCompat, {
+        category,
         subcategory,
-        tone: tone as any,
-        tags: finalTagsForGeneration,
-        recipient_name: selectedPick || "-"
-      }, 4);
+        tone: tone.toLowerCase(),
+        tags: finalTagsForGeneration
+      });
+      
+      // Convert to VibeResult format for compatibility
+      const vibeResult: VibeResult = {
+        candidates: textLines.map(line => line.text),
+        picked: textLines[0]?.text || "",
+        audit: {
+          model: "gpt-4.1-mini-2025-04-14",
+          modelDisplayName: "GPT-4.1 Mini",
+          textSpeed: "fast",
+          usedFallback: false,
+          blockedCount: 0,
+          candidateCount: textLines.length,
+          reason: "Generated via viibe AI engine",
+          retryAttempt: 0
+        }
+      };
 
       // Check for partial tag coverage and show notification
       if (vibeResult.audit.reason?.includes('tag coverage') || vibeResult.audit.reason?.includes('partial tag coverage')) {
@@ -6965,31 +6999,39 @@ const Index = () => {
                  const tone = selectedTextStyleObj?.name || 'Humorous';
                  const finalLine = selectedGeneratedOption || (isCustomTextConfirmed ? stepTwoText : undefined);
                  
-                   const visualResult = await generateVisualRecommendations({
-                     category,
-                     subcategory,
-                     tone: tone.toLowerCase(),
-                     tags: finalTags,
-                     visualStyle: selectedVisualStyle || undefined,
-                     finalLine,
-                     subjectOption: selectedSubjectOption || undefined,
-                     subjectDescription: subjectDescription || undefined,
-                     dimensions: selectedDimension === "custom" ? `${customWidth}x${customHeight}` : dimensionOptions.find(d => d.id === selectedDimension)?.name || undefined,
-                     targetSlot: targetSlot || undefined,
-                     backgroundPreset: backgroundPreset || undefined
-                  }, 4);
-                 
-                 setVisualRecommendations(visualResult);
-                 setIsLoadingRecommendations(false);
-                 
-                 // Now move to Step 4 (auto-generation will trigger via useEffect)
-                 setCurrentStep(4);
-               } catch (error) {
-                 console.error('Failed to generate visual recommendations:', error);
-                 setIsLoadingRecommendations(false);
-                 // Move to Step 4 anyway with fallback
-                 setCurrentStep(4);
-               }
+                    // Use viibe AI engine for visual generation
+                    const visualEngineResult = await generateVisualOptions(openaiCompat, {
+                      category,
+                      subcategory,
+                      tone: tone.toLowerCase(),
+                      tags: finalTags
+                    });
+                    
+                    // Convert to existing VisualResult format for compatibility
+                    const visualResult = {
+                      options: visualEngineResult.visualOptions.map(option => ({
+                        subject: option.lane === 'solo' ? 'Single person' : option.lane === 'group' ? 'Multiple people' : 'No people',
+                        background: option.prompt,
+                        prompt: option.prompt,
+                        slot: option.lane,
+                        textAligned: true,
+                        subcategoryAligned: true
+                      })),
+                      model: "gpt-4.1-mini-2025-04-14",
+                      modelDisplayName: "GPT-4.1 Mini"
+                     };
+                  
+                  setVisualRecommendations(visualResult);
+                  setIsLoadingRecommendations(false);
+                  
+                  // Now move to Step 4 (auto-generation will trigger via useEffect)
+                  setCurrentStep(4);
+                } catch (error) {
+                  console.error('Failed to generate visual recommendations:', error);
+                  setIsLoadingRecommendations(false);
+                  // Move to Step 4 anyway with fallback
+                  setCurrentStep(4);
+                }
                return;
              }
              
