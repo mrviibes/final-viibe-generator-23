@@ -7,6 +7,9 @@
 export const TEXT_MODEL  = "gpt-4.1-mini-2025-04-14";   // change to "gpt-4.1-2025-04-14" if you want sharper text
 export const VIS_MODEL   = "gpt-4.1-mini-2025-04-14";
 
+// ---------- CONSTANTS ----------
+const MAX = 80;
+
 // ---------- STATIC MAPS (light but useful) ----------
 const ANCHORS = {
   "celebrations.birthday": ["cake","candles","balloons","confetti","party hats","gifts"],
@@ -52,7 +55,7 @@ const PUNCT_RX = /[—–]|--/g;
 const lc = s => String(s||"").toLowerCase();
 const pick = a => a[Math.floor(Math.random()*a.length)];
 const dedupe = a => Array.from(new Set(a.filter(Boolean)));
-const clamp = s => s.replace(PUNCT_RX,":").replace(/\s+/g," ").trim().slice(0,100);
+const clamp = s => s.replace(PUNCT_RX,":").replace(/\s+/g," ").trim().slice(0,MAX);
 
 function ctxId(category, subcategory, entity){
   const c = lc(category), s = lc(subcategory), e = lc(entity||"");
@@ -86,6 +89,17 @@ function ensureTagsInEveryLine(text, tags){
   return out;
 }
 
+function humanize(txt, tags){
+  let t = txt.replace(/\s+:\s+/g,": ").replace(/\s{2,}/g," ").trim();
+  // prefer "Jesse's birthday"
+  if (/birthday/i.test(tags.join(" ")) && !/birthday/i.test(t))
+    t = t.replace(/(Jesse)/i,"$1's birthday") || `Birthday: ${t}`;
+  // attach trait neutrally
+  if (/gay/i.test(tags.join(" ")) && /Jesse/i.test(t) && !/gay/i.test(t))
+    t = t.replace(/Jesse/i,"Jesse, proudly gay");
+  return t.length > MAX ? t.slice(0,MAX).trim() : t;
+}
+
 // ---------- STEP 2: TEXT (AI) ----------
 const SYS_TEXT = `
 Return ONLY JSON:
@@ -95,14 +109,14 @@ Return ONLY JSON:
  {"lane":"skill","text":"..."},
  {"lane":"absurdity","text":"..."}
 ]}
-Rules:
-- text = user-facing one-liner; NEVER include lane names or prefixes.
-- Generate 4 lines in that order. ≤100 chars. Only commas/periods/colons.
-- ALL TAGS must appear in EVERY line.
-- Use at least one provided anchor word per line for concreteness.
-- Avoid clichés and vague platitudes.
-- Tone must guide style (Humorous/Playful light; Savage roast behavior not identity; Sentimental/Serious respectful).
-- Do not invent names/occasions not provided.
+Style rules:
+- Conversational, punchy, use contractions; no robotic fillers ("apparently", "indeed", "amazing").
+- Target lengths: ~48, ~60, ~72, ≤80.
+- NO lane words/prefixes inside text. Only commas/periods/colons (no em‑dash, no "--").
+- ALL TAGS in EVERY line, but fold them naturally: "Jesse's birthday", "Jesse, proudly gay".
+- Roast behavior/party performance, not identity. Keep "gay" neutral/positive.
+- Include at least one concrete anchor per line (from Anchors list).
+- Avoid clichés.
 `;
 
 const textUser = ({category, subcategory, tone, tags, anchors}) =>
@@ -127,6 +141,9 @@ function validateTextLines(lines, {tags, anchors}){
     if (!anchors.some(a=>txt.toLowerCase().includes(lc(a)))) return null;
     // enforce tags
     txt = ensureTagsInEveryLine(txt, tags);
+    // humanize phrasing
+    txt = humanize(txt, tags);
+    // final clamp
     txt = clamp(txt);
     return { lane: LANES[i], text: txt };
   });
@@ -166,7 +183,6 @@ export async function generateTextOptions(openai, {category, subcategory, tone, 
       model: TEXT_MODEL,
       response_format: { type: "json_object" },
       max_completion_tokens: 220,
-      temperature: 0.8,
       messages: [
         { role: "system", content: SYS_TEXT },
         { role: "user",   content: textUser({category, subcategory, tone, tags: tagsAll, anchors}) }
@@ -185,7 +201,6 @@ export async function generateTextOptions(openai, {category, subcategory, tone, 
         model: TEXT_MODEL,
         response_format: { type: "json_object" },
         max_completion_tokens: 220,
-        temperature: 0.9,
         messages: [
           { role: "system", content: SYS_TEXT },
           { role: "user",   content: textUser({category, subcategory, tone, tags: tagsAll, anchors}) + "\nBe concrete; avoid clichés strictly." }
@@ -280,7 +295,6 @@ export async function generateVisualOptions(openai, {category, subcategory, tone
       model: VIS_MODEL,
       response_format: { type: "json_object" },
       max_completion_tokens: 550,
-      temperature: 0.7,
       messages: [
         { role:"system", content: SYS_VIS },
         { role:"user",   content: visUser({category, subcategory, tone, tags: tagsAll, anchors, negatives, soloAction: soloAct}) }
