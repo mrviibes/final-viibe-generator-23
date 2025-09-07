@@ -21,6 +21,7 @@ import { generateCandidates, VibeResult } from "@/lib/vibeModel";
 import { buildIdeogramHandoff } from "@/lib/ideogram";
 import { generateVisualRecommendations, VisualOption } from "@/lib/visualModel";
 import { generateTextOptions, generateVisualOptions } from "@/lib/engines/viibe_ai_engine.mjs";
+import { generateTextOptionsHuman } from "@/lib/engines/step2_text_human.mjs";
 import { openaiCompat } from "@/lib/openaiCompat";
 import { generateIdeogramImage, setIdeogramApiKey, getIdeogramApiKey, hasIdeogramApiKey, isUsingBackend as ideogramIsUsingBackend, IdeogramAPIError, getProxySettings, setProxySettings, testProxyConnection, ProxySettings } from "@/lib/ideogramApi";
 import { buildIdeogramPrompt, getAspectRatioForIdeogram, getStyleTypeForIdeogram } from "@/lib/ideogramPrompt";
@@ -4778,8 +4779,8 @@ const Index = () => {
         console.warn('⚠️ finalTagsForGeneration is empty but original tags exist, using original tags');
         finalTagsForGeneration = [...tags];
       }
-      // Use viibe AI engine for text generation
-      const textLines = await generateTextOptions(openaiCompat, {
+      // Use deterministic human text generator for Step-2
+      const textLines = generateTextOptionsHuman({
         category,
         subcategory,
         tone: tone.toLowerCase(),
